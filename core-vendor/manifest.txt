@@ -1,0 +1,35 @@
+# JoaSuite core-vendor manifest
+#
+# Each line is a file path relative to an app repo's root. These files are
+# vendored (copied), NOT imported as part of the @joasuite/shared-ui package
+# in ../src — they don't fit the dependency-injection package pattern
+# (either because they're plain utilities with zero app-specific coupling,
+# where a real package export is future work, or because they're domain
+# business logic too tightly coupled to one app's bills/payment_requests
+# tables to cleanly factor into a DI-injectable server function yet).
+#
+# Canonical source for every file below is currently JoaBooks. Do not edit
+# these directly inside an app repo — edit the canonical app, push here,
+# then pull into every other app. See README.md for the upstream-fix
+# workflow when a non-canonical app genuinely needs a change.
+#
+# Lines starting with # and blank lines are ignored.
+
+# Plain utilities (no app-specific dependencies) — candidates to eventually
+# become real @joasuite/shared-ui package exports instead of copy-vendoring.
+src/lib/timezone.ts
+src/lib/format.ts
+src/lib/utils.ts
+src/lib/error-capture.ts
+src/lib/error-page.ts
+src/hooks/use-mobile.tsx
+src/integrations/supabase/auth-attacher.ts
+src/integrations/supabase/auth-middleware.ts
+src/lib/cron-auth.server.ts
+
+# Domain business logic (recurring / "Planned Transactions") — reconciled
+# 2026-07-06, JoaBooks version adopted as canonical for both JoaBooks and
+# JoaOffice.
+src/lib/recurring-v2.functions.ts
+src/lib/recurring-preview.ts
+src/components/recurring/RecurringForm.tsx
