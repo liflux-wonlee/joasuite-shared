@@ -31,13 +31,6 @@ vendored file, treat it like an upstream PR: change it in that app, push here,
 check it doesn't break other apps, commit, then have every app (including the
 one that changed it) pull so this repo stays the single source of truth.
 
-## Known gap — do NOT blindly sync this file
-
-`src/hooks/useIsTenantAdmin.ts` is intentionally NOT in `manifest.txt` yet.
-JoaBooks only grants UI-admin affordances to `owner`/`super_admin`; JoaOffice's
-copy also grants `admin`. This is a real behavioral difference, not drift —
-reconcile (or parameterize the allowed-roles list) before adding it here.
-
 ## Graduating a file out of core-vendor
 
 If a file here turns out to have zero app-specific coupling (pure function,

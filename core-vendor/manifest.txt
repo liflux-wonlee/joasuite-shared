@@ -23,6 +23,7 @@ src/lib/utils.ts
 src/lib/error-capture.ts
 src/lib/error-page.ts
 src/hooks/use-mobile.tsx
+src/hooks/useIsTenantAdmin.ts
 src/integrations/supabase/auth-attacher.ts
 src/integrations/supabase/auth-middleware.ts
 src/lib/cron-auth.server.ts
