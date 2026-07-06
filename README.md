@@ -2,8 +2,8 @@
 
 JoaSuite 5개 앱(JoaBooks, JoaSOP, JoaOffice, JoaApproval, JoaCRM)이 공유하는 UI, 서버 함수, i18n을 단일 패키지로 묶어 **한 번 publish → `bun update` 한 줄로 모든 앱에 동기화**되도록 만드는 패키지입니다.
 
-> **상태: Bootstrap (v0.1.0-pre.1)**
-> 이 폴더는 사용자가 새 GitHub repo (`joasuite-shared`)를 만들고 그대로 push할 수 있는 초기 스켈레톤입니다. 컴포넌트는 원본 JoaBooks 코드를 `.source.tsx` 파일로 함께 포함했고, 실제 `.tsx` export는 스텁입니다. Phase 1 refactor를 마쳐야 v0.1.0을 publish할 수 있습니다.
+> **상태: Phase 1 완료 (2026-07-06), publish 전 typecheck/build 검증 필요**
+> 모든 컴포넌트와 서버 함수 factory가 DI 패턴으로 포팅되었습니다. `.source.*` 스테이징 파일은 삭제되었습니다. 이 세션 환경에서는 사설 npm 레지스트리(403)에 막혀 `bun install`/`typecheck`/`build`를 실행하지 못했으므로, v0.1.0 태그를 찍기 전에 정상적인 환경에서 반드시 `bun install && bun run typecheck && bun run build`로 검증하세요.
 
 ---
 
@@ -16,43 +16,41 @@ joasuite-shared/
 ├── tsup.config.ts
 ├── .gitignore
 ├── README.md  ← 이 파일
+├── core-vendor/            ← DI 패키지에 맞지 않는 것들의 copy-vendoring (별도 README 참고)
 └── src/
     ├── index.ts                ← public export
-    ├── constants.ts            ✅ 완료 (AppCode, APP_DISPLAY, DEFAULT_APP_URLS, ROLES_BY_APP)
-    ├── types.ts                ✅ 완료 (Membership, AppCatalogEntry, TenantAppRow, …)
-    ├── context.tsx             ✅ 완료 (JoaSuiteProvider, useJoaSuite, UiAdapter, RouterAdapter, BoundServerFns)
-    ├── i18n-helper.ts          ✅ 완료 (mergeSharedResources, SUPPORTED_LANGUAGES)
-    ├── i18n/
-    │   ├── en.json             ✅ 완료 (JoaBooks에서 추출한 suite/people/account/bell/common/set)
-    │   ├── ko.json             ✅
-    │   ├── zh.json             ✅
-    │   ├── es.json             ✅
-    │   └── vi.json             ✅
+    ├── constants.ts            ✅ (AppCode, APP_DISPLAY, DEFAULT_APP_URLS, ROLES_BY_APP)
+    ├── types.ts                ✅ (Membership, AppCatalogEntry, TenantAppRow, …)
+    ├── context.tsx             ✅ (JoaSuiteProvider, useJoaSuite, UiAdapter, RouterAdapter, BoundServerFns)
+    ├── i18n-helper.ts          ✅ (mergeSharedResources, SUPPORTED_LANGUAGES)
+    ├── i18n/                   ✅ en/ko/zh/es/vi (JoaBooks에서 추출한 suite/people/account/bell/common/set)
     ├── components/
-    │   ├── ThemeToggle.tsx     ✅ 완료 (적응 완료)
-    │   ├── LanguageSwitcher.tsx ✅ 완료
-    │   ├── UserBadge.tsx       ⚠️ STUB → UserBadge.source.tsx 포팅 필요
-    │   ├── UserBadge.source.tsx        (JoaBooks 원본)
-    │   ├── NotificationsBell.tsx ⚠️ STUB
-    │   ├── NotificationsBell.source.tsx
-    │   ├── SuiteSwitcher.tsx   ⚠️ STUB
-    │   ├── SuiteSwitcher.source.tsx
-    │   ├── SuiteHomePage.tsx   ⚠️ STUB
-    │   ├── SuiteHomePage.source.tsx
-    │   ├── SuiteSettingsHub.tsx ⚠️ STUB
-    │   ├── SuiteSettingsHub.source.tsx
+    │   ├── ThemeToggle.tsx      ✅
+    │   ├── LanguageSwitcher.tsx ✅
+    │   ├── UserBadge.tsx        ✅ 포팅 완료 (2026-07-06)
+    │   ├── NotificationsBell.tsx ✅ 포팅 완료
+    │   ├── SuiteSwitcher.tsx    ✅ 포팅 완료
+    │   ├── SuiteHomePage.tsx    ✅ 포팅 완료
+    │   ├── SuiteSettingsHub.tsx ✅ 포팅 완료
+    │   ├── ui/                  ⚠️ 미사용 shadcn 원본 사본 — 어디서도 import 안 됨, DI 설계상 필요 없음 (정리 후보)
     │   └── people/
-    │       ├── PeopleListPage.tsx   ⚠️ STUB + .source
-    │       ├── PeopleInvitePage.tsx ⚠️ STUB + .source
-    │       └── PeopleDetailPage.tsx ⚠️ STUB + .source
+    │       ├── PeopleListPage.tsx   ✅ 포팅 완료
+    │       ├── PeopleInvitePage.tsx ✅ 포팅 완료 (ROLES_BY_APP은 이제 ../../constants에서 가져옴)
+    │       └── PeopleDetailPage.tsx ✅ 포팅 완료 (userId를 prop으로 받음, Route.useParams() 아님)
     └── server/
-        ├── index.ts                  ⚠️ 빈 placeholder (createXxx factory들 작성 필요)
-        ├── suite.functions.source.ts
-        ├── suite-home.functions.source.ts
-        ├── notifications.functions.source.ts
-        ├── account.functions.source.ts
-        └── admin.functions.source.ts
+        ├── index.ts                  ✅ 전체 re-export 완료
+        ├── suite.functions.ts        ✅ createListSuiteApps / createSubscribeApp / createCancelApp
+        ├── suite-home.functions.ts   ✅ createGetSuiteHome / createSetAppUrl
+        ├── notifications.functions.ts ✅ createListNotifications 등 (appCode 하드코딩 버그 수정됨)
+        ├── account.functions.ts      ✅ + getMyProfile/updateMyTimezone/updateMyDefaultTenant 추가
+        └── admin.functions.ts        ✅ tenant_users + parties 계열만 (재무 설정 함수는 의도적으로 제외, 아래 참고)
 ```
+
+### admin.functions.ts에서 의도적으로 제외한 것
+
+원본 JoaBooks `admin.functions.ts`(1722줄)는 재무 전용 설정(결제수단/통화/결제계좌/카테고리)과 `getVendorActivity`(bills/expenses/invoices/transactions 직접 조회), `setPartyW9`(미국 세금서식)까지 섞여 있었습니다. 이런 것들은 패키지에 넣지 않고 JoaBooks 자체 파일에만 남겨뒀습니다 — 다른 앱에 재무 전용 함수를 노출하지 않기 위함입니다.
+
+`mergeParties`는 재배정할 테이블 목록을 하드코딩하는 대신 `partyDocRefTables`/`partyChildTables`를 deps로 주입받도록 새로 설계했습니다. 각 앱은 자기 `party-references.ts`(JoaBooks: `src/lib/party-references.ts`, JoaOffice: `src/lib/party-references.ts`)의 레지스트리를 넘겨줍니다. JoaBooks의 실제 `mergeParties` 호출부도 이 레지스트리를 쓰도록 2026-07-06에 함께 수정했습니다.
 
 ---
 
@@ -183,9 +181,9 @@ App-specific 키가 동일 path에서 shared 키를 덮어쓸 수 있도록 deep
 
 ---
 
-## 6. Phase 1 refactor 체크리스트 (v0.1.0 publish 전 완료)
+## 6. Phase 1 refactor 체크리스트 (완료, 2026-07-06)
 
-각 `.source` 파일 → `.tsx` 본문 포팅 시 적용할 변환:
+아래는 각 `.source` 파일 → `.tsx` 포팅 시 실제 적용한 변환 (참고용으로 남겨둠). typecheck/build 검증은 아직 안 됐으니 v0.1.0 태그 전에 반드시 실행할 것.
 
 ### 컴포넌트 (5개)
 

@@ -3,9 +3,10 @@
  *
  * Why factories instead of plain `createServerFn` exports?
  *   - Each app supplies its own Supabase middleware (`requireSupabaseAuth`)
- *     because the middleware import path differs per app and is wired into
- *     the app's `src/start.ts` global middleware stack.
- *   - Each app may want to extend the validators or wrap with logging.
+ *     and admin client because those import paths differ per app.
+ *   - Each app supplies its own app identity (appCode/appName/appBaseUrl) and
+ *     email sender, so transactional copy and fallback URLs stay correct
+ *     per app instead of leaking "JoaBooks"/books.joasuite.com everywhere.
  *
  * Usage in the consuming app (e.g. JoaBooks `src/lib/suite.functions.ts`):
  *
@@ -17,42 +18,72 @@
  * Then the app re-exports the bound server fns and passes them into
  * <JoaSuiteProvider value={{ fns: { listSuiteApps, ... } }}>.
  *
- * --------------------------------------------------------------------
- * IMPLEMENTATION NOTE — TO BE COMPLETED BEFORE v0.1.0 PUBLISH:
- * --------------------------------------------------------------------
- * The full factory bodies should be ported from JoaBooks. The current
- * source files are:
- *
- *   - src/lib/suite.functions.ts          → createListSuiteApps,
- *                                            createSubscribeApp,
- *                                            createCancelApp
- *   - src/lib/suite-home.functions.ts     → createGetSuiteHome,
- *                                            createSetAppUrl
- *   - src/lib/notifications.functions.ts  → createListNotifications,
- *                                            createMarkNotificationRead,
- *                                            createMarkAllNotificationsRead
- *   - src/lib/account.functions.ts        → createListManageableUsers,
- *                                            createInviteUserToWorkspaces,
- *                                            createSetUserAppRoles,
- *                                            createAccountResendInvitation,
- *                                            createAccountSendPasswordReset,
- *                                            createAccountUpdateUserProfile
- *   - src/lib/admin.functions.ts          → createRemoveTenantUser
- *
- * For each: wrap the existing body in
- *
- *   export function createXxx(deps: { requireSupabaseAuth: MiddlewareType }) {
- *     return createServerFn({ method: "POST" })
- *       .middleware([deps.requireSupabaseAuth])
- *       .inputValidator(...)
- *       .handler(...);
- *   }
- *
- * Keep the handler bodies byte-for-byte identical to the JoaBooks
- * source so behavior is preserved across all apps.
+ * mergeParties additionally needs partyDocRefTables/partyChildTables — see
+ * each app's own `party-references.ts` (JoaBooks: src/lib/party-references.ts).
  */
 
 export type { AppCode } from "../constants";
 
-// Placeholder so the entry point compiles. Replace with real factories.
-export const __SERVER_FACTORIES_NOT_YET_IMPLEMENTED__ = true;
+export {
+  createListSuiteApps,
+  createSubscribeApp,
+  createCancelApp,
+  type AppCatalogEntry,
+  type TenantAppRow,
+} from "./suite.functions";
+
+export { createGetSuiteHome, createSetAppUrl, type SuiteHomeData } from "./suite-home.functions";
+
+export {
+  createListNotifications,
+  createMarkNotificationRead,
+  createMarkAllNotificationsRead,
+} from "./notifications.functions";
+
+export {
+  createListManageableTenants,
+  createListManageableUsers,
+  createInviteUserToWorkspaces,
+  createSetUserAppRoles,
+  createAccountResendInvitation,
+  createAccountSendPasswordReset,
+  createAccountUpdateUserProfile,
+  createGetMyProfile,
+  createUpdateMyTimezone,
+  createUpdateMyDefaultTenant,
+  type AccountDeps,
+} from "./account.functions";
+
+export {
+  createGetTenantSettings,
+  createUpdateTenantSettings,
+  createListTenantUsers,
+  createGetTenantUser,
+  createUpdateTenantUserProfile,
+  createInviteTenantUser,
+  createResendInvitation,
+  createSendPasswordResetLink,
+  createUpdateTenantUserRoles,
+  createSetTenantUserStatus,
+  createRemoveTenantUser,
+  createListParties,
+  createUpsertParty,
+  createDeleteParty,
+  createGetParty,
+  createListPartyContacts,
+  createUpsertPartyContact,
+  createDeletePartyContact,
+  createInvitePartyContact,
+  createRevokePartyContact,
+  createListMyAccessibleVendors,
+  createListMyVendorTenants,
+  createUpsertPartyBankAccount,
+  createDeletePartyBankAccount,
+  createArchiveParty,
+  createUnarchiveParty,
+  createCleanupPartyContacts,
+  createMergeParties,
+  type AdminDeps,
+  type MergePartiesDeps,
+  type PartyRefTable,
+} from "./admin.functions";
