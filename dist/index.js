@@ -1319,14 +1319,12 @@ function SuiteSwitcher() {
             const subscribed = isCurrent || subs.has(a.code);
             const url = urlFor(a.code);
             const Icon = APP_ICONS[a.code];
-            const baseCls = "flex flex-col items-center justify-center gap-1.5 rounded-md border p-3 text-center transition-colors min-h-[96px]";
+            const baseCls = "relative flex flex-col items-center justify-center gap-1.5 rounded-md border p-3 text-center transition-colors min-h-[96px]";
             const stateCls = isCurrent ? "ring-2 ring-primary border-primary/40 bg-primary/5" : subscribed && url ? "hover:bg-accent hover:border-accent-foreground/20 cursor-pointer" : "opacity-50 bg-muted/30 cursor-not-allowed";
             const content = /* @__PURE__ */ jsxs(Fragment, { children: [
-              /* @__PURE__ */ jsxs("div", { className: "relative", children: [
-                /* @__PURE__ */ jsx(Icon, { className: "h-6 w-6 text-foreground" }),
-                isCurrent && /* @__PURE__ */ jsx(Check, { className: "absolute -bottom-1 -right-1 h-3 w-3 text-primary bg-background rounded-full" }),
-                !subscribed && /* @__PURE__ */ jsx(Lock, { className: "absolute -bottom-1 -right-1 h-3 w-3 text-muted-foreground" })
-              ] }),
+              isCurrent && /* @__PURE__ */ jsx(Check, { className: "absolute top-2 right-2 h-3.5 w-3.5 text-primary bg-background rounded-full" }),
+              !subscribed && /* @__PURE__ */ jsx(Lock, { className: "absolute top-2 right-2 h-3.5 w-3.5 text-muted-foreground" }),
+              /* @__PURE__ */ jsx(Icon, { className: "h-6 w-6 text-foreground" }),
               /* @__PURE__ */ jsx("span", { className: "text-xs font-medium", children: a.name }),
               /* @__PURE__ */ jsx("span", { className: "text-[10px] text-muted-foreground line-clamp-2 leading-tight", children: t(`suite.tile.${a.code}.desc`, "") })
             ] });

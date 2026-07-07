@@ -119,7 +119,7 @@ export function SuiteSwitcher() {
               const Icon = APP_ICONS[a.code];
 
               const baseCls =
-                "flex flex-col items-center justify-center gap-1.5 rounded-md border p-3 text-center transition-colors min-h-[96px]";
+                "relative flex flex-col items-center justify-center gap-1.5 rounded-md border p-3 text-center transition-colors min-h-[96px]";
               const stateCls = isCurrent
                 ? "ring-2 ring-primary border-primary/40 bg-primary/5"
                 : subscribed && url
@@ -128,15 +128,13 @@ export function SuiteSwitcher() {
 
               const content = (
                 <>
-                  <div className="relative">
-                    <Icon className="h-6 w-6 text-foreground" />
-                    {isCurrent && (
-                      <Check className="absolute -bottom-1 -right-1 h-3 w-3 text-primary bg-background rounded-full" />
-                    )}
-                    {!subscribed && (
-                      <Lock className="absolute -bottom-1 -right-1 h-3 w-3 text-muted-foreground" />
-                    )}
-                  </div>
+                  {isCurrent && (
+                    <Check className="absolute top-2 right-2 h-3.5 w-3.5 text-primary bg-background rounded-full" />
+                  )}
+                  {!subscribed && (
+                    <Lock className="absolute top-2 right-2 h-3.5 w-3.5 text-muted-foreground" />
+                  )}
+                  <Icon className="h-6 w-6 text-foreground" />
                   <span className="text-xs font-medium">{a.name}</span>
                   <span className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">
                     {t(`suite.tile.${a.code}.desc`, "")}
