@@ -606,7 +606,7 @@ export const markOccurrencePaid = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// ------------------------- Cash Flow Forecast (JoaBooks only) -------------------------
+// ------------------------- Cash Flow Forecast (scoped to the current app) -------------------------
 
 export const getCashFlowForecast = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
