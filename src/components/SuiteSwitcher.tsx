@@ -1,9 +1,31 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { Layers, ExternalLink, Check, Settings2, Home, Users, Bell, ScrollText, ChevronDown } from "lucide-react";
+import {
+  Layers,
+  Check,
+  Lock,
+  Settings2,
+  Home,
+  Users,
+  Bell,
+  ScrollText,
+  ChevronDown,
+  BookOpen,
+  ClipboardCheck,
+  Briefcase,
+  FileText,
+} from "lucide-react";
 import { useJoaSuite } from "../context";
-import { APP_DISPLAY, DEFAULT_APP_URLS } from "../constants";
+import { APP_DISPLAY, DEFAULT_APP_URLS, type AppCode } from "../constants";
+
+const APP_ICONS: Record<AppCode, React.ComponentType<{ className?: string }>> = {
+  joabooks: BookOpen,
+  joaapproval: ClipboardCheck,
+  joacrm: Users,
+  joaoffice: Briefcase,
+  joasop: FileText,
+};
 
 export function SuiteSwitcher() {
   const { t } = useTranslation();
@@ -37,23 +59,17 @@ export function SuiteSwitcher() {
     staleTime: 60_000,
   });
 
-  const items = useMemo(() => {
-    const subs = new Set(
-      (q.data?.subscriptions ?? [])
-        .filter((s: any) => s.status === "active")
-        .map((s: any) => s.app_code),
-    );
-    const mine = new Set(q.data?.myAppCodes ?? []);
-    const tenantUrls = homeQ.data?.appUrls ?? {};
-    return APP_DISPLAY.map((a) => {
-      const active = a.code === currentApp || subs.has(a.code);
-      // Accessibility is enforced by the target app's own auth.
-      // Allow opening any active+subscribed app the tenant has enabled.
-      const accessible = a.code === currentApp || mine.has(a.code) || subs.has(a.code);
-      const url = tenantUrls[a.code] || DEFAULT_APP_URLS[a.code] || "";
-      return { ...a, active, accessible, url };
-    });
-  }, [q.data, homeQ.data, currentApp]);
+  const subs = useMemo(
+    () =>
+      new Set(
+        (q.data?.subscriptions ?? [])
+          .filter((s: any) => s.status === "active")
+          .map((s: any) => s.app_code),
+      ),
+    [q.data],
+  );
+  const tenantUrls = homeQ.data?.appUrls ?? {};
+  const urlFor = (code: string) => tenantUrls[code] || DEFAULT_APP_URLS[code as AppCode] || "";
 
   const [appsOpen, setAppsOpen] = useState(false);
 
@@ -69,7 +85,7 @@ export function SuiteSwitcher() {
           <span className="hidden md:inline">JoaSuite</span>
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent align="end" className="w-[340px]">
         <DropdownMenuItem asChild>
           <Link to="/app/suite" className="flex items-center gap-2 cursor-pointer">
             <Home className="h-4 w-4 opacity-70" />
@@ -93,36 +109,68 @@ export function SuiteSwitcher() {
           />
         </button>
         <div
-          className={`overflow-hidden transition-all duration-200 ${appsOpen ? "max-h-96" : "max-h-0"}`}
+          className={`overflow-hidden transition-all duration-200 ${appsOpen ? "max-h-[400px]" : "max-h-0"}`}
         >
-          {items.map((item) => {
-            const isCurrent = item.code === currentApp;
-            const disabled = isCurrent || !item.active || !item.accessible || !item.url;
-            return (
-              <DropdownMenuItem
-                key={item.code}
-                disabled={disabled}
-                onSelect={(e: any) => {
-                  if (disabled) return;
-                  e.preventDefault();
-                  window.open(item.url, "_blank", "noopener,noreferrer");
-                }}
-                className="flex items-center gap-2 cursor-pointer"
-              >
-                <Layers className="h-4 w-4 shrink-0 opacity-70" />
-                <span className="flex-1 truncate">{item.name}</span>
-                {isCurrent ? (
-                  <Check className="h-4 w-4 text-primary" />
-                ) : item.active && item.url ? (
-                  <ExternalLink className="h-3.5 w-3.5 opacity-50" />
-                ) : (
-                  <span className="text-[10px] text-muted-foreground">
-                    {!item.active ? t("suite.state.not_subscribed", "—") : t("suite.no_url", "no URL")}
+          <div className="grid grid-cols-3 gap-2 p-2">
+            {APP_DISPLAY.map((a) => {
+              const isCurrent = a.code === currentApp;
+              const subscribed = isCurrent || subs.has(a.code);
+              const url = urlFor(a.code);
+              const Icon = APP_ICONS[a.code];
+
+              const baseCls =
+                "flex flex-col items-center justify-center gap-1.5 rounded-md border p-3 text-center transition-colors min-h-[96px]";
+              const stateCls = isCurrent
+                ? "ring-2 ring-primary border-primary/40 bg-primary/5"
+                : subscribed && url
+                  ? "hover:bg-accent hover:border-accent-foreground/20 cursor-pointer"
+                  : "opacity-50 bg-muted/30 cursor-not-allowed";
+
+              const content = (
+                <>
+                  <div className="relative">
+                    <Icon className="h-6 w-6 text-foreground" />
+                    {isCurrent && (
+                      <Check className="absolute -bottom-1 -right-1 h-3 w-3 text-primary bg-background rounded-full" />
+                    )}
+                    {!subscribed && (
+                      <Lock className="absolute -bottom-1 -right-1 h-3 w-3 text-muted-foreground" />
+                    )}
+                  </div>
+                  <span className="text-xs font-medium">{a.name}</span>
+                  <span className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">
+                    {t(`suite.tile.${a.code}.desc`, "")}
                   </span>
-                )}
-              </DropdownMenuItem>
-            );
-          })}
+                </>
+              );
+
+              if (isCurrent) {
+                return (
+                  <div key={a.code} className={`${baseCls} ${stateCls}`}>
+                    {content}
+                  </div>
+                );
+              }
+              if (subscribed && url) {
+                return (
+                  <a
+                    key={a.code}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${baseCls} ${stateCls}`}
+                  >
+                    {content}
+                  </a>
+                );
+              }
+              return (
+                <Link key={a.code} to="/app/suite" className={`${baseCls} ${stateCls}`}>
+                  {content}
+                </Link>
+              );
+            })}
+          </div>
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuLabel>{t("suite.core", "Suite / Core")}</DropdownMenuLabel>

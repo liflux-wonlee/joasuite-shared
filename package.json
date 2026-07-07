@@ -1,6 +1,6 @@
 {
   "name": "@joasuite/shared-ui",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Shared UI, server functions, and i18n for JoaSuite apps (JoaBooks, JoaSOP, JoaOffice, JoaApproval, JoaCRM).",
   "type": "module",
   "sideEffects": false,

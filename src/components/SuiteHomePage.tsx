@@ -1,25 +1,7 @@
-import { useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import {
-  ExternalLink,
-  CheckCircle2,
-  Clock,
-  Inbox,
-  Send,
-  Bell,
-  ScrollText,
-  Settings2,
-  Building2,
-  Users,
-  Shield,
-  AppWindow,
-  ArrowRight,
-} from "lucide-react";
-import { toast } from "sonner";
+import { Inbox, Send, Bell, ScrollText, Settings2, Home, ArrowRight } from "lucide-react";
 import { useJoaSuite } from "../context";
-import { APP_DISPLAY, DEFAULT_APP_URLS } from "../constants";
-import type { AppCatalogEntry, TenantAppRow } from "../server/suite.functions";
 
 function formatMoney(n: number | null | undefined) {
   if (n == null) return "";
@@ -28,138 +10,46 @@ function formatMoney(n: number | null | undefined) {
 
 export function SuiteHomePage() {
   const { t } = useTranslation();
-  const { useAuth, ui, router, fns, currentApp } = useJoaSuite();
+  const { useAuth, ui, router, fns } = useJoaSuite();
   const { Link } = router;
-  const { Card, Badge, Button } = ui;
+  const { Card, Badge } = ui;
   const { currentMembership } = useAuth();
   const tenantId = currentMembership?.tenant_id ?? "";
-  const isAdmin = (currentMembership?.roles ?? []).some((r) =>
-    ["owner", "super_admin"].includes(r),
-  );
-  const qc = useQueryClient();
 
-  const appsQ = useQuery({
-    queryKey: ["suite-apps", tenantId],
-    enabled: !!tenantId,
-    queryFn: () => fns.listSuiteApps({ tenantId }),
-  });
   const homeQ = useQuery({
     queryKey: ["suite-home", tenantId],
     enabled: !!tenantId,
     queryFn: () => fns.getSuiteHome({ tenantId }),
   });
 
-  const subsByCode = useMemo(() => {
-    const m = new Map<string, TenantAppRow>();
-    (appsQ.data?.subscriptions ?? []).forEach((s: TenantAppRow) => m.set(s.app_code, s));
-    return m;
-  }, [appsQ.data]);
-  const catalogByCode = useMemo(() => {
-    const m = new Map<string, AppCatalogEntry>();
-    (appsQ.data?.catalog ?? []).forEach((c: AppCatalogEntry) => m.set(c.code, c));
-    return m;
-  }, [appsQ.data]);
-
-  const appUrls = homeQ.data?.appUrls ?? {};
-  const resolveUrl = (code: string) => appUrls[code] || DEFAULT_APP_URLS[code as keyof typeof DEFAULT_APP_URLS] || "";
-
-  const subMut = useMutation({
-    mutationFn: (v: { appCode: string; plan: string }) => fns.subscribeApp({ tenantId, ...v }),
-    onSuccess: () => {
-      toast.success(t("suite.activated", "App activated"));
-      qc.invalidateQueries({ queryKey: ["suite-apps", tenantId] });
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
-  });
-  const cancelMut = useMutation({
-    mutationFn: (appCode: string) => fns.cancelApp({ tenantId, appCode }),
-    onSuccess: () => {
-      toast.success(t("suite.canceled", "Subscription canceled. Data is preserved."));
-      qc.invalidateQueries({ queryKey: ["suite-apps", tenantId] });
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
-  });
-  const urlMut = useMutation({
-    mutationFn: (v: { appCode: any; url: string }) => fns.setAppUrl({ tenantId, ...v }),
-    onSuccess: () => {
-      toast.success(t("suite.url_saved", "URL saved"));
-      qc.invalidateQueries({ queryKey: ["suite-home", tenantId] });
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Failed"),
-  });
-
   if (!tenantId) return null;
-
-  const cardFor = (code: string) => {
-    const meta = APP_DISPLAY.find((a) => a.code === code)!;
-    const catalog = catalogByCode.get(code);
-    const sub = subsByCode.get(code);
-    const url = resolveUrl(code);
-    const isActiveSub = sub?.status === "active";
-    const isHostApp = code === currentApp;
-    // The host app is always available in-product, regardless of subscription state.
-    // catalog row is absent when app_catalog.is_active = false (filtered server-side) → coming_soon
-    let state: "active_open" | "active_no_url" | "coming_soon" | "not_subscribed";
-    if (isHostApp) state = "active_open";
-    else if (isActiveSub && url) state = "active_open";
-    else if (isActiveSub && !url) state = "active_no_url";
-    else if (!catalog) state = "coming_soon";
-    else state = "not_subscribed";
-
-    return { meta, catalog, sub, url, state };
-  };
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
-      {/* Header */}
+      {/* Header — clearly distinct from Settings */}
       <div className="flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {t("suite.home_title", "JoaSuite")}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t(
-              "suite.home_subtitle",
-              "Your business operations suite. One workspace, multiple apps.",
+        <div className="flex items-start gap-3">
+          <div className="rounded-md bg-primary/10 text-primary p-2.5 mt-0.5">
+            <Home className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {t("suite.home_title", "JoaSuite Home")}
+            </h1>
+            {currentMembership?.tenant_name && (
+              <div className="text-base font-medium text-foreground mt-1">
+                {currentMembership.tenant_name}
+              </div>
             )}
-          </p>
-        </div>
-        <div className="text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">{currentMembership?.tenant_name}</span>
+            <p className="text-sm text-muted-foreground mt-1">
+              {t(
+                "suite.home_subtitle",
+                "Your daily workspace — approvals, requests, notifications, and activity across every JoaSuite app.",
+              )}
+            </p>
+          </div>
         </div>
       </div>
-
-      {/* A. App Launcher */}
-      <section className="space-y-3">
-        <SectionHeader
-          icon={AppWindow}
-          title={t("suite.section.launcher", "App Launcher")}
-        />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {APP_DISPLAY.map((m) => {
-            const info = cardFor(m.code);
-            return (
-              <AppCard
-                key={m.code}
-                code={m.code}
-                name={m.name}
-                description={m.description}
-                state={info.state}
-                url={info.url}
-                isAdmin={isAdmin}
-                hasUserAccess={(appsQ.data?.myAppCodes ?? []).includes(m.code)}
-                onSubscribe={() =>
-                  subMut.mutate({
-                    appCode: m.code,
-                    plan: info.catalog?.plans?.[0]?.code ?? "free",
-                  })
-                }
-                subscribePending={subMut.isPending}
-              />
-            );
-          })}
-        </div>
-      </section>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* B. My Approvals */}
@@ -313,119 +203,27 @@ export function SuiteHomePage() {
         </Card>
       </div>
 
-      {/* F. Organization Setup */}
+      {/* F. Suite Settings CTA */}
       <section className="space-y-3">
-        <SectionHeader
-          icon={Building2}
-          title={t("suite.section.org", "Organization Setup")}
-        />
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <SetupTile
-            to="/app/suite/settings"
-            icon={Settings2}
-            label={t("suite.settings.title", "Suite Settings")}
-          />
-          <SetupTile
-            to="/app/settings/general"
-            icon={Building2}
-            label={t("suite.tile.company", "Company Profile")}
-          />
-          {isAdmin && (
-            <SetupTile
-              to="/app/people"
-              icon={Users}
-              label={t("suite.tile.people", "People")}
-            />
-          )}
-          <SetupTile
-            to="/app/settings/organizations"
-            icon={Shield}
-            label={t("suite.tile.org_units", "Departments")}
-          />
-          <DisabledTile
-            icon={Users}
-            label={t("suite.tile.positions", "Positions")}
-            note={t("suite.state.coming_soon", "Coming Soon")}
-          />
-          <DisabledTile
-            icon={Users}
-            label={t("suite.tile.directory", "Directory")}
-            note={t(
-              "suite.tile.directory_desc",
-              "Directory will provide shared access to customers, vendors, employees, contractors, and contacts across JoaSuite apps.",
-            )}
-          />
-          <SetupTile
-            to="/app/audit-logs"
-            icon={ScrollText}
-            label={t("suite.tile.audit_logs", "Audit Logs")}
-          />
-          <SetupTile
-            to="/app/settings"
-            icon={Settings2}
-            label={t("suite.tile.settings", "All Settings")}
-          />
-        </div>
-      </section>
-
-      {/* G. Add Apps + External URL config */}
-      <section className="space-y-3">
-        <SectionHeader
-          icon={ExternalLink}
-          title={t("suite.section.add_apps", "Add Apps & External URLs")}
-        />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {APP_DISPLAY.filter((m) => m.code !== currentApp).map((m) => {
-            const info = cardFor(m.code);
-            return (
-              <Card key={m.code} className="p-4 flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sm">{m.name}</span>
-                    <StateBadge state={info.state} />
-                  </div>
-                  <div className="text-xs text-muted-foreground truncate">
-                    {info.url || t("suite.no_url", "No external URL configured")}
-                  </div>
-                </div>
-                {isAdmin && (
-                  <>
-                    <ConfigureUrlDialog
-                      appCode={m.code}
-                      currentUrl={info.url}
-                      onSave={(url) => urlMut.mutate({ appCode: m.code, url })}
-                    />
-                    {info.sub?.status === "active" ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => {
-                          if (confirm(t("suite.confirm_cancel", "Cancel this subscription?")))
-                            cancelMut.mutate(m.code);
-                        }}
-                      >
-                        {t("suite.cancel", "Cancel")}
-                      </Button>
-                    ) : info.catalog && (info.catalog as any).is_active !== false ? (
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          subMut.mutate({
-                            appCode: m.code,
-                            plan: info.catalog?.plans?.[0]?.code ?? "free",
-                          })
-                        }
-                        disabled={subMut.isPending}
-                      >
-                        {t("suite.subscribe", "Subscribe")}
-                      </Button>
-                    ) : null}
-                  </>
+        <Link to="/app/suite/settings" className="block">
+          <Card className="p-5 flex items-center gap-4 hover:bg-muted/50 transition-colors">
+            <div className="rounded-md bg-primary/10 text-primary p-2.5">
+              <Settings2 className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-sm">
+                {t("suite.settings.title", "Suite Settings")}
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                {t(
+                  "suite.settings_cta_desc",
+                  "Manage organization, people, apps, and platform policies.",
                 )}
-              </Card>
-            );
-          })}
-        </div>
+              </div>
+            </div>
+            <ArrowRight className="h-4 w-4 text-muted-foreground" />
+          </Card>
+        </Link>
       </section>
     </div>
   );
@@ -455,211 +253,4 @@ function SectionHeader({
 
 function EmptyState({ text }: { text: string }) {
   return <div className="text-sm text-muted-foreground py-4 text-center">{text}</div>;
-}
-
-function DisabledTile({ icon: Icon, label, note }: { icon: any; label: string; note: string }) {
-  return (
-    <div className="p-4 rounded-lg border bg-card/50 flex flex-col items-start gap-2 opacity-70">
-      <Icon className="h-5 w-5 text-muted-foreground" />
-      <span className="text-sm font-medium">{label}</span>
-      <span className="text-[11px] text-muted-foreground line-clamp-2">{note}</span>
-    </div>
-  );
-}
-
-function SetupTile({ to, icon: Icon, label }: { to: string; icon: any; label: string }) {
-  const { router } = useJoaSuite();
-  const { Link } = router;
-  return (
-    <Link
-      to={to as any}
-      className="p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors flex flex-col items-start gap-2"
-    >
-      <Icon className="h-5 w-5 text-muted-foreground" />
-      <span className="text-sm font-medium">{label}</span>
-    </Link>
-  );
-}
-
-function StateBadge({ state }: { state: string }) {
-  const { t } = useTranslation();
-  const { ui } = useJoaSuite();
-  const { Badge } = ui;
-  if (state === "active_open")
-    return (
-      <Badge variant="default" className="gap-1 text-[10px]">
-        <CheckCircle2 className="h-3 w-3" /> {t("suite.state.active", "Active")}
-      </Badge>
-    );
-  if (state === "active_no_url")
-    return (
-      <Badge variant="secondary" className="gap-1 text-[10px]">
-        {t("suite.state.no_url", "Enabled, URL not configured")}
-      </Badge>
-    );
-  if (state === "coming_soon")
-    return (
-      <Badge variant="outline" className="gap-1 text-[10px]">
-        <Clock className="h-3 w-3" /> {t("suite.state.coming_soon", "Coming Soon")}
-      </Badge>
-    );
-  if (state === "not_subscribed")
-    return (
-      <Badge variant="outline" className="text-[10px]">
-        {t("suite.state.not_subscribed", "Not subscribed")}
-      </Badge>
-    );
-  return (
-    <Badge variant="outline" className="text-[10px]">
-      {t("suite.state.not_configured", "Not configured")}
-    </Badge>
-  );
-}
-
-function AppCard({
-  code,
-  name,
-  description,
-  state,
-  url,
-  isAdmin,
-  hasUserAccess,
-  onSubscribe,
-  subscribePending,
-}: {
-  code: string;
-  name: string;
-  description: string;
-  state: string;
-  url: string;
-  isAdmin: boolean;
-  hasUserAccess: boolean;
-  onSubscribe: () => void;
-  subscribePending: boolean;
-}) {
-  const { t } = useTranslation();
-  const { ui, router, currentApp } = useJoaSuite();
-  const { Link } = router;
-  const { Card, Button } = ui;
-  const isHostApp = code === currentApp;
-
-  return (
-    <Card className="p-5 flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="font-semibold">{name}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">{description}</div>
-        </div>
-        <StateBadge state={state} />
-      </div>
-
-      <div className="flex-1" />
-
-      <div className="flex flex-wrap gap-2">
-        {isHostApp ? (
-          <Link to="/app">
-            <Button size="sm">
-              {t("suite.open_app", "Open App")} <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-            </Button>
-          </Link>
-        ) : state === "active_open" ? (
-          <Button
-            size="sm"
-            onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
-            disabled={!hasUserAccess}
-            title={
-              hasUserAccess
-                ? undefined
-                : t("suite.no_user_access", "You don't have access to this app")
-            }
-          >
-            {t("suite.open_app", "Open App")}
-            <ExternalLink className="h-3.5 w-3.5 ml-1.5" />
-          </Button>
-        ) : state === "active_no_url" ? (
-          <span className="text-xs text-muted-foreground self-center">
-            {t("suite.state.no_url", "Enabled, URL not configured")}
-          </span>
-        ) : state === "not_subscribed" ? (
-          isAdmin ? (
-            <Button size="sm" variant="outline" onClick={onSubscribe} disabled={subscribePending}>
-              {t("suite.subscribe", "Subscribe")}
-            </Button>
-          ) : (
-            <span className="text-xs text-muted-foreground self-center">
-              {t("suite.admin_only", "Admin can subscribe")}
-            </span>
-          )
-        ) : (
-          <span className="text-xs text-muted-foreground self-center">
-            {state === "coming_soon"
-              ? t("suite.state.coming_soon", "Coming Soon")
-              : t("suite.state.not_configured", "Not configured")}
-          </span>
-        )}
-      </div>
-    </Card>
-  );
-}
-
-function ConfigureUrlDialog({
-  appCode,
-  currentUrl,
-  onSave,
-}: {
-  appCode: string;
-  currentUrl: string;
-  onSave: (url: string) => void;
-}) {
-  const { t } = useTranslation();
-  const { ui } = useJoaSuite();
-  const { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Input } = ui;
-  const [open, setOpen] = useState(false);
-  const [val, setVal] = useState(currentUrl);
-  return (
-    <Dialog
-      open={open}
-      onOpenChange={(o: boolean) => {
-        setOpen(o);
-        if (o) setVal(currentUrl);
-      }}
-    >
-      <DialogTrigger asChild>
-        <Button size="sm" variant="outline">
-          {t("suite.set_url", "Set URL")}
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>
-            {t("suite.set_external_url", "External URL")} — {appCode}
-          </DialogTitle>
-        </DialogHeader>
-        <Input
-          value={val}
-          onChange={(e: any) => setVal(e.target.value)}
-          placeholder="https://example.lovable.app"
-        />
-        <p className="text-xs text-muted-foreground">
-          {t(
-            "suite.set_url_help",
-            "Leave blank to unset. Saved per-workspace in settings_kv (app_url.*).",
-          )}
-        </p>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            onClick={() => {
-              onSave(val.trim());
-              setOpen(false);
-            }}
-          >
-            {t("common.save")}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
 }

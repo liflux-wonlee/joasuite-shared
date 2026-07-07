@@ -8,6 +8,7 @@ type Membership = {
     tenant_id: string;
     tenant_name: string | null;
     roles: string[];
+    portal?: "internal" | "vendor" | "approver" | "customer";
 };
 type AppCatalogEntry = {
     code: AppCode | string;
@@ -256,6 +257,8 @@ declare function SuiteHomePage(): react.JSX.Element | null;
 
 declare function SuiteSettingsHub(): react.JSX.Element;
 
+declare function AppSubscriptionsSummary(): react.JSX.Element | null;
+
 declare function PeopleListPage(): react.JSX.Element;
 
 declare function PeopleInvitePage(): react.JSX.Element;
@@ -264,4 +267,4 @@ declare function PeopleDetailPage({ userId }: {
     userId: string;
 }): react.JSX.Element;
 
-export { type AppCatalogEntry, AppCode, type ApprovalSummary, type AuthState, type BoundServerFns, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type Membership, type NotificationRow, NotificationsBell, PeopleDetailPage, PeopleInvitePage, PeopleListPage, type RouterAdapter, SUPPORTED_LANGUAGES, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, type TenantAppRow, ThemeToggle, type UiAdapter, UserBadge, mergeSharedResources, useJoaSuite };
+export { type AppCatalogEntry, AppCode, AppSubscriptionsSummary, type ApprovalSummary, type AuthState, type BoundServerFns, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type Membership, type NotificationRow, NotificationsBell, PeopleDetailPage, PeopleInvitePage, PeopleListPage, type RouterAdapter, SUPPORTED_LANGUAGES, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, type TenantAppRow, ThemeToggle, type UiAdapter, UserBadge, mergeSharedResources, useJoaSuite };

@@ -6,6 +6,7 @@ export type Membership = {
   tenant_id: string;
   tenant_name: string | null;
   roles: string[];
+  portal?: "internal" | "vendor" | "approver" | "customer";
 };
 
 export type AppCatalogEntry = {
