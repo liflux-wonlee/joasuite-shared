@@ -5,7 +5,25 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 // =========================================================================
 // Shared Recurring Transactions module (JoaBooks + JoaOffice)
 // All access is scoped by RLS (tenant_has_app + role checks).
+//
+// Vendored byte-for-byte into other apps via joasuite-shared/core-vendor
+// (see manifest.txt). APP_CODE is the one line that changes per app copy —
+// everything else stays identical to the canonical JoaBooks source.
 // =========================================================================
+
+const APP_CODE: "joabooks" | "joaoffice" = "joabooks";
+const APP_ORIGINS: Record<string, string> = {
+  joabooks: "https://books.joasuite.com",
+  joaoffice: "https://office.joasuite.com",
+};
+const REMINDER_ROLES_BY_APP: Record<string, string[]> = {
+  joabooks: ["owner", "super_admin", "admin", "finance_ap", "finance_manager", "accountant"],
+  joaoffice: ["owner", "super_admin", "admin", "hr_manager", "manager"],
+};
+const APP_LABEL_BY_APP: Record<string, string> = {
+  joabooks: "JoaBooks",
+  joaoffice: "JoaOffice",
+};
 
 const Direction = z.enum(["money_in", "money_out"]);
 const Frequency = z.enum([
@@ -230,7 +248,7 @@ async function regenerateOccurrencesFor(
 
   // Build rows
   let rows: any[] = [];
-  if (r.amount_type === "custom_plan") {
+  if (r.amount_type === "custom_plan" || r.frequency === "custom") {
     const { data: lines } = await supabase
       .from("recurring_payment_plan_lines")
       .select("*").eq("recurring_id", recurringId)
@@ -287,6 +305,27 @@ async function regenerateOccurrencesFor(
     if (error) throw new Error(error.message);
   }
 
+  // For custom / custom_plan schedules the master row's next_date is not
+  // derivable from a cadence rule — sync it to the earliest upcoming
+  // forecasted occurrence so the detail header reflects the real plan.
+  if (r.frequency === "custom" || r.amount_type === "custom_plan") {
+    const { data: nextOcc } = await supabase
+      .from("recurring_occurrences")
+      .select("occurrence_date")
+      .eq("recurring_id", recurringId)
+      .eq("status", "forecasted")
+      .gte("occurrence_date", todayIso())
+      .order("occurrence_date", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    const newNext = nextOcc?.occurrence_date ?? null;
+    if (newNext !== r.next_date) {
+      await supabase
+        .from("recurring_transactions")
+        .update({ next_date: newNext })
+        .eq("id", recurringId);
+    }
+  }
 
   return rows.length;
 }
@@ -319,7 +358,33 @@ export const listRecurring = createServerFn({ method: "POST" })
     if (data.search) q = q.ilike("name", `%${data.search}%`);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-    return rows ?? [];
+    const list = rows ?? [];
+    if (list.length === 0) return list;
+
+    // Attach overdue aggregates (unresolved forecasted occurrences dated
+    // before today) so the list can show a badge without a second round trip.
+    const { data: overdueRows, error: overdueErr } = await context.supabase
+      .from("recurring_occurrences")
+      .select("recurring_id, forecast_amount")
+      .eq("tenant_id", data.tenant_id)
+      .eq("status", "forecasted")
+      .lt("occurrence_date", todayIso())
+      .in("recurring_id", list.map((r: any) => r.id));
+    if (overdueErr) throw new Error(overdueErr.message);
+
+    const overdueByRecurring = new Map<string, { count: number; amount: number }>();
+    for (const o of overdueRows ?? []) {
+      const cur = overdueByRecurring.get(o.recurring_id) ?? { count: 0, amount: 0 };
+      cur.count += 1;
+      cur.amount += Number(o.forecast_amount ?? 0);
+      overdueByRecurring.set(o.recurring_id, cur);
+    }
+
+    return list.map((r: any) => ({
+      ...r,
+      overdue_count: overdueByRecurring.get(r.id)?.count ?? 0,
+      overdue_amount: overdueByRecurring.get(r.id)?.amount ?? 0,
+    }));
   });
 
 export const getRecurring = createServerFn({ method: "POST" })
@@ -495,6 +560,52 @@ export const unlinkOccurrence = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Mark an occurrence as paid/collected directly, without linking it to a real
+// bill/payment_request/expense/transaction row (e.g. an autopay charge or a
+// bank transfer that was already recorded elsewhere). Distinct from the
+// linked_* statuses set by linkOccurrence.
+export const markOccurrencePaid = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({
+    occurrence_id: z.string().uuid(),
+    actual_amount: z.number().optional(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: occ, error: occErr } = await context.supabase
+      .from("recurring_occurrences")
+      .select("id, recurring_id, forecast_amount, occurrence_date")
+      .eq("id", data.occurrence_id)
+      .single();
+    if (occErr) throw new Error(occErr.message);
+
+    const { error } = await context.supabase
+      .from("recurring_occurrences")
+      .update({
+        status: "paid",
+        actual_amount: data.actual_amount ?? occ.forecast_amount,
+      })
+      .eq("id", data.occurrence_id);
+    if (error) throw new Error(error.message);
+
+    // Advance parent next_date if this occurrence was the current one
+    // (same rule as convertOccurrenceToDoc, so "paid" and "converted" behave
+    // identically from the schedule's point of view).
+    const { data: r } = await context.supabase
+      .from("recurring_transactions")
+      .select("next_date, frequency, due_day")
+      .eq("id", occ.recurring_id)
+      .maybeSingle();
+    if (r?.next_date && occ.occurrence_date >= r.next_date) {
+      const newNext = advance(occ.occurrence_date, r.frequency, r.due_day);
+      await context.supabase
+        .from("recurring_transactions")
+        .update({ next_date: newNext })
+        .eq("id", occ.recurring_id);
+    }
+
+    return { ok: true };
+  });
+
 // ------------------------- Cash Flow Forecast (JoaBooks only) -------------------------
 
 export const getCashFlowForecast = createServerFn({ method: "POST" })
@@ -509,10 +620,11 @@ export const getCashFlowForecast = createServerFn({ method: "POST" })
     opening_balance: z.number().default(0),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    // Gate: tenant must have joabooks
-    const { data: hasJB } = await context.supabase
-      .rpc("tenant_has_app", { _tenant: data.tenant_id, _app_code: "joabooks" });
-    if (!hasJB) throw new Error("Cash Flow Manage requires JoaBooks subscription");
+    // Gate: tenant must have the current app (JoaOffice's copy checks its own
+    // subscription, not JoaBooks' — Cash Flow is scoped to each app's own rows).
+    const { data: hasApp } = await context.supabase
+      .rpc("tenant_has_app", { _tenant: data.tenant_id, _app_code: APP_CODE });
+    if (!hasApp) throw new Error(`Cash Flow Manage requires a ${APP_LABEL_BY_APP[APP_CODE]} subscription`);
 
     // Pull recurring occurrences in range
     const { data: occs, error } = await context.supabase
@@ -576,7 +688,41 @@ export const getCashFlowForecast = createServerFn({ method: "POST" })
     }
     const months = Object.values(byMonth).sort((a, b) => a.month.localeCompare(b.month));
 
-    return { rows, totals, months, ending_balance: running, opening_balance: data.opening_balance };
+    // Overdue bucket: forecasted occurrences dated before today, regardless of
+    // the requested from/to window — otherwise an unpaid item just falls out
+    // of a forward-looking range and silently disappears from the forecast.
+    const today = todayIso();
+    const { data: overdueRows, error: overdueErr } = await context.supabase
+      .from("recurring_occurrences")
+      .select("id, occurrence_date, direction, forecast_amount, priority, recurring_id, recurring_transactions:recurring_id(name,type,party_id)")
+      .eq("tenant_id", data.tenant_id)
+      .eq("status", "forecasted")
+      .eq("forecast_included", true)
+      .lt("occurrence_date", today)
+      .order("priority", { ascending: true })
+      .order("occurrence_date", { ascending: true });
+    if (overdueErr) throw new Error(overdueErr.message);
+
+    const priorityRank: Record<string, number> = { critical: 0, high: 1, normal: 2, low: 3, optional: 4 };
+    const overdueItems = (overdueRows ?? [])
+      .map((o: any) => ({
+        ...o,
+        days_overdue: Math.round((new Date(today).getTime() - new Date(o.occurrence_date).getTime()) / 86_400_000),
+      }))
+      .sort((a: any, b: any) =>
+        (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9)
+        || b.days_overdue - a.days_overdue
+        || Number(b.forecast_amount ?? 0) - Number(a.forecast_amount ?? 0),
+      );
+    const overdueBucket = {
+      pay_total: overdueItems.filter((o: any) => o.direction === "money_out").reduce((s: number, o: any) => s + Number(o.forecast_amount ?? 0), 0),
+      collect_total: overdueItems.filter((o: any) => o.direction === "money_in").reduce((s: number, o: any) => s + Number(o.forecast_amount ?? 0), 0),
+      pay_count: overdueItems.filter((o: any) => o.direction === "money_out").length,
+      collect_count: overdueItems.filter((o: any) => o.direction === "money_in").length,
+      items: overdueItems,
+    };
+
+    return { rows, totals, months, ending_balance: running, opening_balance: data.opening_balance, overdue: overdueBucket };
   });
 
 // ------------------------- Reminder log (per recurring) -------------------------
@@ -883,7 +1029,7 @@ export async function runRecurringRemindersImpl(now: Date = new Date()) {
         .from("user_roles")
         .select("user_id")
         .eq("tenant_id", r.tenant_id)
-        .in("role", ["owner", "super_admin", "admin", "finance_ap", "finance_manager", "accountant"] as any);
+        .in("role", REMINDER_ROLES_BY_APP[APP_CODE] as any);
       for (const rr of roleRows ?? []) recipientIds.add(rr.user_id as string);
 
       if (recipientIds.size === 0) continue;
@@ -921,11 +1067,11 @@ export async function runRecurringRemindersImpl(now: Date = new Date()) {
         .in("user_id", Array.from(recipientIds));
       const emails = (members ?? []).map((m) => m.email).filter((e): e is string => !!e);
       if (emails.length > 0) {
-        const origin = process.env.PUBLIC_APP_URL || "https://books.joasuite.com";
+        const origin = process.env.PUBLIC_APP_URL || APP_ORIGINS[APP_CODE];
         const { loginLinkEmail } = await import("@/lib/email.server");
         const tpl = loginLinkEmail({
           loginUrl: `${origin.replace(/\/$/, "")}${linkPath}`,
-          subject: `[JoaBooks] ${title}`,
+          subject: `[${APP_LABEL_BY_APP[APP_CODE]}] ${title}`,
         });
         try {
           await sendEmail({ to: emails, subject: tpl.subject, html: tpl.html });

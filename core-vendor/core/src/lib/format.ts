@@ -26,6 +26,13 @@ export function statusClass(status: string) {
   }`;
 }
 
+// Amount types with a definite, known amount (fixed per occurrence, or an
+// explicit custom_plan line) vs everything else, which is a projection.
+const CONFIRMED_AMOUNT_TYPES = new Set(["fixed", "custom_plan"]);
+export function isConfirmedAmountType(amountType: string | null | undefined) {
+  return !!amountType && CONFIRMED_AMOUNT_TYPES.has(amountType);
+}
+
 export function fmtMoney(n: number | string | null | undefined) {
   const v = typeof n === "string" ? parseFloat(n) : n ?? 0;
   return new Intl.NumberFormat("en-US", {
