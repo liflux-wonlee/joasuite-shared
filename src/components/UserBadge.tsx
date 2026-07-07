@@ -65,12 +65,20 @@ export function UserBadge() {
   const roles = currentMembership?.roles ?? [];
   const roleLabel = roles[0]?.replace(/_/g, " ").toUpperCase();
 
-  const ITEMS = [
+  const portal = currentMembership?.portal;
+  const isVendorPortal = portal === "vendor";
+  const isExternalPortal = portal === "vendor" || portal === "approver" || portal === "customer";
+  const ALL_ITEMS = [
     { to: "/app/account/profile", key: "profile", icon: UserIcon },
     { to: "/app/account/security", key: "security", icon: Shield },
     { to: "/app/account/organizations", key: "organizations", icon: Briefcase },
     { to: "/app/account/billing", key: "billing", icon: CreditCard },
   ] as const;
+  const ITEMS = isVendorPortal
+    ? []
+    : isExternalPortal
+      ? ALL_ITEMS.filter((i) => i.key === "profile" || i.key === "security")
+      : ALL_ITEMS;
 
   return (
     <DropdownMenu>
@@ -113,7 +121,7 @@ export function UserBadge() {
             </DropdownMenuItem>
           );
         })}
-        <DropdownMenuSeparator />
+        {ITEMS.length > 0 && <DropdownMenuSeparator />}
         <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer">
           <LogOut className="h-4 w-4 mr-2" />
           {t("common.logout")}

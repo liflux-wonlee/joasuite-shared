@@ -27,6 +27,7 @@ export { NotificationsBell } from "./components/NotificationsBell";
 export { SuiteSwitcher } from "./components/SuiteSwitcher";
 export { SuiteHomePage } from "./components/SuiteHomePage";
 export { SuiteSettingsHub } from "./components/SuiteSettingsHub";
+export { AppSubscriptionsSummary } from "./components/AppSubscriptionsSummary";
 export { PeopleListPage } from "./components/people/PeopleListPage";
 export { PeopleInvitePage } from "./components/people/PeopleInvitePage";
 export { PeopleDetailPage } from "./components/people/PeopleDetailPage";

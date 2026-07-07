@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
-import { Moon, Sun, Globe, User, Shield, Briefcase, CreditCard, LogOut, Bell, Check, Layers, Home, ChevronDown, ExternalLink, Settings2, Users, ScrollText, AppWindow, Inbox, Send, ArrowRight, Building2, CheckCircle2, Clock, Contact2, Plus, Search, MoreHorizontal, Mail, KeyRound, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
+import { Moon, Sun, Globe, User, Shield, Briefcase, CreditCard, LogOut, Bell, Check, Layers, Home, ChevronDown, FileText, Users, ClipboardCheck, BookOpen, Lock, Settings2, ScrollText, Inbox, Send, ArrowRight, ExternalLink, Building2, Contact2, Link, AppWindow, Plus, Search, MoreHorizontal, Mail, KeyRound, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -1093,12 +1093,16 @@ function UserBadge() {
   const position = current?.position || "";
   const roles = currentMembership?.roles ?? [];
   const roleLabel = roles[0]?.replace(/_/g, " ").toUpperCase();
-  const ITEMS = [
+  const portal = currentMembership?.portal;
+  const isVendorPortal = portal === "vendor";
+  const isExternalPortal = portal === "vendor" || portal === "approver" || portal === "customer";
+  const ALL_ITEMS = [
     { to: "/app/account/profile", key: "profile", icon: User },
     { to: "/app/account/security", key: "security", icon: Shield },
     { to: "/app/account/organizations", key: "organizations", icon: Briefcase },
     { to: "/app/account/billing", key: "billing", icon: CreditCard }
   ];
+  const ITEMS = isVendorPortal ? [] : isExternalPortal ? ALL_ITEMS.filter((i) => i.key === "profile" || i.key === "security") : ALL_ITEMS;
   return /* @__PURE__ */ jsxs(DropdownMenu, { children: [
     /* @__PURE__ */ jsx(DropdownMenuTrigger, { asChild: true, children: /* @__PURE__ */ jsxs("button", { className: "min-w-0 leading-tight text-left rounded px-2 py-1 hover:bg-muted transition", children: [
       showName && /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 min-w-0", children: [
@@ -1121,7 +1125,7 @@ function UserBadge() {
           t(`account.nav.${it.key}`)
         ] }) }, it.key);
       }),
-      /* @__PURE__ */ jsx(DropdownMenuSeparator, {}),
+      ITEMS.length > 0 && /* @__PURE__ */ jsx(DropdownMenuSeparator, {}),
       /* @__PURE__ */ jsxs(DropdownMenuItem, { onClick: () => signOut(), className: "cursor-pointer", children: [
         /* @__PURE__ */ jsx(LogOut, { className: "h-4 w-4 mr-2" }),
         t("common.logout")
@@ -1220,6 +1224,13 @@ function NotificationsBell() {
     ] })
   ] });
 }
+var APP_ICONS = {
+  joabooks: BookOpen,
+  joaapproval: ClipboardCheck,
+  joacrm: Users,
+  joaoffice: Briefcase,
+  joasop: FileText
+};
 function SuiteSwitcher() {
   const { t } = useTranslation();
   const { useAuth, ui, router, fns, currentApp } = useJoaSuite();
@@ -1249,19 +1260,14 @@ function SuiteSwitcher() {
     queryFn: () => fns.getSuiteHome({ tenantId }),
     staleTime: 6e4
   });
-  const items = useMemo(() => {
-    const subs = new Set(
+  const subs = useMemo(
+    () => new Set(
       (q.data?.subscriptions ?? []).filter((s) => s.status === "active").map((s) => s.app_code)
-    );
-    const mine = new Set(q.data?.myAppCodes ?? []);
-    const tenantUrls = homeQ.data?.appUrls ?? {};
-    return APP_DISPLAY.map((a) => {
-      const active = a.code === currentApp || subs.has(a.code);
-      const accessible = a.code === currentApp || mine.has(a.code) || subs.has(a.code);
-      const url = tenantUrls[a.code] || DEFAULT_APP_URLS[a.code] || "";
-      return { ...a, active, accessible, url };
-    });
-  }, [q.data, homeQ.data, currentApp]);
+    ),
+    [q.data]
+  );
+  const tenantUrls = homeQ.data?.appUrls ?? {};
+  const urlFor = (code) => tenantUrls[code] || DEFAULT_APP_URLS[code] || "";
   const [appsOpen, setAppsOpen] = useState(false);
   return /* @__PURE__ */ jsxs(DropdownMenu, { children: [
     /* @__PURE__ */ jsx(DropdownMenuTrigger, { asChild: true, children: /* @__PURE__ */ jsxs(
@@ -1276,7 +1282,7 @@ function SuiteSwitcher() {
         ]
       }
     ) }),
-    /* @__PURE__ */ jsxs(DropdownMenuContent, { align: "end", className: "w-64", children: [
+    /* @__PURE__ */ jsxs(DropdownMenuContent, { align: "end", className: "w-[340px]", children: [
       /* @__PURE__ */ jsx(DropdownMenuItem, { asChild: true, children: /* @__PURE__ */ jsxs(Link, { to: "/app/suite", className: "flex items-center gap-2 cursor-pointer", children: [
         /* @__PURE__ */ jsx(Home, { className: "h-4 w-4 opacity-70" }),
         /* @__PURE__ */ jsx("span", { children: t("suite.home", "JoaSuite Home") })
@@ -1307,29 +1313,41 @@ function SuiteSwitcher() {
       /* @__PURE__ */ jsx(
         "div",
         {
-          className: `overflow-hidden transition-all duration-200 ${appsOpen ? "max-h-96" : "max-h-0"}`,
-          children: items.map((item) => {
-            const isCurrent = item.code === currentApp;
-            const disabled = isCurrent || !item.active || !item.accessible || !item.url;
-            return /* @__PURE__ */ jsxs(
-              DropdownMenuItem,
-              {
-                disabled,
-                onSelect: (e) => {
-                  if (disabled) return;
-                  e.preventDefault();
-                  window.open(item.url, "_blank", "noopener,noreferrer");
+          className: `overflow-hidden transition-all duration-200 ${appsOpen ? "max-h-[400px]" : "max-h-0"}`,
+          children: /* @__PURE__ */ jsx("div", { className: "grid grid-cols-3 gap-2 p-2", children: APP_DISPLAY.map((a) => {
+            const isCurrent = a.code === currentApp;
+            const subscribed = isCurrent || subs.has(a.code);
+            const url = urlFor(a.code);
+            const Icon = APP_ICONS[a.code];
+            const baseCls = "flex flex-col items-center justify-center gap-1.5 rounded-md border p-3 text-center transition-colors min-h-[96px]";
+            const stateCls = isCurrent ? "ring-2 ring-primary border-primary/40 bg-primary/5" : subscribed && url ? "hover:bg-accent hover:border-accent-foreground/20 cursor-pointer" : "opacity-50 bg-muted/30 cursor-not-allowed";
+            const content = /* @__PURE__ */ jsxs(Fragment, { children: [
+              /* @__PURE__ */ jsxs("div", { className: "relative", children: [
+                /* @__PURE__ */ jsx(Icon, { className: "h-6 w-6 text-foreground" }),
+                isCurrent && /* @__PURE__ */ jsx(Check, { className: "absolute -bottom-1 -right-1 h-3 w-3 text-primary bg-background rounded-full" }),
+                !subscribed && /* @__PURE__ */ jsx(Lock, { className: "absolute -bottom-1 -right-1 h-3 w-3 text-muted-foreground" })
+              ] }),
+              /* @__PURE__ */ jsx("span", { className: "text-xs font-medium", children: a.name }),
+              /* @__PURE__ */ jsx("span", { className: "text-[10px] text-muted-foreground line-clamp-2 leading-tight", children: t(`suite.tile.${a.code}.desc`, "") })
+            ] });
+            if (isCurrent) {
+              return /* @__PURE__ */ jsx("div", { className: `${baseCls} ${stateCls}`, children: content }, a.code);
+            }
+            if (subscribed && url) {
+              return /* @__PURE__ */ jsx(
+                "a",
+                {
+                  href: url,
+                  target: "_blank",
+                  rel: "noopener noreferrer",
+                  className: `${baseCls} ${stateCls}`,
+                  children: content
                 },
-                className: "flex items-center gap-2 cursor-pointer",
-                children: [
-                  /* @__PURE__ */ jsx(Layers, { className: "h-4 w-4 shrink-0 opacity-70" }),
-                  /* @__PURE__ */ jsx("span", { className: "flex-1 truncate", children: item.name }),
-                  isCurrent ? /* @__PURE__ */ jsx(Check, { className: "h-4 w-4 text-primary" }) : item.active && item.url ? /* @__PURE__ */ jsx(ExternalLink, { className: "h-3.5 w-3.5 opacity-50" }) : /* @__PURE__ */ jsx("span", { className: "text-[10px] text-muted-foreground", children: !item.active ? t("suite.state.not_subscribed", "\u2014") : t("suite.no_url", "no URL") })
-                ]
-              },
-              item.code
-            );
-          })
+                a.code
+              );
+            }
+            return /* @__PURE__ */ jsx(Link, { to: "/app/suite", className: `${baseCls} ${stateCls}`, children: content }, a.code);
+          }) })
         }
       ),
       /* @__PURE__ */ jsx(DropdownMenuSeparator, {}),
@@ -1364,118 +1382,29 @@ function formatMoney(n) {
 }
 function SuiteHomePage() {
   const { t } = useTranslation();
-  const { useAuth, ui, router, fns, currentApp } = useJoaSuite();
+  const { useAuth, ui, router, fns } = useJoaSuite();
   const { Link } = router;
-  const { Card, Badge, Button } = ui;
+  const { Card, Badge } = ui;
   const { currentMembership } = useAuth();
   const tenantId = currentMembership?.tenant_id ?? "";
-  const isAdmin = (currentMembership?.roles ?? []).some(
-    (r) => ["owner", "super_admin"].includes(r)
-  );
-  const qc = useQueryClient();
-  const appsQ = useQuery({
-    queryKey: ["suite-apps", tenantId],
-    enabled: !!tenantId,
-    queryFn: () => fns.listSuiteApps({ tenantId })
-  });
   const homeQ = useQuery({
     queryKey: ["suite-home", tenantId],
     enabled: !!tenantId,
     queryFn: () => fns.getSuiteHome({ tenantId })
   });
-  const subsByCode = useMemo(() => {
-    const m = /* @__PURE__ */ new Map();
-    (appsQ.data?.subscriptions ?? []).forEach((s) => m.set(s.app_code, s));
-    return m;
-  }, [appsQ.data]);
-  const catalogByCode = useMemo(() => {
-    const m = /* @__PURE__ */ new Map();
-    (appsQ.data?.catalog ?? []).forEach((c) => m.set(c.code, c));
-    return m;
-  }, [appsQ.data]);
-  const appUrls = homeQ.data?.appUrls ?? {};
-  const resolveUrl = (code) => appUrls[code] || DEFAULT_APP_URLS[code] || "";
-  const subMut = useMutation({
-    mutationFn: (v) => fns.subscribeApp({ tenantId, ...v }),
-    onSuccess: () => {
-      toast.success(t("suite.activated", "App activated"));
-      qc.invalidateQueries({ queryKey: ["suite-apps", tenantId] });
-    },
-    onError: (e) => toast.error(e?.message ?? "Failed")
-  });
-  const cancelMut = useMutation({
-    mutationFn: (appCode) => fns.cancelApp({ tenantId, appCode }),
-    onSuccess: () => {
-      toast.success(t("suite.canceled", "Subscription canceled. Data is preserved."));
-      qc.invalidateQueries({ queryKey: ["suite-apps", tenantId] });
-    },
-    onError: (e) => toast.error(e?.message ?? "Failed")
-  });
-  const urlMut = useMutation({
-    mutationFn: (v) => fns.setAppUrl({ tenantId, ...v }),
-    onSuccess: () => {
-      toast.success(t("suite.url_saved", "URL saved"));
-      qc.invalidateQueries({ queryKey: ["suite-home", tenantId] });
-    },
-    onError: (e) => toast.error(e?.message ?? "Failed")
-  });
   if (!tenantId) return null;
-  const cardFor = (code) => {
-    const meta = APP_DISPLAY.find((a) => a.code === code);
-    const catalog = catalogByCode.get(code);
-    const sub = subsByCode.get(code);
-    const url = resolveUrl(code);
-    const isActiveSub = sub?.status === "active";
-    const isHostApp = code === currentApp;
-    let state;
-    if (isHostApp) state = "active_open";
-    else if (isActiveSub && url) state = "active_open";
-    else if (isActiveSub && !url) state = "active_no_url";
-    else if (!catalog) state = "coming_soon";
-    else state = "not_subscribed";
-    return { meta, catalog, sub, url, state };
-  };
   return /* @__PURE__ */ jsxs("div", { className: "p-6 lg:p-8 max-w-7xl mx-auto space-y-8", children: [
-    /* @__PURE__ */ jsxs("div", { className: "flex items-end justify-between gap-4", children: [
+    /* @__PURE__ */ jsx("div", { className: "flex items-end justify-between gap-4", children: /* @__PURE__ */ jsxs("div", { className: "flex items-start gap-3", children: [
+      /* @__PURE__ */ jsx("div", { className: "rounded-md bg-primary/10 text-primary p-2.5 mt-0.5", children: /* @__PURE__ */ jsx(Home, { className: "h-5 w-5" }) }),
       /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsx("h1", { className: "text-2xl font-semibold tracking-tight", children: t("suite.home_title", "JoaSuite") }),
+        /* @__PURE__ */ jsx("h1", { className: "text-2xl font-semibold tracking-tight", children: t("suite.home_title", "JoaSuite Home") }),
+        currentMembership?.tenant_name && /* @__PURE__ */ jsx("div", { className: "text-base font-medium text-foreground mt-1", children: currentMembership.tenant_name }),
         /* @__PURE__ */ jsx("p", { className: "text-sm text-muted-foreground mt-1", children: t(
           "suite.home_subtitle",
-          "Your business operations suite. One workspace, multiple apps."
+          "Your daily workspace \u2014 approvals, requests, notifications, and activity across every JoaSuite app."
         ) })
-      ] }),
-      /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: /* @__PURE__ */ jsx("span", { className: "font-medium text-foreground", children: currentMembership?.tenant_name }) })
-    ] }),
-    /* @__PURE__ */ jsxs("section", { className: "space-y-3", children: [
-      /* @__PURE__ */ jsx(
-        SectionHeader,
-        {
-          icon: AppWindow,
-          title: t("suite.section.launcher", "App Launcher")
-        }
-      ),
-      /* @__PURE__ */ jsx("div", { className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4", children: APP_DISPLAY.map((m) => {
-        const info = cardFor(m.code);
-        return /* @__PURE__ */ jsx(
-          AppCard,
-          {
-            code: m.code,
-            name: m.name,
-            description: m.description,
-            state: info.state,
-            url: info.url,
-            isAdmin,
-            hasUserAccess: (appsQ.data?.myAppCodes ?? []).includes(m.code),
-            onSubscribe: () => subMut.mutate({
-              appCode: m.code,
-              plan: info.catalog?.plans?.[0]?.code ?? "free"
-            }),
-            subscribePending: subMut.isPending
-          },
-          m.code
-        );
-      }) })
-    ] }),
+      ] })
+    ] }) }),
     /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-1 lg:grid-cols-2 gap-6", children: [
       /* @__PURE__ */ jsxs(Card, { className: "p-5", children: [
         /* @__PURE__ */ jsx(SectionHeader, { icon: Inbox, title: t("suite.section.my_approvals", "My Approvals") }),
@@ -1587,138 +1516,17 @@ function SuiteHomePage() {
         ] }, a.id)) })
       ] })
     ] }),
-    /* @__PURE__ */ jsxs("section", { className: "space-y-3", children: [
-      /* @__PURE__ */ jsx(
-        SectionHeader,
-        {
-          icon: Building2,
-          title: t("suite.section.org", "Organization Setup")
-        }
-      ),
-      /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 md:grid-cols-4 gap-3", children: [
-        /* @__PURE__ */ jsx(
-          SetupTile,
-          {
-            to: "/app/suite/settings",
-            icon: Settings2,
-            label: t("suite.settings.title", "Suite Settings")
-          }
-        ),
-        /* @__PURE__ */ jsx(
-          SetupTile,
-          {
-            to: "/app/settings/general",
-            icon: Building2,
-            label: t("suite.tile.company", "Company Profile")
-          }
-        ),
-        isAdmin && /* @__PURE__ */ jsx(
-          SetupTile,
-          {
-            to: "/app/people",
-            icon: Users,
-            label: t("suite.tile.people", "People")
-          }
-        ),
-        /* @__PURE__ */ jsx(
-          SetupTile,
-          {
-            to: "/app/settings/organizations",
-            icon: Shield,
-            label: t("suite.tile.org_units", "Departments")
-          }
-        ),
-        /* @__PURE__ */ jsx(
-          DisabledTile,
-          {
-            icon: Users,
-            label: t("suite.tile.positions", "Positions"),
-            note: t("suite.state.coming_soon", "Coming Soon")
-          }
-        ),
-        /* @__PURE__ */ jsx(
-          DisabledTile,
-          {
-            icon: Users,
-            label: t("suite.tile.directory", "Directory"),
-            note: t(
-              "suite.tile.directory_desc",
-              "Directory will provide shared access to customers, vendors, employees, contractors, and contacts across JoaSuite apps."
-            )
-          }
-        ),
-        /* @__PURE__ */ jsx(
-          SetupTile,
-          {
-            to: "/app/audit-logs",
-            icon: ScrollText,
-            label: t("suite.tile.audit_logs", "Audit Logs")
-          }
-        ),
-        /* @__PURE__ */ jsx(
-          SetupTile,
-          {
-            to: "/app/settings",
-            icon: Settings2,
-            label: t("suite.tile.settings", "All Settings")
-          }
-        )
-      ] })
-    ] }),
-    /* @__PURE__ */ jsxs("section", { className: "space-y-3", children: [
-      /* @__PURE__ */ jsx(
-        SectionHeader,
-        {
-          icon: ExternalLink,
-          title: t("suite.section.add_apps", "Add Apps & External URLs")
-        }
-      ),
-      /* @__PURE__ */ jsx("div", { className: "grid grid-cols-1 lg:grid-cols-2 gap-3", children: APP_DISPLAY.filter((m) => m.code !== currentApp).map((m) => {
-        const info = cardFor(m.code);
-        return /* @__PURE__ */ jsxs(Card, { className: "p-4 flex items-center gap-3", children: [
-          /* @__PURE__ */ jsxs("div", { className: "flex-1 min-w-0", children: [
-            /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
-              /* @__PURE__ */ jsx("span", { className: "font-medium text-sm", children: m.name }),
-              /* @__PURE__ */ jsx(StateBadge, { state: info.state })
-            ] }),
-            /* @__PURE__ */ jsx("div", { className: "text-xs text-muted-foreground truncate", children: info.url || t("suite.no_url", "No external URL configured") })
-          ] }),
-          isAdmin && /* @__PURE__ */ jsxs(Fragment, { children: [
-            /* @__PURE__ */ jsx(
-              ConfigureUrlDialog,
-              {
-                appCode: m.code,
-                currentUrl: info.url,
-                onSave: (url) => urlMut.mutate({ appCode: m.code, url })
-              }
-            ),
-            info.sub?.status === "active" ? /* @__PURE__ */ jsx(
-              Button,
-              {
-                size: "sm",
-                variant: "ghost",
-                onClick: () => {
-                  if (confirm(t("suite.confirm_cancel", "Cancel this subscription?")))
-                    cancelMut.mutate(m.code);
-                },
-                children: t("suite.cancel", "Cancel")
-              }
-            ) : info.catalog && info.catalog.is_active !== false ? /* @__PURE__ */ jsx(
-              Button,
-              {
-                size: "sm",
-                onClick: () => subMut.mutate({
-                  appCode: m.code,
-                  plan: info.catalog?.plans?.[0]?.code ?? "free"
-                }),
-                disabled: subMut.isPending,
-                children: t("suite.subscribe", "Subscribe")
-              }
-            ) : null
-          ] })
-        ] }, m.code);
-      }) })
-    ] })
+    /* @__PURE__ */ jsx("section", { className: "space-y-3", children: /* @__PURE__ */ jsx(Link, { to: "/app/suite/settings", className: "block", children: /* @__PURE__ */ jsxs(Card, { className: "p-5 flex items-center gap-4 hover:bg-muted/50 transition-colors", children: [
+      /* @__PURE__ */ jsx("div", { className: "rounded-md bg-primary/10 text-primary p-2.5", children: /* @__PURE__ */ jsx(Settings2, { className: "h-5 w-5" }) }),
+      /* @__PURE__ */ jsxs("div", { className: "flex-1 min-w-0", children: [
+        /* @__PURE__ */ jsx("div", { className: "font-medium text-sm", children: t("suite.settings.title", "Suite Settings") }),
+        /* @__PURE__ */ jsx("div", { className: "text-xs text-muted-foreground mt-0.5", children: t(
+          "suite.settings_cta_desc",
+          "Manage organization, people, apps, and platform policies."
+        ) })
+      ] }),
+      /* @__PURE__ */ jsx(ArrowRight, { className: "h-4 w-4 text-muted-foreground" })
+    ] }) }) })
   ] });
 }
 function SectionHeader({
@@ -1737,154 +1545,133 @@ function SectionHeader({
 function EmptyState({ text }) {
   return /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground py-4 text-center", children: text });
 }
-function DisabledTile({ icon: Icon, label, note }) {
-  return /* @__PURE__ */ jsxs("div", { className: "p-4 rounded-lg border bg-card/50 flex flex-col items-start gap-2 opacity-70", children: [
-    /* @__PURE__ */ jsx(Icon, { className: "h-5 w-5 text-muted-foreground" }),
-    /* @__PURE__ */ jsx("span", { className: "text-sm font-medium", children: label }),
-    /* @__PURE__ */ jsx("span", { className: "text-[11px] text-muted-foreground line-clamp-2", children: note })
-  ] });
+var APP_ICONS2 = {
+  joabooks: BookOpen,
+  joaapproval: ClipboardCheck,
+  joacrm: Users,
+  joaoffice: Briefcase,
+  joasop: FileText
+};
+function planBadgeStyle(plan) {
+  const p = (plan ?? "").toLowerCase();
+  if (p === "basic") return { backgroundColor: "#DEE545", color: "#1a1a1a" };
+  if (p === "pro") return { backgroundColor: "#E56F3F", color: "#ffffff" };
+  if (p === "business" || p === "enterprise")
+    return { backgroundColor: "#454545", color: "#ffffff" };
+  return void 0;
 }
-function SetupTile({ to, icon: Icon, label }) {
-  const { router } = useJoaSuite();
-  const { Link } = router;
-  return /* @__PURE__ */ jsxs(
-    Link,
-    {
-      to,
-      className: "p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors flex flex-col items-start gap-2",
-      children: [
-        /* @__PURE__ */ jsx(Icon, { className: "h-5 w-5 text-muted-foreground" }),
-        /* @__PURE__ */ jsx("span", { className: "text-sm font-medium", children: label })
-      ]
-    }
-  );
+function planLabel(plan) {
+  const p = (plan ?? "").toLowerCase();
+  if (!p) return "";
+  return p.charAt(0).toUpperCase() + p.slice(1);
 }
-function StateBadge({ state }) {
+function AppSubscriptionsSummary() {
   const { t } = useTranslation();
-  const { ui } = useJoaSuite();
-  const { Badge } = ui;
-  if (state === "active_open")
-    return /* @__PURE__ */ jsxs(Badge, { variant: "default", className: "gap-1 text-[10px]", children: [
-      /* @__PURE__ */ jsx(CheckCircle2, { className: "h-3 w-3" }),
-      " ",
-      t("suite.state.active", "Active")
-    ] });
-  if (state === "active_no_url")
-    return /* @__PURE__ */ jsx(Badge, { variant: "secondary", className: "gap-1 text-[10px]", children: t("suite.state.no_url", "Enabled, URL not configured") });
-  if (state === "coming_soon")
-    return /* @__PURE__ */ jsxs(Badge, { variant: "outline", className: "gap-1 text-[10px]", children: [
-      /* @__PURE__ */ jsx(Clock, { className: "h-3 w-3" }),
-      " ",
-      t("suite.state.coming_soon", "Coming Soon")
-    ] });
-  if (state === "not_subscribed")
-    return /* @__PURE__ */ jsx(Badge, { variant: "outline", className: "text-[10px]", children: t("suite.state.not_subscribed", "Not subscribed") });
-  return /* @__PURE__ */ jsx(Badge, { variant: "outline", className: "text-[10px]", children: t("suite.state.not_configured", "Not configured") });
-}
-function AppCard({
-  code,
-  name,
-  description,
-  state,
-  url,
-  isAdmin,
-  hasUserAccess,
-  onSubscribe,
-  subscribePending
-}) {
-  const { t } = useTranslation();
-  const { ui, router, currentApp } = useJoaSuite();
+  const { useAuth, ui, router, fns, currentApp } = useJoaSuite();
   const { Link } = router;
-  const { Card, Button } = ui;
-  const isHostApp = code === currentApp;
-  return /* @__PURE__ */ jsxs(Card, { className: "p-5 flex flex-col gap-3", children: [
-    /* @__PURE__ */ jsxs("div", { className: "flex items-start justify-between gap-2", children: [
-      /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
-        /* @__PURE__ */ jsx("div", { className: "font-semibold", children: name }),
-        /* @__PURE__ */ jsx("div", { className: "text-xs text-muted-foreground mt-0.5", children: description })
-      ] }),
-      /* @__PURE__ */ jsx(StateBadge, { state })
+  const { Card } = ui;
+  const { currentMembership } = useAuth();
+  const tenantId = currentMembership?.tenant_id ?? "";
+  const appsQ = useQuery({
+    queryKey: ["suite-apps", tenantId],
+    enabled: !!tenantId,
+    queryFn: () => fns.listSuiteApps({ tenantId })
+  });
+  const homeQ = useQuery({
+    queryKey: ["suite-home", tenantId],
+    enabled: !!tenantId,
+    queryFn: () => fns.getSuiteHome({ tenantId })
+  });
+  const subsByCode = useMemo(() => {
+    const m = /* @__PURE__ */ new Map();
+    (appsQ.data?.subscriptions ?? []).forEach((s) => m.set(s.app_code, s));
+    return m;
+  }, [appsQ.data]);
+  const catalogByCode = useMemo(() => {
+    const m = /* @__PURE__ */ new Map();
+    (appsQ.data?.catalog ?? []).forEach((c) => m.set(c.code, c));
+    return m;
+  }, [appsQ.data]);
+  const appUrls = homeQ.data?.appUrls ?? {};
+  const resolveUrl = (code) => appUrls[code] || DEFAULT_APP_URLS[code] || "";
+  if (!tenantId) return null;
+  return /* @__PURE__ */ jsxs(Card, { className: "overflow-hidden", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/30", children: [
+      /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t(
+        "suite.subscriptions.summary_hint",
+        "Read-only summary. To change plans, start a trial, or cancel, go to Billing."
+      ) }),
+      /* @__PURE__ */ jsxs(
+        Link,
+        {
+          to: "/app/account/billing",
+          className: "inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline whitespace-nowrap",
+          children: [
+            t("suite.subscriptions.manage_cta", "Manage plans & billing"),
+            /* @__PURE__ */ jsx(ArrowRight, { className: "h-3 w-3" })
+          ]
+        }
+      )
     ] }),
-    /* @__PURE__ */ jsx("div", { className: "flex-1" }),
-    /* @__PURE__ */ jsx("div", { className: "flex flex-wrap gap-2", children: isHostApp ? /* @__PURE__ */ jsx(Link, { to: "/app", children: /* @__PURE__ */ jsxs(Button, { size: "sm", children: [
-      t("suite.open_app", "Open App"),
-      " ",
-      /* @__PURE__ */ jsx(ArrowRight, { className: "h-3.5 w-3.5 ml-1.5" })
-    ] }) }) : state === "active_open" ? /* @__PURE__ */ jsxs(
-      Button,
-      {
-        size: "sm",
-        onClick: () => window.open(url, "_blank", "noopener,noreferrer"),
-        disabled: !hasUserAccess,
-        title: hasUserAccess ? void 0 : t("suite.no_user_access", "You don't have access to this app"),
-        children: [
-          t("suite.open_app", "Open App"),
-          /* @__PURE__ */ jsx(ExternalLink, { className: "h-3.5 w-3.5 ml-1.5" })
-        ]
-      }
-    ) : state === "active_no_url" ? /* @__PURE__ */ jsx("span", { className: "text-xs text-muted-foreground self-center", children: t("suite.state.no_url", "Enabled, URL not configured") }) : state === "not_subscribed" ? isAdmin ? /* @__PURE__ */ jsx(Button, { size: "sm", variant: "outline", onClick: onSubscribe, disabled: subscribePending, children: t("suite.subscribe", "Subscribe") }) : /* @__PURE__ */ jsx("span", { className: "text-xs text-muted-foreground self-center", children: t("suite.admin_only", "Admin can subscribe") }) : /* @__PURE__ */ jsx("span", { className: "text-xs text-muted-foreground self-center", children: state === "coming_soon" ? t("suite.state.coming_soon", "Coming Soon") : t("suite.state.not_configured", "Not configured") }) })
-  ] });
-}
-function ConfigureUrlDialog({
-  appCode,
-  currentUrl,
-  onSave
-}) {
-  const { t } = useTranslation();
-  const { ui } = useJoaSuite();
-  const { Button, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Input } = ui;
-  const [open, setOpen] = useState(false);
-  const [val, setVal] = useState(currentUrl);
-  return /* @__PURE__ */ jsxs(
-    Dialog,
-    {
-      open,
-      onOpenChange: (o) => {
-        setOpen(o);
-        if (o) setVal(currentUrl);
-      },
-      children: [
-        /* @__PURE__ */ jsx(DialogTrigger, { asChild: true, children: /* @__PURE__ */ jsx(Button, { size: "sm", variant: "outline", children: t("suite.set_url", "Set URL") }) }),
-        /* @__PURE__ */ jsxs(DialogContent, { children: [
-          /* @__PURE__ */ jsx(DialogHeader, { children: /* @__PURE__ */ jsxs(DialogTitle, { children: [
-            t("suite.set_external_url", "External URL"),
-            " \u2014 ",
-            appCode
-          ] }) }),
-          /* @__PURE__ */ jsx(
-            Input,
-            {
-              value: val,
-              onChange: (e) => setVal(e.target.value),
-              placeholder: "https://example.lovable.app"
-            }
-          ),
-          /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground", children: t(
-            "suite.set_url_help",
-            "Leave blank to unset. Saved per-workspace in settings_kv (app_url.*)."
-          ) }),
-          /* @__PURE__ */ jsxs(DialogFooter, { children: [
-            /* @__PURE__ */ jsx(Button, { variant: "outline", onClick: () => setOpen(false), children: t("common.cancel") }),
-            /* @__PURE__ */ jsx(
-              Button,
+    /* @__PURE__ */ jsx("ul", { className: "divide-y", children: APP_DISPLAY.map((meta) => {
+      const sub = subsByCode.get(meta.code);
+      const catalog = catalogByCode.get(meta.code);
+      const isHostApp = meta.code === currentApp;
+      const isActive = isHostApp || sub?.status === "active";
+      const isCanceled = sub?.status === "canceled";
+      const plan = sub?.plan ?? (isHostApp ? "basic" : null);
+      const url = resolveUrl(meta.code);
+      const Icon = APP_ICONS2[meta.code];
+      const badge = planBadgeStyle(plan);
+      const statusLabel = isActive ? t("suite.subscriptions.status.active", "Active") : isCanceled ? t("suite.subscriptions.status.canceled", "Canceled") : !catalog ? t("suite.state.coming_soon", "Coming Soon") : t("suite.subscriptions.status.not_subscribed", "Not subscribed");
+      return /* @__PURE__ */ jsxs("li", { className: "flex items-center gap-4 px-4 py-3", children: [
+        /* @__PURE__ */ jsx("div", { className: "rounded-md bg-muted p-2 shrink-0", children: /* @__PURE__ */ jsx(Icon, { className: "h-5 w-5 text-foreground" }) }),
+        /* @__PURE__ */ jsxs("div", { className: "min-w-0 flex-1", children: [
+          /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 flex-wrap", children: [
+            /* @__PURE__ */ jsx("span", { className: "font-medium text-sm", children: meta.name }),
+            isActive && badge && /* @__PURE__ */ jsx(
+              "span",
               {
-                onClick: () => {
-                  onSave(val.trim());
-                  setOpen(false);
-                },
-                children: t("common.save")
+                className: "text-[10px] leading-none px-1.5 py-0.5 rounded-sm font-medium uppercase tracking-wide",
+                style: badge,
+                children: planLabel(plan)
               }
             )
-          ] })
-        ] })
-      ]
-    }
-  );
+          ] }),
+          /* @__PURE__ */ jsx("div", { className: "text-xs text-muted-foreground mt-0.5 truncate", children: meta.description })
+        ] }),
+        /* @__PURE__ */ jsx("div", { className: "text-xs text-muted-foreground whitespace-nowrap min-w-[6rem] text-right", children: statusLabel }),
+        /* @__PURE__ */ jsx("div", { className: "w-24 flex justify-end", children: isActive && (isHostApp ? /* @__PURE__ */ jsxs(
+          Link,
+          {
+            to: "/app",
+            className: "inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline",
+            children: [
+              t("suite.subscriptions.open_app", "Open"),
+              /* @__PURE__ */ jsx(ArrowRight, { className: "h-3 w-3" })
+            ]
+          }
+        ) : url ? /* @__PURE__ */ jsxs(
+          "a",
+          {
+            href: url,
+            target: "_blank",
+            rel: "noopener noreferrer",
+            className: "inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline",
+            children: [
+              t("suite.subscriptions.open_app", "Open"),
+              /* @__PURE__ */ jsx(ExternalLink, { className: "h-3 w-3" })
+            ]
+          }
+        ) : /* @__PURE__ */ jsx("span", { className: "text-[11px] text-muted-foreground", children: t("suite.state.no_url", "No URL") })) })
+      ] }, meta.code);
+    }) })
+  ] });
 }
 function SuiteSettingsHub() {
   const { t } = useTranslation();
   const { ui, router } = useJoaSuite();
-  const { Link } = router;
+  const { Link: Link$1 } = router;
   const { Card, Badge } = ui;
   const orgTiles = [
     {
@@ -1937,21 +1724,21 @@ function SuiteSettingsHub() {
   ];
   const appsTiles = [
     {
-      to: "/app/suite",
-      icon: AppWindow,
-      label: t("suite.tile.app_access", "App Access"),
+      to: "/app/account/billing",
+      icon: Briefcase,
+      label: t("suite.tile.billing", "Plan & Billing"),
       description: t(
-        "suite.tile.app_access_desc",
-        "Enable / cancel subscriptions in app_catalog & tenant_apps."
+        "suite.tile.billing_desc",
+        "Workspace plan, invoices, and payment methods."
       )
     },
     {
-      to: "/app/suite",
-      icon: ExternalLink,
+      to: "/app/suite/settings/app-urls",
+      icon: Link,
       label: t("suite.tile.app_urls", "App URLs"),
       description: t(
         "suite.tile.app_urls_desc",
-        "Per-tenant external URLs for JoaApproval, JoaCRM, JoaOffice, JoaSOP."
+        "Override external URLs used to open each JoaSuite app."
       )
     }
   ];
@@ -1977,15 +1764,18 @@ function SuiteSettingsHub() {
   ];
   return /* @__PURE__ */ jsxs("div", { className: "p-6 lg:p-8 max-w-6xl mx-auto space-y-8", children: [
     /* @__PURE__ */ jsxs("div", { className: "flex items-end justify-between gap-4", children: [
-      /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsx("h1", { className: "text-2xl font-semibold tracking-tight", children: t("suite.settings.title", "Suite Settings") }),
-        /* @__PURE__ */ jsx("p", { className: "text-sm text-muted-foreground mt-1", children: t(
-          "suite.settings.subtitle",
-          "Workspace-wide settings shared across all JoaSuite apps. App-specific settings live inside each app."
-        ) })
+      /* @__PURE__ */ jsxs("div", { className: "flex items-start gap-3", children: [
+        /* @__PURE__ */ jsx("div", { className: "rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400 p-2.5 mt-0.5", children: /* @__PURE__ */ jsx(Settings2, { className: "h-5 w-5" }) }),
+        /* @__PURE__ */ jsxs("div", { children: [
+          /* @__PURE__ */ jsx("h1", { className: "text-2xl font-semibold tracking-tight", children: t("suite.settings.title", "Suite Settings") }),
+          /* @__PURE__ */ jsx("p", { className: "text-sm text-muted-foreground mt-1", children: t(
+            "suite.settings.subtitle",
+            "Configure organizations, people, app subscriptions, and platform policies. App-specific settings live inside each app."
+          ) })
+        ] })
       ] }),
       /* @__PURE__ */ jsxs(
-        Link,
+        Link$1,
         {
           to: "/app/suite",
           className: "text-xs text-primary hover:underline flex items-center gap-1",
@@ -1997,14 +1787,21 @@ function SuiteSettingsHub() {
         }
       )
     ] }),
-    /* @__PURE__ */ jsx(Section, { title: t("suite.section.org", "Organization"), tiles: orgTiles, Link, Card, Badge }),
-    /* @__PURE__ */ jsx(Section, { title: t("suite.section.apps", "Apps"), tiles: appsTiles, Link, Card, Badge }),
+    /* @__PURE__ */ jsxs("section", { className: "space-y-3", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx(AppWindow, { className: "h-4 w-4 text-muted-foreground" }),
+        /* @__PURE__ */ jsx("h2", { className: "text-sm font-semibold uppercase tracking-wider text-muted-foreground", children: t("suite.subscriptions.title", "App Subscriptions") })
+      ] }),
+      /* @__PURE__ */ jsx(AppSubscriptionsSummary, {})
+    ] }),
+    /* @__PURE__ */ jsx(Section, { title: t("suite.section.org", "Organization"), tiles: orgTiles, Link: Link$1, Card, Badge }),
+    /* @__PURE__ */ jsx(Section, { title: t("suite.section.apps", "Apps"), tiles: appsTiles, Link: Link$1, Card, Badge }),
     /* @__PURE__ */ jsx(
       Section,
       {
         title: t("suite.section.activity", "Activity & Monitoring"),
         tiles: activityTiles,
-        Link,
+        Link: Link$1,
         Card,
         Badge
       }
@@ -3027,6 +2824,6 @@ function PeopleDetailPage({ userId }) {
   ] });
 }
 
-export { APP_CODES, APP_DISPLAY, DEFAULT_APP_URLS, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, PeopleDetailPage, PeopleInvitePage, PeopleListPage, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, ThemeToggle, UserBadge, mergeSharedResources, useJoaSuite };
+export { APP_CODES, APP_DISPLAY, AppSubscriptionsSummary, DEFAULT_APP_URLS, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, PeopleDetailPage, PeopleInvitePage, PeopleListPage, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, ThemeToggle, UserBadge, mergeSharedResources, useJoaSuite };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map
