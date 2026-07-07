@@ -42,12 +42,11 @@ const Priority = z.enum(["critical", "high", "normal", "low", "optional"]);
 const Status = z.enum([
   "active", "paused", "ended", "draft", "needs_review", "cancel_planned", "cancelled",
 ]);
-const RecurringType = z.enum([
-  "subscription", "utility", "insurance", "rent", "lease", "loan_payment",
-  "interest", "payroll", "wage", "tax", "fee", "maintenance", "advertising",
-  "software", "professional_service", "budget", "recurring_income",
-  "other_expense", "other_income",
-]);
+// Built-in suggestions shown in RecurringForm's Type dropdown. Not a closed
+// set — the form's "+ Add new type…" lets a user pick any custom value
+// (persisted client-side in localStorage), so this must stay a free-text
+// field rather than a z.enum or every custom type fails validation on save.
+const RecurringType = z.string().min(1).max(60).default("other_expense");
 
 const PlanLineInput = z.object({
   line_no: z.number().int().min(1),
@@ -63,7 +62,7 @@ const RecurringInput = z.object({
   source_app: z.enum(["joabooks", "joaoffice"]).default("joabooks"),
   name: z.string().min(1).max(200),
   direction: Direction,
-  type: RecurringType.default("other_expense"),
+  type: RecurringType,
   party_id: z.string().uuid().nullable().optional(),
   description: z.string().nullable().optional(),
   owner_user_id: z.string().uuid().nullable().optional(),
