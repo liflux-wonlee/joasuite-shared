@@ -68,6 +68,14 @@ export type RecurringFormValue = {
   cancellation_deadline: string | null;
   must_pay_by: string | null;
   can_defer: boolean;
+  plan_lines: PlanLine[];
+};
+
+export type PlanLine = {
+  line_no: number;
+  due_date: string;
+  amount: number;
+  note?: string | null;
 };
 
 const DEFAULTS: RecurringFormValue = {
@@ -100,6 +108,7 @@ const DEFAULTS: RecurringFormValue = {
   cancellation_deadline: null,
   must_pay_by: null,
   can_defer: false,
+  plan_lines: [],
 };
 
 export function makeRecurringDefaults(over: Partial<RecurringFormValue> = {}): RecurringFormValue {
@@ -164,6 +173,38 @@ export function RecurringForm({
   const accounts = (((accountsQ.data as { rows?: AccountOpt[] } | undefined)?.rows) ?? []).filter((a) => a.active !== false);
   const [addVendorOpen, setAddVendorOpen] = useState(false);
 
+  // Custom type list persisted per-tenant in localStorage so newly added types
+  // remain selectable on subsequent visits within the same browser.
+  const BUILTIN_TYPES = ["subscription","utility","insurance","rent","lease","loan_payment","interest","payroll","wage","tax","fee","maintenance","advertising","software","professional_service","budget","recurring_income","other_expense","other_income"];
+  const typesStorageKey = `joabooks.recurring.types.${tenantId}`;
+  const [customTypes, setCustomTypes] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(typesStorageKey);
+      if (raw) setCustomTypes(JSON.parse(raw));
+    } catch { /* ignore */ }
+  }, [typesStorageKey]);
+  const allTypes = useMemo(() => {
+    const merged = [...BUILTIN_TYPES, ...customTypes];
+    if (v.type && !merged.includes(v.type)) merged.push(v.type);
+    return Array.from(new Set(merged));
+  }, [customTypes, v.type]);
+  const handleTypeChange = (val: string) => {
+    if (val === "__add_new__") {
+      const name = window.prompt(t("recurring.add_type_prompt", "New type name"))?.trim();
+      if (!name) return;
+      const key = name.toLowerCase().replace(/\s+/g, "_");
+      if (!customTypes.includes(key) && !BUILTIN_TYPES.includes(key)) {
+        const next = [...customTypes, key];
+        setCustomTypes(next);
+        try { localStorage.setItem(typesStorageKey, JSON.stringify(next)); } catch { /* ignore */ }
+      }
+      set("type", key);
+      return;
+    }
+    set("type", val);
+  };
+
   const set = <K extends keyof RecurringFormValue>(k: K, val: RecurringFormValue[K]) =>
     setV((s) => ({ ...s, [k]: val }));
 
@@ -223,7 +264,7 @@ export function RecurringForm({
     >
       <FormSection title={t("recurring.section_basic", "Basic information")} columns="md:grid-cols-2">
         <div className="md:col-span-2">
-          <Label>{t("recurring.name", "Name")} *</Label>
+          <Label>{t("recurring.label_title", "Title")} *</Label>
           <Input value={v.name} onChange={(e) => set("name", e.target.value)} required />
         </div>
         <div>
@@ -238,10 +279,11 @@ export function RecurringForm({
         <div>
           <Label>{t("recurring.type", "Type")}</Label>
           <select className="w-full border rounded h-9 px-2 bg-background"
-            value={v.type} onChange={(e) => set("type", e.target.value)}>
-            {["subscription","utility","insurance","rent","lease","loan_payment","interest","payroll","wage","tax","fee","maintenance","advertising","software","professional_service","budget","recurring_income","other_expense","other_income"].map((k) => (
+            value={v.type} onChange={(e) => handleTypeChange(e.target.value)}>
+            {allTypes.map((k) => (
               <option key={k} value={k}>{k}</option>
             ))}
+            <option value="__add_new__">＋ {t("recurring.add_new_type", "Add new type…")}</option>
           </select>
         </div>
         <div className="md:col-span-2">
@@ -296,7 +338,23 @@ export function RecurringForm({
 
       <FormSection title={t("recurring.section_money", "Money & account")} columns="md:grid-cols-3">
         <div>
-          <Label>{t("recurring.amount_type", "Amount Type")}</Label>
+          <LabelWithInfo
+            label={t("recurring.amount_type", "Amount Type")}
+            title={t("recurring.amount_type_info_title", "What is Amount Type?")}
+          >
+            <p>{t("recurring.amount_type_info_desc", "How the charge amount is determined for each occurrence.")}</p>
+            <ul className="space-y-1">
+              <li><b>fixed</b> — {t("recurring.at_fixed", "Same amount every time.")}</li>
+              <li><b>estimated</b> — {t("recurring.at_estimated", "Approximate; actual may vary slightly.")}</li>
+              <li><b>variable</b> — {t("recurring.at_variable", "Changes each occurrence (e.g. utility bill).")}</li>
+              <li><b>range</b> — {t("recurring.at_range", "Falls between a min and max amount.")}</li>
+              <li><b>historical_average</b> — {t("recurring.at_hist", "Uses the average of past charges.")}</li>
+              <li><b>same_month_last_year</b> — {t("recurring.at_smly", "Uses same month's amount from last year.")}</li>
+              <li><b>custom_plan</b> — {t("recurring.at_custom", "Custom schedule with different amounts per date.")}</li>
+              <li><b>budget</b> — {t("recurring.at_budget", "A planned budget cap, not a real bill.")}</li>
+              <li><b>manual</b> — {t("recurring.at_manual", "You will enter the amount each time.")}</li>
+            </ul>
+          </LabelWithInfo>
           <select className="w-full border rounded h-9 px-2 bg-background"
             value={v.amount_type} onChange={(e) => set("amount_type", e.target.value as any)}>
             {["fixed","estimated","variable","range","historical_average","same_month_last_year","custom_plan","budget","manual"].map((k) => (
@@ -317,7 +375,7 @@ export function RecurringForm({
           </>
         ) : (
           <div>
-            <Label>{t("recurring.amount", "Amount")}</Label>
+            <Label>{t("recurring.total_amount", "Total Amount")}</Label>
             <Input type="number" step="0.01" value={v.amount ?? 0} onChange={(e) => set("amount", Number(e.target.value))} />
           </div>
         )}
@@ -359,7 +417,24 @@ export function RecurringForm({
           </select>
         </div>
         <div>
-          <Label>{t("recurring.forecast_method", "Forecast Method")}</Label>
+          <LabelWithInfo
+            label={t("recurring.forecast_method", "Forecast Method")}
+            title={t("recurring.forecast_method_info_title", "What is Forecast Method?")}
+          >
+            <p>{t("recurring.forecast_method_info_desc", "How the forecast graph estimates future amounts for this item. Amount Type is the actual charge; Forecast Method is how we project it.")}</p>
+            <ul className="space-y-1">
+              <li><b>manual</b> — {t("recurring.fm_manual", "You set future amounts yourself.")}</li>
+              <li><b>fixed</b> — {t("recurring.fm_fixed", "Uses the fixed amount every period.")}</li>
+              <li><b>last_txn</b> — {t("recurring.fm_last", "Uses the most recent actual transaction.")}</li>
+              <li><b>avg_3m</b> — {t("recurring.fm_avg3", "Average of the last 3 months.")}</li>
+              <li><b>avg_6m</b> — {t("recurring.fm_avg6", "Average of the last 6 months.")}</li>
+              <li><b>same_month_last_year</b> — {t("recurring.fm_smly", "Same month from last year.")}</li>
+              <li><b>max_6m</b> — {t("recurring.fm_max6", "Highest amount in the last 6 months (conservative).")}</li>
+              <li><b>range</b> — {t("recurring.fm_range", "Uses the min–max range midpoint.")}</li>
+              <li><b>ai</b> — {t("recurring.fm_ai", "AI-based prediction from history and patterns.")}</li>
+              <li><b>custom_plan</b> — {t("recurring.fm_custom", "Uses the custom plan lines you defined.")}</li>
+            </ul>
+          </LabelWithInfo>
           <select className="w-full border rounded h-9 px-2 bg-background"
             value={v.forecast_method} onChange={(e) => set("forecast_method", e.target.value as any)}>
             {["manual","fixed","last_txn","avg_3m","avg_6m","same_month_last_year","max_6m","range","ai","custom_plan"].map((k) => (
@@ -409,27 +484,49 @@ export function RecurringForm({
           </select>
           {cadenceHint && <p className="text-xs text-muted-foreground mt-1">{cadenceHint}</p>}
         </div>
-        <div>
-          <Label>{t("recurring.start_date", "Start Date")}</Label>
-          <Input type="date" value={v.start_date ?? ""} onChange={(e) => handleDateChange("start_date", e.target.value)} />
-        </div>
-        <div>
-          <Label>{t("recurring.next_date", "Next Date")}</Label>
-          <Input type="date" value={v.next_date ?? ""} onChange={(e) => handleDateChange("next_date", e.target.value)} />
-        </div>
-        <div>
-          <Label>{t("recurring.end_date", "End Date")}</Label>
-          <Input type="date" value={v.end_date ?? ""} onChange={(e) => set("end_date", e.target.value || null)} />
-        </div>
-        <div>
-          <Label>{t("recurring.due_day", "Due Day (1-31)")}</Label>
-          <Input type="number" min={1} max={31} value={v.due_day ?? ""} onChange={(e) => set("due_day", e.target.value ? Number(e.target.value) : null)} />
-        </div>
-        <div>
-          <Label>{t("recurring.must_pay_by", "Must Pay By")}</Label>
-          <Input type="date" value={v.must_pay_by ?? ""} onChange={(e) => set("must_pay_by", e.target.value || null)} />
-        </div>
+        {v.frequency === "custom" ? (
+          <div className="md:col-span-3">
+            <CustomPlanEditor
+              lines={v.plan_lines}
+              currency={v.currency_code}
+              onChange={(lines) => set("plan_lines", lines)}
+              embedded
+            />
+          </div>
+        ) : (
+          <>
+            <div>
+              <Label>{t("recurring.start_date", "Start Date")}</Label>
+              <Input type="date" value={v.start_date ?? ""} onChange={(e) => handleDateChange("start_date", e.target.value)} />
+            </div>
+            <div>
+              <Label>{t("recurring.next_date", "Next Date")}</Label>
+              <Input type="date" value={v.next_date ?? ""} onChange={(e) => handleDateChange("next_date", e.target.value)} />
+            </div>
+            <div>
+              <Label>{t("recurring.end_date", "End Date")}</Label>
+              <Input type="date" value={v.end_date ?? ""} onChange={(e) => set("end_date", e.target.value || null)} />
+            </div>
+            <div>
+              <Label>{t("recurring.due_day", "Due Day (1-31)")}</Label>
+              <Input type="number" min={1} max={31} value={v.due_day ?? ""} onChange={(e) => set("due_day", e.target.value ? Number(e.target.value) : null)} />
+            </div>
+            <div>
+              <Label>{t("recurring.must_pay_by", "Must Pay By")}</Label>
+              <Input type="date" value={v.must_pay_by ?? ""} onChange={(e) => set("must_pay_by", e.target.value || null)} />
+            </div>
+          </>
+        )}
       </FormSection>
+
+      {v.frequency !== "custom" && v.amount_type === "custom_plan" && (
+        <CustomPlanEditor
+          lines={v.plan_lines}
+          currency={v.currency_code}
+          onChange={(lines) => set("plan_lines", lines)}
+        />
+      )}
+
 
       <FormSection title={t("recurring.section_lifecycle", "Lifecycle")} columns="md:grid-cols-3">
         <div>
@@ -483,7 +580,22 @@ export function RecurringForm({
         </div>
       </FormSection>
 
-      <FormSection title={t("recurring.section_controls", "Forecast & automation")} columns="sm:grid-cols-2 lg:grid-cols-4">
+      <FormSection
+        title={t("recurring.section_controls", "Forecast & automation")}
+        columns="sm:grid-cols-2 lg:grid-cols-4"
+        infoTitle={t("recurring.section_controls_info_title", "Forecast & automation")}
+        info={
+          <>
+            <p>{t("recurring.section_controls_info_desc", "Controls how this item behaves in forecasts and whether the system handles it automatically.")}</p>
+            <ul className="space-y-1">
+              <li><b>{t("recurring.forecast_included", "Include in forecast")}</b> — {t("recurring.ci_forecast_included", "Show this item in cashflow forecast charts and totals.")}</li>
+              <li><b>{t("recurring.autopay", "Autopay")}</b> — {t("recurring.ci_autopay", "Payment is charged automatically by the vendor/bank on the due date.")}</li>
+              <li><b>{t("recurring.auto_renew", "Auto Renew")}</b> — {t("recurring.ci_auto_renew", "Subscription/contract renews automatically after the end/renewal date.")}</li>
+              <li><b>{t("recurring.can_defer", "Can Defer")}</b> — {t("recurring.ci_can_defer", "This payment can be postponed to a later period if cash is tight.")}</li>
+            </ul>
+          </>
+        }
+      >
         <ToggleField
           label={t("recurring.forecast_included", "Include in forecast")}
           checked={v.forecast_included}
@@ -555,17 +667,71 @@ export function RecurringForm({
 function FormSection({
   title,
   columns,
+  info,
+  infoTitle,
   children,
 }: {
   title: string;
   columns: string;
+  info?: ReactNode;
+  infoTitle?: string;
   children: ReactNode;
 }) {
   return (
     <section className="rounded-lg border bg-muted/30 p-4 space-y-3">
-      <h2 className="text-base font-bold text-foreground">{title}</h2>
+      <h2 className="text-base font-bold text-foreground flex items-center gap-1">
+        {title}
+        {info && (
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                aria-label={infoTitle ?? title}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <Info className="h-4 w-4" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent side="top" className="w-80 text-xs space-y-2">
+              {infoTitle && <p className="font-medium text-sm">{infoTitle}</p>}
+              <div className="text-muted-foreground space-y-2">{info}</div>
+            </PopoverContent>
+          </Popover>
+        )}
+      </h2>
       <div className={cn("grid grid-cols-1 gap-3", columns)}>{children}</div>
     </section>
+  );
+}
+
+function LabelWithInfo({
+  label,
+  title,
+  children,
+}: {
+  label: string;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-1 mb-1">
+      <Label className="m-0">{label}</Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label={title}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <Info className="h-3.5 w-3.5" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent side="top" className="w-80 text-xs space-y-2">
+          <p className="font-medium text-sm">{title}</p>
+          <div className="text-muted-foreground space-y-2">{children}</div>
+        </PopoverContent>
+      </Popover>
+    </div>
   );
 }
 
@@ -621,6 +787,114 @@ function OccurrencePreview({ v }: { v: RecurringFormValue }) {
         {t("recurring.preview_hint", "Preview only — full 13-month schedule is generated after save.")}
       </p>
     </section>
+  );
+}
+
+function CustomPlanEditor({
+  lines,
+  currency,
+  onChange,
+  embedded = false,
+}: {
+  lines: PlanLine[];
+  currency: string;
+  onChange: (lines: PlanLine[]) => void;
+  embedded?: boolean;
+}) {
+  const { t } = useTranslation();
+  const update = (idx: number, patch: Partial<PlanLine>) => {
+    onChange(lines.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
+  };
+  const add = () => {
+    const nextNo = (lines[lines.length - 1]?.line_no ?? 0) + 1;
+    onChange([
+      ...lines,
+      { line_no: nextNo, due_date: new Date().toISOString().slice(0, 10), amount: 0, note: "" },
+    ]);
+  };
+  const remove = (idx: number) => onChange(lines.filter((_, i) => i !== idx));
+  const total = lines.reduce((s, l) => s + (Number(l.amount) || 0), 0);
+
+  const Wrapper: any = embedded ? "div" : "section";
+  return (
+    <Wrapper className={embedded ? "space-y-3" : "rounded-lg border bg-muted/30 p-4 space-y-3"}>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-bold text-foreground">
+            {t("recurring.custom_plan_title", "Custom schedule")}
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            {t(
+              "recurring.custom_plan_desc",
+              "Add each planned payment with its own date and amount. Used when frequency is Custom or amount type is Custom plan.",
+            )}
+          </p>
+        </div>
+        <Button type="button" variant="outline" size="sm" onClick={add}>
+          <Plus className="h-3.5 w-3.5 mr-1" />
+          {t("recurring.add_plan_line", "Add line")}
+        </Button>
+      </div>
+
+      {lines.length === 0 ? (
+        <p className="text-sm text-muted-foreground py-2">
+          {t("recurring.no_plan_lines", "No plan lines yet. Click Add line to create a schedule.")}
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {lines.map((l, i) => (
+            <div key={i} className="grid grid-cols-12 gap-2 items-end">
+              <div className="col-span-1">
+                <Label className="text-xs">#</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={l.line_no}
+                  onChange={(e) => update(i, { line_no: Number(e.target.value) })}
+                />
+              </div>
+              <div className="col-span-3">
+                <Label className="text-xs">{t("recurring.due_date", "Due date")}</Label>
+                <Input
+                  type="date"
+                  value={l.due_date}
+                  onChange={(e) => update(i, { due_date: e.target.value })}
+                />
+              </div>
+              <div className="col-span-3">
+                <Label className="text-xs">
+                  {t("recurring.amount", "Amount")} ({currency})
+                </Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={l.amount}
+                  onChange={(e) => update(i, { amount: Number(e.target.value) })}
+                />
+              </div>
+              <div className="col-span-4">
+                <Label className="text-xs">{t("recurring.note", "Note")}</Label>
+                <Input
+                  value={l.note ?? ""}
+                  onChange={(e) => update(i, { note: e.target.value })}
+                />
+              </div>
+              <div className="col-span-1">
+                <Button type="button" variant="ghost" size="sm" onClick={() => remove(i)}>
+                  ×
+                </Button>
+              </div>
+            </div>
+          ))}
+          <div className="text-right text-sm border-t pt-2">
+            <span className="text-muted-foreground">{t("recurring.plan_total", "Total")}: </span>
+            <span className="font-medium tabular-nums">
+              {currency} {fmtMoney(total)}
+            </span>
+          </div>
+        </div>
+      )}
+    </Wrapper>
   );
 }
 
