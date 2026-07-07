@@ -77,8 +77,8 @@ export function createListSuiteApps(deps: Deps) {
       if (subErr) throw subErr;
       if (rErr) throw rErr;
 
-      const myAppCodes = Array.from(
-        new Set((myRoles ?? []).map((r: any) => (r.app_code as string) ?? "joabooks")),
+      const myAppCodes: string[] = Array.from(
+        new Set<string>((myRoles ?? []).map((r: any) => (r.app_code as string) ?? "joabooks")),
       );
 
       return {

@@ -2,8 +2,8 @@
 
 JoaSuite 5개 앱(JoaBooks, JoaSOP, JoaOffice, JoaApproval, JoaCRM)이 공유하는 UI, 서버 함수, i18n을 단일 패키지로 묶어 **한 번 publish → `bun update` 한 줄로 모든 앱에 동기화**되도록 만드는 패키지입니다.
 
-> **상태: Phase 1 완료 (2026-07-06), publish 전 typecheck/build 검증 필요**
-> 모든 컴포넌트와 서버 함수 factory가 DI 패턴으로 포팅되었습니다. `.source.*` 스테이징 파일은 삭제되었습니다. 이 세션 환경에서는 사설 npm 레지스트리(403)에 막혀 `bun install`/`typecheck`/`build`를 실행하지 못했으므로, v0.1.0 태그를 찍기 전에 정상적인 환경에서 반드시 `bun install && bun run typecheck && bun run build`로 검증하세요.
+> **상태: Phase 1 완료 및 검증 완료 (2026-07-06)**
+> 모든 컴포넌트와 서버 함수 factory가 DI 패턴으로 포팅되었습니다. `.source.*` 스테이징 파일은 삭제되었습니다. 로컬 환경에서 `npm install && npm run typecheck && npm run build`를 실행해 typecheck 오류 0건, `tsup` ESM/DTS 빌드 성공(`dist/index.js`, `dist/server/index.js` 및 각 `.d.ts`)을 확인했습니다. v0.1.0 태그를 찍어도 좋습니다.
 
 ---
 
@@ -181,9 +181,9 @@ App-specific 키가 동일 path에서 shared 키를 덮어쓸 수 있도록 deep
 
 ---
 
-## 6. Phase 1 refactor 체크리스트 (완료, 2026-07-06)
+## 6. Phase 1 refactor 체크리스트 (완료 및 검증 완료, 2026-07-06)
 
-아래는 각 `.source` 파일 → `.tsx` 포팅 시 실제 적용한 변환 (참고용으로 남겨둠). typecheck/build 검증은 아직 안 됐으니 v0.1.0 태그 전에 반드시 실행할 것.
+아래는 각 `.source` 파일 → `.tsx` 포팅 시 실제 적용한 변환 (참고용으로 남겨둠). typecheck/build 검증 완료.
 
 ### 컴포넌트 (5개)
 

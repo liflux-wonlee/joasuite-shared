@@ -415,7 +415,7 @@ export function createInviteUserToWorkspaces(deps: AccountDeps) {
       const supabaseAdmin = deps.supabaseAdmin;
       for (const a of data.assignments) {
         await assertCallerManagesTenant(supabaseAdmin, a.tenant_id, callerId);
-        const wantsOwner = a.apps.some((ap) => ap.roles.includes("owner" as any));
+        const wantsOwner = a.apps.some((ap: any) => ap.roles.includes("owner" as any));
         if (wantsOwner) {
           const isOwner = await callerIsOwner(supabaseAdmin, a.tenant_id, callerId);
           if (!isOwner) {
@@ -426,7 +426,7 @@ export function createInviteUserToWorkspaces(deps: AccountDeps) {
           await assertAppsSubscribed(
             supabaseAdmin,
             a.tenant_id,
-            a.apps.map((x) => x.app_code),
+            a.apps.map((x: any) => x.app_code),
           );
         }
       }
@@ -434,7 +434,7 @@ export function createInviteUserToWorkspaces(deps: AccountDeps) {
       // Determine primary tenant: explicit input, or first assignment.
       const primaryTenantId =
         data.primary_tenant_id &&
-        data.assignments.some((a) => a.tenant_id === data.primary_tenant_id)
+        data.assignments.some((a: any) => a.tenant_id === data.primary_tenant_id)
           ? data.primary_tenant_id
           : data.assignments[0].tenant_id;
 
@@ -450,7 +450,7 @@ export function createInviteUserToWorkspaces(deps: AccountDeps) {
         .select("id, name")
         .in(
           "id",
-          data.assignments.map((a) => a.tenant_id),
+          data.assignments.map((a: any) => a.tenant_id),
         );
       const nameById = new Map<string, string>();
       (tenants ?? []).forEach((t: any) => nameById.set(t.id as string, (t.name as string) ?? ""));
@@ -474,8 +474,8 @@ export function createInviteUserToWorkspaces(deps: AccountDeps) {
           );
         if (muErr) throw new Error(muErr.message);
 
-        const rows = a.apps.flatMap((ap) =>
-          ap.roles.map((r) => ({
+        const rows = a.apps.flatMap((ap: any) =>
+          ap.roles.map((r: any) => ({
             tenant_id: a.tenant_id,
             user_id: invited.user.id,
             role: r,
@@ -551,7 +551,7 @@ export function createSetUserAppRoles(deps: AccountDeps) {
         .eq("app_code", data.app_code);
       if (delErr) throw new Error(delErr.message);
       if (data.roles.length > 0) {
-        const rows = data.roles.map((r) => ({
+        const rows = data.roles.map((r: any) => ({
           tenant_id: data.tenant_id,
           user_id: data.user_id,
           role: r,

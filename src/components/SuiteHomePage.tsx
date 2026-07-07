@@ -171,7 +171,7 @@ export function SuiteHomePage() {
             ) : (homeQ.data?.myApprovals ?? []).length === 0 ? (
               <EmptyState text={t("suite.empty.approvals", "No pending approvals.")} />
             ) : (
-              homeQ.data!.myApprovals.map((a) => (
+              homeQ.data!.myApprovals.map((a: any) => (
                 <Link
                   key={a.id}
                   to={"/app/approvals/$id" as any}
@@ -205,7 +205,7 @@ export function SuiteHomePage() {
             ) : (homeQ.data?.requestedByMe ?? []).length === 0 ? (
               <EmptyState text={t("suite.empty.requested", "Nothing requested yet.")} />
             ) : (
-              homeQ.data!.requestedByMe.map((r) => {
+              homeQ.data!.requestedByMe.map((r: any) => {
                 const to =
                   r.kind === "payment_request"
                     ? "/app/payment-requests/$id"
@@ -251,7 +251,7 @@ export function SuiteHomePage() {
             ) : (homeQ.data?.notifications ?? []).length === 0 ? (
               <EmptyState text={t("suite.empty.notifications", "No notifications.")} />
             ) : (
-              homeQ.data!.notifications.map((n) => (
+              homeQ.data!.notifications.map((n: any) => (
                 <div
                   key={n.id}
                   className={`p-2 rounded text-sm ${n.read_at ? "" : "bg-muted/40"}`}
@@ -292,7 +292,7 @@ export function SuiteHomePage() {
             ) : (homeQ.data?.recentActivity ?? []).length === 0 ? (
               <EmptyState text={t("suite.empty.activity", "No recent activity.")} />
             ) : (
-              homeQ.data!.recentActivity.map((a) => (
+              homeQ.data!.recentActivity.map((a: any) => (
                 <div key={a.id} className="text-xs flex items-center gap-2">
                   <span className="text-muted-foreground tabular-nums">
                     {new Date(a.created_at).toLocaleString()}
