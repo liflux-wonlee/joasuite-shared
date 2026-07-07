@@ -322,7 +322,7 @@ export function createInviteTenantUser(deps: AdminDeps) {
       if (muErr) throw new Error(muErr.message);
 
       if (data.roles.length > 0) {
-        const rows = data.roles.map((r) => ({
+        const rows = data.roles.map((r: any) => ({
           tenant_id: data.tenant_id,
           user_id: invited.user.id,
           role: r,
@@ -477,7 +477,7 @@ export function createUpdateTenantUserRoles(deps: AdminDeps) {
         .eq("app_code", appCode);
       if (delErr) throw new Error(delErr.message);
       if (data.roles.length > 0) {
-        const rows = data.roles.map((r) => ({
+        const rows = data.roles.map((r: any) => ({
           tenant_id: data.tenant_id,
           user_id: data.user_id,
           role: r,
