@@ -246,20 +246,22 @@ interface Props {
 }
 declare function LanguageSwitcher({ className, variant }: Props): react.JSX.Element;
 
-declare function UserBadge(_props?: Record<string, unknown>): void;
+declare function UserBadge(): react.JSX.Element;
 
-declare function NotificationsBell(_props?: Record<string, unknown>): void;
+declare function NotificationsBell(): react.JSX.Element;
 
-declare function SuiteSwitcher(_props?: Record<string, unknown>): void;
+declare function SuiteSwitcher(): react.JSX.Element;
 
-declare function SuiteHomePage(_props?: Record<string, unknown>): void;
+declare function SuiteHomePage(): react.JSX.Element | null;
 
-declare function SuiteSettingsHub(_props?: Record<string, unknown>): void;
+declare function SuiteSettingsHub(): react.JSX.Element;
 
-declare function PeopleListPage(_props?: Record<string, unknown>): void;
+declare function PeopleListPage(): react.JSX.Element;
 
-declare function PeopleInvitePage(_props?: Record<string, unknown>): void;
+declare function PeopleInvitePage(): react.JSX.Element;
 
-declare function PeopleDetailPage(_props?: Record<string, unknown>): void;
+declare function PeopleDetailPage({ userId }: {
+    userId: string;
+}): react.JSX.Element;
 
 export { type AppCatalogEntry, AppCode, type ApprovalSummary, type AuthState, type BoundServerFns, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type Membership, type NotificationRow, NotificationsBell, PeopleDetailPage, PeopleInvitePage, PeopleListPage, type RouterAdapter, SUPPORTED_LANGUAGES, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, type TenantAppRow, ThemeToggle, type UiAdapter, UserBadge, mergeSharedResources, useJoaSuite };
