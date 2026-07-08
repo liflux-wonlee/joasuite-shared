@@ -3,3 +3,11 @@ node_modules
 *.log
 .env
 .env.*
+
+# This repo is Lovable-connected and bun.lock is managed by it (bakes
+# Lovable's private package-registry mirror URLs into every entry — not
+# installable outside Lovable's own sandbox). Don't commit a competing
+# lockfile from another package manager; see CLAUDE.md.
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
