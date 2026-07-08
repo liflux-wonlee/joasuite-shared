@@ -620,10 +620,10 @@ export const markOccurrencePaid = createServerFn({ method: "POST" })
     } as any);
     if (payErr) throw new Error(payErr.message);
 
-    const newStatus = data.fully_paid ? "paid" : "partially_paid";
+    const newStatus: "paid" | "partially_paid" = data.fully_paid ? "paid" : "partially_paid";
     const { error } = await context.supabase
       .from("recurring_occurrences")
-      .update({ status: newStatus, actual_amount: newTotalPaid })
+      .update({ status: newStatus, actual_amount: newTotalPaid } as never)
       .eq("id", data.occurrence_id);
     if (error) throw new Error(error.message);
 
@@ -651,10 +651,11 @@ export const markOccurrencePaid = createServerFn({ method: "POST" })
   });
 
 // Undo a mistaken markOccurrencePaid call. Resets the occurrence back to
-// forecasted and clears its accumulated actual_amount. The `payments`
-// row(s) recorded by markOccurrencePaid (and any attachment) are kept for
-// audit history rather than deleted — only the occurrence's own paid-state
-// is rolled back. Only valid for the direct mark-as-paid path (no
+// forecasted, clears its accumulated actual_amount, AND deletes the
+// `payments` rows previously inserted for this occurrence so a subsequent
+// markOccurrencePaid doesn't double-count them (paidSoFar is recomputed
+// from that table). Audit history of the revert itself is preserved via
+// audit_logs. Only valid for the direct mark-as-paid path (no
 // linked_kind); a linked bill/expense/payment_request should be unlinked
 // via unlinkOccurrence instead.
 export const revertOccurrencePayment = createServerFn({ method: "POST" })
@@ -663,16 +664,23 @@ export const revertOccurrencePayment = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { data: occ, error: occErr } = await context.supabase
       .from("recurring_occurrences")
-      .select("id, linked_kind, status")
+      .select("id, tenant_id, linked_kind, status")
       .eq("id", data.occurrence_id)
       .single();
     if (occErr) throw new Error(occErr.message);
     if (occ.linked_kind) {
       throw new Error("This occurrence is linked to a document — unlink it from that document instead.");
     }
-    if (occ.status !== "paid" && occ.status !== "partially_paid") {
+    if (occ.status !== "paid" && (occ.status as string) !== "partially_paid") {
       throw new Error("This occurrence isn't marked paid.");
     }
+    const { error: delErr } = await context.supabase
+      .from("payments")
+      .delete()
+      .eq("tenant_id", occ.tenant_id)
+      .eq("doc_kind", "shared.recurring_occurrence")
+      .eq("doc_id", data.occurrence_id);
+    if (delErr) throw new Error(delErr.message);
     const { error } = await context.supabase
       .from("recurring_occurrences")
       .update({ status: "forecasted", actual_amount: null })
