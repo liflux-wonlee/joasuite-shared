@@ -46,6 +46,9 @@ const Status = z.enum([
 // set — the form's "+ Add new type…" lets a user pick any custom value
 // (persisted client-side in localStorage), so this must stay a free-text
 // field rather than a z.enum or every custom type fails validation on save.
+// recurring_transactions.type is a `text` column (migration 20260708120000)
+// for the same reason — it used to be a closed enum, which rejected any
+// custom type at the DB layer even though this schema already allowed it.
 const RecurringType = z.string().min(1).max(60).default("other_expense");
 
 const PlanLineInput = z.object({
@@ -419,7 +422,7 @@ export const createRecurring = createServerFn({ method: "POST" })
     const { plan_lines, ...master } = data;
     const { data: row, error } = await context.supabase
       .from("recurring_transactions")
-      .insert({ ...master, created_by: context.userId })
+      .insert({ ...master, created_by: context.userId } as any)
       .select().single();
     if (error) throw new Error(error.message);
 
@@ -445,7 +448,7 @@ export const updateRecurring = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { data: row, error } = await context.supabase
       .from("recurring_transactions")
-      .update(data.patch).eq("id", data.id).select().single();
+      .update(data.patch as any).eq("id", data.id).select().single();
     if (error) throw new Error(error.message);
 
     if (data.plan_lines) {
@@ -571,45 +574,110 @@ export const unlinkOccurrence = createServerFn({ method: "POST" })
 // bill/payment_request/expense/transaction row (e.g. an autopay charge or a
 // bank transfer that was already recorded elsewhere). Distinct from the
 // linked_* statuses set by linkOccurrence.
+//
+// Records the payment detail as a row in the generic `payments` table
+// (doc_kind="shared.recurring_occurrence"), mirroring markPaymentRequestPaid
+// in payment-requests.functions.ts — same full-vs-partial-paid model, same
+// note/proof_attachment_id fields — instead of adding bespoke columns to
+// recurring_occurrences.
 export const markOccurrencePaid = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({
     occurrence_id: z.string().uuid(),
-    actual_amount: z.number().optional(),
+    amount: z.number().positive(),
+    payment_date: z.string(),
+    fully_paid: z.boolean().default(true),
+    note: z.string().max(2000).optional().default(""),
+    proof_attachment_id: z.string().uuid().nullable().optional(),
   }).parse(i))
   .handler(async ({ data, context }) => {
     const { data: occ, error: occErr } = await context.supabase
       .from("recurring_occurrences")
-      .select("id, recurring_id, forecast_amount, occurrence_date")
+      .select("id, tenant_id, recurring_id, forecast_amount, occurrence_date")
       .eq("id", data.occurrence_id)
       .single();
     if (occErr) throw new Error(occErr.message);
 
+    const { data: priorPays } = await context.supabase
+      .from("payments")
+      .select("amount_usd")
+      .eq("tenant_id", occ.tenant_id)
+      .eq("doc_kind", "shared.recurring_occurrence")
+      .eq("doc_id", data.occurrence_id);
+    const paidSoFar = (priorPays ?? []).reduce((s, p: any) => s + (Number(p.amount_usd) || 0), 0);
+    const newTotalPaid = paidSoFar + data.amount;
+
+    const { error: payErr } = await context.supabase.from("payments").insert({
+      tenant_id: occ.tenant_id,
+      doc_kind: "shared.recurring_occurrence",
+      doc_id: data.occurrence_id,
+      payment_date: data.payment_date,
+      method: "other",
+      amount_usd: data.amount,
+      proof_attachment_id: data.proof_attachment_id ?? null,
+      paid_by: context.userId,
+      note: data.note,
+    } as any);
+    if (payErr) throw new Error(payErr.message);
+
+    const newStatus = data.fully_paid ? "paid" : "partially_paid";
     const { error } = await context.supabase
       .from("recurring_occurrences")
-      .update({
-        status: "paid",
-        actual_amount: data.actual_amount ?? occ.forecast_amount,
-      })
+      .update({ status: newStatus, actual_amount: newTotalPaid })
       .eq("id", data.occurrence_id);
     if (error) throw new Error(error.message);
 
-    // Advance parent next_date if this occurrence was the current one
-    // (same rule as convertOccurrenceToDoc, so "paid" and "converted" behave
-    // identically from the schedule's point of view).
-    const { data: r } = await context.supabase
-      .from("recurring_transactions")
-      .select("next_date, frequency, due_day")
-      .eq("id", occ.recurring_id)
-      .maybeSingle();
-    if (r?.next_date && occ.occurrence_date >= r.next_date) {
-      const newNext = advance(occ.occurrence_date, r.frequency, r.due_day);
-      await context.supabase
+    // Advance parent next_date if this occurrence was the current one and is
+    // now fully resolved (same rule as convertOccurrenceToDoc, so "paid" and
+    // "converted" behave identically from the schedule's point of view). A
+    // partial payment doesn't advance the schedule — the occurrence is still
+    // outstanding.
+    if (data.fully_paid) {
+      const { data: r } = await context.supabase
         .from("recurring_transactions")
-        .update({ next_date: newNext })
-        .eq("id", occ.recurring_id);
+        .select("next_date, frequency, due_day")
+        .eq("id", occ.recurring_id)
+        .maybeSingle();
+      if (r?.next_date && occ.occurrence_date >= r.next_date) {
+        const newNext = advance(occ.occurrence_date, r.frequency, r.due_day);
+        await context.supabase
+          .from("recurring_transactions")
+          .update({ next_date: newNext })
+          .eq("id", occ.recurring_id);
+      }
     }
 
+    return { ok: true, status: newStatus };
+  });
+
+// Undo a mistaken markOccurrencePaid call. Resets the occurrence back to
+// forecasted and clears its accumulated actual_amount. The `payments`
+// row(s) recorded by markOccurrencePaid (and any attachment) are kept for
+// audit history rather than deleted — only the occurrence's own paid-state
+// is rolled back. Only valid for the direct mark-as-paid path (no
+// linked_kind); a linked bill/expense/payment_request should be unlinked
+// via unlinkOccurrence instead.
+export const revertOccurrencePayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({ occurrence_id: z.string().uuid() }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: occ, error: occErr } = await context.supabase
+      .from("recurring_occurrences")
+      .select("id, linked_kind, status")
+      .eq("id", data.occurrence_id)
+      .single();
+    if (occErr) throw new Error(occErr.message);
+    if (occ.linked_kind) {
+      throw new Error("This occurrence is linked to a document — unlink it from that document instead.");
+    }
+    if (occ.status !== "paid" && occ.status !== "partially_paid") {
+      throw new Error("This occurrence isn't marked paid.");
+    }
+    const { error } = await context.supabase
+      .from("recurring_occurrences")
+      .update({ status: "forecasted", actual_amount: null })
+      .eq("id", data.occurrence_id);
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
 
