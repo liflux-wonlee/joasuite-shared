@@ -236,14 +236,22 @@ async function regenerateOccurrencesFor(
   const windowStart = addMonths(todayIso(), -1);
   const windowEnd = addMonths(todayIso(), 12);
 
-  // Delete only forward-looking forecasted occurrences (preserve linked/paid history)
-  await supabase
+  // Delete forward-looking forecasted occurrences (preserve linked/paid history),
+  // plus any forecasted row dated before the series' own start_date — those
+  // can never be valid once the anchor moves forward and would otherwise be
+  // orphaned outside the rolling window (e.g. editing start_date 6/3 -> 7/3
+  // must drop the now-invalid 6/3 occurrence even though it's now older than
+  // windowStart).
+  let deleteQuery = supabase
     .from("recurring_occurrences")
     .delete()
     .eq("tenant_id", tenantId)
     .eq("recurring_id", recurringId)
-    .eq("status", "forecasted")
-    .gte("occurrence_date", windowStart);
+    .eq("status", "forecasted");
+  deleteQuery = r.start_date
+    ? deleteQuery.or(`occurrence_date.gte.${windowStart},occurrence_date.lt.${r.start_date}`)
+    : deleteQuery.gte("occurrence_date", windowStart);
+  await deleteQuery;
 
   // Build rows
   let rows: any[] = [];
