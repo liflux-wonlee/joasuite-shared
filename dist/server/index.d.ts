@@ -1,5 +1,6 @@
 export { A as AppCode } from '../constants-CjPROrfF.js';
 import * as _tanstack_start_client_core from '@tanstack/start-client-core';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 type AppCatalogEntry = {
     code: string;
@@ -97,6 +98,21 @@ declare function createSetAppUrl(deps: Deps$1): _tanstack_start_client_core.Opti
 }, Promise<{
     ok: true;
 }>>;
+
+/**
+ * Verifies every requested tenant_id is an active membership of `userId`
+ * before a cross-organization query is allowed to run. No elevated role is
+ * required — a user may always aggregate across organizations they already
+ * belong to (unlike, say, an internal audit-log view of other users'
+ * activity). Throws if any requested id is not an active membership, so a
+ * client can never smuggle in an organization the caller doesn't belong to.
+ *
+ * A plain helper rather than a `createServerFn` factory: it has nothing
+ * app-specific to inject (no email sender, no app code) and is meant to be
+ * called from inside another handler that already has an authenticated
+ * `supabase` client and `userId` from its own middleware.
+ */
+declare function resolveScopedTenantIds(supabase: SupabaseClient, userId: string, tenantIds: string[]): Promise<string[]>;
 
 type Deps = {
     requireSupabaseAuth: any;
@@ -502,4 +518,4 @@ declare function createMergeParties(deps: MergePartiesDeps): _tanstack_start_cli
     reassigned: Record<string, number>;
 }>>;
 
-export { type AccountDeps, type AdminDeps, type AppCatalogEntry, type MergePartiesDeps, type PartyRefTable, type SuiteHomeData, type TenantAppRow, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createArchiveParty, createCancelApp, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createGetMyProfile, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSetUserAppRoles, createSubscribeApp, createUnarchiveParty, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact };
+export { type AccountDeps, type AdminDeps, type AppCatalogEntry, type MergePartiesDeps, type PartyRefTable, type SuiteHomeData, type TenantAppRow, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createArchiveParty, createCancelApp, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createGetMyProfile, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSetUserAppRoles, createSubscribeApp, createUnarchiveParty, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, resolveScopedTenantIds };

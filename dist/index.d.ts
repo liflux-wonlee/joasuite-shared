@@ -63,6 +63,23 @@ type SuiteHomeData = {
         app_code: string | null;
     }>;
 };
+/**
+ * Standard shape each app implements to summarize its own state for the
+ * JoaSuite Home "App Overview" section. The core only defines the shape —
+ * every metric behind it is computed and owned by the app itself.
+ */
+type AppSummaryTile = {
+    app_code: AppCode;
+    headline_label: string;
+    headline_value: string;
+    trend?: "up" | "down" | "flat";
+    secondary: Array<{
+        label: string;
+        value: string;
+    }>;
+    alert_count?: number;
+    link_path: string;
+};
 
 type AuthState = {
     user: {
@@ -164,6 +181,9 @@ type BoundServerFns = {
     }) => Promise<{
         ok: true;
     }>;
+    getAppSummaries: (input: {
+        tenantIds: string[];
+    }) => Promise<AppSummaryTile[]>;
     listNotifications: (input: {
         tenant_id: string;
         limit?: number;
@@ -259,6 +279,31 @@ declare function SuiteSettingsHub(): react.JSX.Element;
 
 declare function AppSubscriptionsSummary(): react.JSX.Element | null;
 
+/**
+ * Lets the user widen a screen (Dashboard, JoaSuite Home) from "this
+ * organization" to any combination of the organizations they belong to.
+ * Hidden entirely for users with only one membership — there's nothing to
+ * scope. No elevated role is required: a user may always aggregate across
+ * organizations they're already an active member of (the server still
+ * re-verifies membership for every requested id — see
+ * `resolveScopedTenantIds` in `./server`).
+ */
+declare function OrgScopeToggle({ value, onChange, }: {
+    value: string[];
+    onChange: (tenantIds: string[]) => void;
+}): react.JSX.Element | null;
+
+/**
+ * "App Overview" section for JoaSuite Home — one tile per app that has
+ * implemented the `AppSummaryTile` contract (see types.ts). Apps that
+ * haven't implemented it yet simply don't produce a tile; there is no
+ * placeholder per-app row here, since the core has no way to know an app
+ * exists until it starts returning a tile.
+ */
+declare function AppOverviewSection({ tenantIds }: {
+    tenantIds: string[];
+}): react.JSX.Element;
+
 declare function PeopleListPage(): react.JSX.Element;
 
 declare function PeopleInvitePage(): react.JSX.Element;
@@ -267,4 +312,13 @@ declare function PeopleDetailPage({ userId }: {
     userId: string;
 }): react.JSX.Element;
 
-export { type AppCatalogEntry, AppCode, AppSubscriptionsSummary, type ApprovalSummary, type AuthState, type BoundServerFns, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type Membership, type NotificationRow, NotificationsBell, PeopleDetailPage, PeopleInvitePage, PeopleListPage, type RouterAdapter, SUPPORTED_LANGUAGES, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, type TenantAppRow, ThemeToggle, type UiAdapter, UserBadge, mergeSharedResources, useJoaSuite };
+/**
+ * Local "which organizations am I looking at" state for a screen that wants
+ * an org-scope selector (Dashboard, JoaSuite Home). Defaults to the user's
+ * current active organization and follows it when they switch via the
+ * workspace switcher — as long as they haven't deliberately widened the
+ * selection to more than one org.
+ */
+declare function useOrgScope(): [string[], (tenantIds: string[]) => void];
+
+export { type AppCatalogEntry, AppCode, AppOverviewSection, AppSubscriptionsSummary, type AppSummaryTile, type ApprovalSummary, type AuthState, type BoundServerFns, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type Membership, type NotificationRow, NotificationsBell, OrgScopeToggle, PeopleDetailPage, PeopleInvitePage, PeopleListPage, type RouterAdapter, SUPPORTED_LANGUAGES, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, type TenantAppRow, ThemeToggle, type UiAdapter, UserBadge, mergeSharedResources, useJoaSuite, useOrgScope };

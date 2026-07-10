@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
-import { Moon, Sun, Globe, User, Shield, Briefcase, CreditCard, LogOut, Bell, Check, Layers, Home, ChevronDown, FileText, Users, ClipboardCheck, BookOpen, Lock, Settings2, ScrollText, Inbox, Send, ArrowRight, ExternalLink, Building2, Contact2, Link, AppWindow, Plus, Search, MoreHorizontal, Mail, KeyRound, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
+import { Moon, Sun, Globe, User, Shield, Briefcase, CreditCard, LogOut, Bell, Check, Layers, Home, ChevronDown, FileText, Users, ClipboardCheck, BookOpen, Lock, Settings2, ScrollText, Building2, LayoutGrid, AlertCircle, Inbox, Send, ArrowRight, ExternalLink, Contact2, Link, AppWindow, Plus, Search, MoreHorizontal, Mail, KeyRound, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -234,6 +234,20 @@ var en_default = {
     currency_code: "Code (USD, KRW, \u2026)",
     currency_symbol: "Symbol",
     subscription: "Subscription"
+  },
+  suite: {
+    org_scope: {
+      this_org: "This organization",
+      all_orgs: "All organizations ({{count}})",
+      n_selected: "{{count}} organizations selected",
+      select_orgs: "Organizations",
+      select_all: "Select all",
+      reset_to_current: "Reset to current"
+    },
+    app_overview: {
+      title: "App Overview",
+      empty: "No connected app summaries yet."
+    }
   }
 };
 
@@ -414,6 +428,20 @@ var ko_default = {
     account_added: "\uACC4\uC815\uC774 \uCD94\uAC00\uB418\uC5C8\uC2B5\uB2C8\uB2E4",
     account_updated: "\uACC4\uC815\uC774 \uC5C5\uB370\uC774\uD2B8\uB418\uC5C8\uC2B5\uB2C8\uB2E4",
     subscription: "\uAD6C\uB3C5"
+  },
+  suite: {
+    org_scope: {
+      this_org: "\uC774 \uC870\uC9C1",
+      all_orgs: "\uC804\uCCB4 \uC870\uC9C1 ({{count}})",
+      n_selected: "\uC870\uC9C1 {{count}}\uAC1C \uC120\uD0DD\uB428",
+      select_orgs: "\uC870\uC9C1",
+      select_all: "\uC804\uCCB4 \uC120\uD0DD",
+      reset_to_current: "\uD604\uC7AC \uC870\uC9C1\uC73C\uB85C \uC7AC\uC124\uC815"
+    },
+    app_overview: {
+      title: "\uC571 \uD604\uD669",
+      empty: "\uC544\uC9C1 \uC5F0\uACB0\uB41C \uC571 \uC694\uC57D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4."
+    }
   }
 };
 
@@ -1374,6 +1402,117 @@ function SuiteSwitcher() {
     ] })
   ] });
 }
+function useOrgScope() {
+  const { useAuth } = useJoaSuite();
+  const { currentTenantId } = useAuth();
+  const [scope, setScope] = useState(currentTenantId ? [currentTenantId] : []);
+  useEffect(() => {
+    if (!currentTenantId) return;
+    setScope((prev) => prev.length <= 1 ? [currentTenantId] : prev);
+  }, [currentTenantId]);
+  return [scope, setScope];
+}
+function OrgScopeToggle({
+  value,
+  onChange
+}) {
+  const { t } = useTranslation();
+  const { useAuth, ui } = useJoaSuite();
+  const { Button, Badge, Checkbox, Popover, PopoverContent, PopoverTrigger } = ui;
+  const { memberships } = useAuth();
+  const [open, setOpen] = useState(false);
+  if (memberships.length <= 1) return null;
+  const selected = new Set(value);
+  const allSelected = memberships.every((m) => selected.has(m.tenant_id));
+  const label = allSelected ? t("suite.org_scope.all_orgs", "All organizations ({{count}})", { count: memberships.length }) : value.length <= 1 ? t("suite.org_scope.this_org", "This organization") : t("suite.org_scope.n_selected", "{{count}} organizations selected", { count: value.length });
+  const toggleOne = (tenantId) => {
+    const next = new Set(selected);
+    if (next.has(tenantId)) next.delete(tenantId);
+    else next.add(tenantId);
+    if (next.size === 0) return;
+    onChange(Array.from(next));
+  };
+  const toggleAll = () => {
+    onChange(allSelected ? [memberships[0].tenant_id] : memberships.map((m) => m.tenant_id));
+  };
+  return /* @__PURE__ */ jsxs(Popover, { open, onOpenChange: setOpen, children: [
+    /* @__PURE__ */ jsx(PopoverTrigger, { asChild: true, children: /* @__PURE__ */ jsxs(Button, { variant: "outline", size: "sm", className: "gap-2", children: [
+      /* @__PURE__ */ jsx(Building2, { className: "h-3.5 w-3.5" }),
+      label,
+      /* @__PURE__ */ jsx(ChevronDown, { className: "h-3.5 w-3.5 opacity-60" })
+    ] }) }),
+    /* @__PURE__ */ jsxs(PopoverContent, { align: "end", className: "w-72 p-0", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between px-3 py-2 border-b", children: [
+        /* @__PURE__ */ jsx("span", { className: "text-xs font-medium text-muted-foreground", children: t("suite.org_scope.select_orgs", "Organizations") }),
+        /* @__PURE__ */ jsx("button", { type: "button", className: "text-xs text-primary hover:underline", onClick: toggleAll, children: allSelected ? t("suite.org_scope.reset_to_current", "Reset to current") : t("suite.org_scope.select_all", "Select all") })
+      ] }),
+      /* @__PURE__ */ jsx("div", { className: "max-h-72 overflow-y-auto divide-y", children: memberships.map((m) => {
+        const adminRole = m.roles.find((r) => r === "owner" || r === "super_admin");
+        return /* @__PURE__ */ jsxs(
+          "label",
+          {
+            className: "flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-muted/50",
+            children: [
+              /* @__PURE__ */ jsx(
+                Checkbox,
+                {
+                  checked: selected.has(m.tenant_id),
+                  onCheckedChange: () => toggleOne(m.tenant_id)
+                }
+              ),
+              /* @__PURE__ */ jsx("span", { className: "flex-1 truncate", children: m.tenant_name ?? m.tenant_id }),
+              adminRole && /* @__PURE__ */ jsx(Badge, { variant: "outline", className: "text-[10px]", children: adminRole })
+            ]
+          },
+          m.tenant_id
+        );
+      }) })
+    ] })
+  ] });
+}
+function AppOverviewSection({ tenantIds }) {
+  const { t } = useTranslation();
+  const { ui, router, fns } = useJoaSuite();
+  const { Card, Badge } = ui;
+  const { Link } = router;
+  const q = useQuery({
+    queryKey: ["app-overview", tenantIds],
+    enabled: tenantIds.length > 0,
+    queryFn: () => fns.getAppSummaries({ tenantIds })
+  });
+  const tiles = q.data ?? [];
+  return /* @__PURE__ */ jsxs(Card, { className: "p-5", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 mb-3", children: [
+      /* @__PURE__ */ jsx(LayoutGrid, { className: "h-4 w-4 text-muted-foreground" }),
+      /* @__PURE__ */ jsx("h2", { className: "text-sm font-semibold uppercase tracking-wider text-muted-foreground", children: t("suite.app_overview.title", "App Overview") })
+    ] }),
+    q.isLoading ? /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("common.loading") }) : tiles.length === 0 ? /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground py-4 text-center", children: t("suite.app_overview.empty", "No connected app summaries yet.") }) : /* @__PURE__ */ jsx("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-3", children: tiles.map((tile) => /* @__PURE__ */ jsxs(
+      Link,
+      {
+        to: tile.link_path,
+        className: "border rounded-lg p-4 hover:border-primary transition block",
+        children: [
+          /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between gap-2", children: [
+            /* @__PURE__ */ jsx("span", { className: "text-xs font-medium uppercase text-muted-foreground", children: tile.app_code }),
+            !!tile.alert_count && /* @__PURE__ */ jsxs(Badge, { variant: "outline", className: "gap-1 text-[10px]", children: [
+              /* @__PURE__ */ jsx(AlertCircle, { className: "h-3 w-3" }),
+              tile.alert_count
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { className: "mt-2", children: [
+            /* @__PURE__ */ jsx("div", { className: "text-xs text-muted-foreground", children: tile.headline_label }),
+            /* @__PURE__ */ jsx("div", { className: "text-xl font-semibold mt-0.5", children: tile.headline_value })
+          ] }),
+          tile.secondary.length > 0 && /* @__PURE__ */ jsx("div", { className: "mt-3 space-y-1", children: tile.secondary.map((s) => /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between text-xs text-muted-foreground", children: [
+            /* @__PURE__ */ jsx("span", { children: s.label }),
+            /* @__PURE__ */ jsx("span", { className: "tabular-nums text-foreground", children: s.value })
+          ] }, s.label)) })
+        ]
+      },
+      tile.app_code
+    )) })
+  ] });
+}
 function formatMoney(n) {
   if (n == null) return "";
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(n));
@@ -1385,6 +1524,7 @@ function SuiteHomePage() {
   const { Card, Badge } = ui;
   const { currentMembership } = useAuth();
   const tenantId = currentMembership?.tenant_id ?? "";
+  const [orgScope, setOrgScope] = useOrgScope();
   const homeQ = useQuery({
     queryKey: ["suite-home", tenantId],
     enabled: !!tenantId,
@@ -1392,17 +1532,21 @@ function SuiteHomePage() {
   });
   if (!tenantId) return null;
   return /* @__PURE__ */ jsxs("div", { className: "p-6 lg:p-8 max-w-7xl mx-auto space-y-8", children: [
-    /* @__PURE__ */ jsx("div", { className: "flex items-end justify-between gap-4", children: /* @__PURE__ */ jsxs("div", { className: "flex items-start gap-3", children: [
-      /* @__PURE__ */ jsx("div", { className: "rounded-md bg-primary/10 text-primary p-2.5 mt-0.5", children: /* @__PURE__ */ jsx(Home, { className: "h-5 w-5" }) }),
-      /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsx("h1", { className: "text-2xl font-semibold tracking-tight", children: t("suite.home_title", "JoaSuite Home") }),
-        currentMembership?.tenant_name && /* @__PURE__ */ jsx("div", { className: "text-base font-medium text-foreground mt-1", children: currentMembership.tenant_name }),
-        /* @__PURE__ */ jsx("p", { className: "text-sm text-muted-foreground mt-1", children: t(
-          "suite.home_subtitle",
-          "Your daily workspace \u2014 approvals, requests, notifications, and activity across every JoaSuite app."
-        ) })
-      ] })
-    ] }) }),
+    /* @__PURE__ */ jsxs("div", { className: "flex items-end justify-between gap-4 flex-wrap", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex items-start gap-3", children: [
+        /* @__PURE__ */ jsx("div", { className: "rounded-md bg-primary/10 text-primary p-2.5 mt-0.5", children: /* @__PURE__ */ jsx(Home, { className: "h-5 w-5" }) }),
+        /* @__PURE__ */ jsxs("div", { children: [
+          /* @__PURE__ */ jsx("h1", { className: "text-2xl font-semibold tracking-tight", children: t("suite.home_title", "JoaSuite Home") }),
+          currentMembership?.tenant_name && /* @__PURE__ */ jsx("div", { className: "text-base font-medium text-foreground mt-1", children: currentMembership.tenant_name }),
+          /* @__PURE__ */ jsx("p", { className: "text-sm text-muted-foreground mt-1", children: t(
+            "suite.home_subtitle",
+            "Your daily workspace \u2014 approvals, requests, notifications, and activity across every JoaSuite app."
+          ) })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsx(OrgScopeToggle, { value: orgScope, onChange: setOrgScope })
+    ] }),
+    /* @__PURE__ */ jsx(AppOverviewSection, { tenantIds: orgScope }),
     /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-1 lg:grid-cols-2 gap-6", children: [
       /* @__PURE__ */ jsxs(Card, { className: "p-5", children: [
         /* @__PURE__ */ jsx(SectionHeader, { icon: Inbox, title: t("suite.section.my_approvals", "My Approvals") }),
@@ -2822,6 +2966,6 @@ function PeopleDetailPage({ userId }) {
   ] });
 }
 
-export { APP_CODES, APP_DISPLAY, AppSubscriptionsSummary, DEFAULT_APP_URLS, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, PeopleDetailPage, PeopleInvitePage, PeopleListPage, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, ThemeToggle, UserBadge, mergeSharedResources, useJoaSuite };
+export { APP_CODES, APP_DISPLAY, AppOverviewSection, AppSubscriptionsSummary, DEFAULT_APP_URLS, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgScopeToggle, PeopleDetailPage, PeopleInvitePage, PeopleListPage, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, ThemeToggle, UserBadge, mergeSharedResources, useJoaSuite, useOrgScope };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

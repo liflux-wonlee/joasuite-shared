@@ -14,7 +14,7 @@
 import { createContext, useContext, type ReactNode, type ComponentType } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AppCode } from "./constants";
-import type { Membership } from "./types";
+import type { Membership, AppSummaryTile } from "./types";
 
 export type AuthState = {
   user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> } | null;
@@ -91,6 +91,7 @@ export type BoundServerFns = {
   cancelApp: (input: { tenantId: string; appCode: string }) => Promise<{ ok: true }>;
   getSuiteHome: (input: { tenantId: string }) => Promise<any>;
   setAppUrl: (input: { tenantId: string; appCode: AppCode; url: string }) => Promise<{ ok: true }>;
+  getAppSummaries: (input: { tenantIds: string[] }) => Promise<AppSummaryTile[]>;
   listNotifications: (input: { tenant_id: string; limit?: number }) => Promise<{
     unread_count: number;
     rows: any[];
