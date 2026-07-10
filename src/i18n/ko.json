@@ -174,5 +174,19 @@
     "account_added": "계정이 추가되었습니다",
     "account_updated": "계정이 업데이트되었습니다",
     "subscription": "구독"
+  },
+  "suite": {
+    "org_scope": {
+      "this_org": "이 조직",
+      "all_orgs": "전체 조직 ({{count}})",
+      "n_selected": "조직 {{count}}개 선택됨",
+      "select_orgs": "조직",
+      "select_all": "전체 선택",
+      "reset_to_current": "현재 조직으로 재설정"
+    },
+    "app_overview": {
+      "title": "앱 현황",
+      "empty": "아직 연결된 앱 요약이 없습니다."
+    }
   }
 }

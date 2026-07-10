@@ -2,6 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Inbox, Send, Bell, ScrollText, Settings2, Home, ArrowRight } from "lucide-react";
 import { useJoaSuite } from "../context";
+import { useOrgScope } from "../hooks/useOrgScope";
+import { OrgScopeToggle } from "./OrgScopeToggle";
+import { AppOverviewSection } from "./AppOverviewSection";
 
 function formatMoney(n: number | null | undefined) {
   if (n == null) return "";
@@ -15,6 +18,7 @@ export function SuiteHomePage() {
   const { Card, Badge } = ui;
   const { currentMembership } = useAuth();
   const tenantId = currentMembership?.tenant_id ?? "";
+  const [orgScope, setOrgScope] = useOrgScope();
 
   const homeQ = useQuery({
     queryKey: ["suite-home", tenantId],
@@ -27,7 +31,7 @@ export function SuiteHomePage() {
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
       {/* Header — clearly distinct from Settings */}
-      <div className="flex items-end justify-between gap-4">
+      <div className="flex items-end justify-between gap-4 flex-wrap">
         <div className="flex items-start gap-3">
           <div className="rounded-md bg-primary/10 text-primary p-2.5 mt-0.5">
             <Home className="h-5 w-5" />
@@ -49,7 +53,10 @@ export function SuiteHomePage() {
             </p>
           </div>
         </div>
+        <OrgScopeToggle value={orgScope} onChange={setOrgScope} />
       </div>
+
+      <AppOverviewSection tenantIds={orgScope} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* B. My Approvals */}

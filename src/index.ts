@@ -28,6 +28,11 @@ export { SuiteSwitcher } from "./components/SuiteSwitcher";
 export { SuiteHomePage } from "./components/SuiteHomePage";
 export { SuiteSettingsHub } from "./components/SuiteSettingsHub";
 export { AppSubscriptionsSummary } from "./components/AppSubscriptionsSummary";
+export { OrgScopeToggle } from "./components/OrgScopeToggle";
+export { AppOverviewSection } from "./components/AppOverviewSection";
 export { PeopleListPage } from "./components/people/PeopleListPage";
 export { PeopleInvitePage } from "./components/people/PeopleInvitePage";
 export { PeopleDetailPage } from "./components/people/PeopleDetailPage";
+
+// Hooks
+export { useOrgScope } from "./hooks/useOrgScope";

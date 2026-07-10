@@ -63,3 +63,18 @@ export type SuiteHomeData = {
     app_code: string | null;
   }>;
 };
+
+/**
+ * Standard shape each app implements to summarize its own state for the
+ * JoaSuite Home "App Overview" section. The core only defines the shape —
+ * every metric behind it is computed and owned by the app itself.
+ */
+export type AppSummaryTile = {
+  app_code: AppCode;
+  headline_label: string;
+  headline_value: string;
+  trend?: "up" | "down" | "flat";
+  secondary: Array<{ label: string; value: string }>;
+  alert_count?: number;
+  link_path: string;
+};

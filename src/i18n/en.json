@@ -177,5 +177,19 @@
     "currency_code": "Code (USD, KRW, …)",
     "currency_symbol": "Symbol",
     "subscription": "Subscription"
+  },
+  "suite": {
+    "org_scope": {
+      "this_org": "This organization",
+      "all_orgs": "All organizations ({{count}})",
+      "n_selected": "{{count}} organizations selected",
+      "select_orgs": "Organizations",
+      "select_all": "Select all",
+      "reset_to_current": "Reset to current"
+    },
+    "app_overview": {
+      "title": "App Overview",
+      "empty": "No connected app summaries yet."
+    }
   }
 }
