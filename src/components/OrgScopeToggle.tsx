@@ -3,32 +3,26 @@ import { useTranslation } from "react-i18next";
 import { Building2, ChevronDown } from "lucide-react";
 import { useJoaSuite } from "../context";
 
-/** Roles that may combine multiple organizations into one view by default.
- * `owner`/`super_admin` are suite-wide (see constants.ts ROLES_BY_APP) so
- * the core can safely gate on them; anything app-specific (e.g. JoaBooks'
- * `finance_manager`) is added by the caller via `allowedTenantIds`. */
-const DEFAULT_PRIVILEGED_ROLES = ["owner", "super_admin"];
-
 /**
- * Lets eligible users widen a screen (Dashboard, JoaSuite Home) from "this
- * organization" to a combination of the organizations they belong to.
- * Hidden entirely for everyone else, and for anyone with only one eligible
- * membership — there's nothing to scope.
+ * Lets the user widen a screen (Dashboard, JoaSuite Home) from "this
+ * organization" to any combination of the organizations they belong to.
+ * Hidden entirely for users with only one eligible membership — there's
+ * nothing to scope. No elevated role is required: a user may always
+ * aggregate across organizations they're already an active member of.
  *
- * By default only `owner`/`super_admin` memberships are eligible. Pass
- * `allowedTenantIds` to widen eligibility with app-specific privileged
- * roles (e.g. JoaBooks includes `finance_manager`). This is a UI hint only
- * — the server independently re-checks role eligibility for every
- * requested tenant id (see `assertOrgScopeAccess` in `./server`).
+ * Only `internal` memberships are eligible — `vendor`/`approver`/
+ * `customer` portal grants are narrow, single-purpose access to someone
+ * else's tenant, not "one of my organizations," and must never be folded
+ * into a cross-org aggregate. This is a UI hint only; the server
+ * independently re-verifies portal type for every requested tenant id
+ * (see `resolveScopedTenantIds` in `./server`).
  */
 export function OrgScopeToggle({
   value,
   onChange,
-  allowedTenantIds,
 }: {
   value: string[];
   onChange: (tenantIds: string[]) => void;
-  allowedTenantIds?: string[];
 }) {
   const { t } = useTranslation();
   const { useAuth, ui } = useJoaSuite();
@@ -36,9 +30,7 @@ export function OrgScopeToggle({
   const { memberships } = useAuth();
   const [open, setOpen] = useState(false);
 
-  const eligible = allowedTenantIds
-    ? memberships.filter((m) => allowedTenantIds.includes(m.tenant_id))
-    : memberships.filter((m) => m.roles.some((r) => DEFAULT_PRIVILEGED_ROLES.includes(r)));
+  const eligible = memberships.filter((m) => !m.portal || m.portal === "internal");
 
   if (eligible.length <= 1) return null;
 
@@ -85,7 +77,7 @@ export function OrgScopeToggle({
           </button>
         </div>
         <div className="max-h-72 overflow-y-auto divide-y">
-          {memberships.map((m) => {
+          {eligible.map((m) => {
             const adminRole = m.roles.find((r) => r === "owner" || r === "super_admin");
             return (
               <label

@@ -1413,18 +1413,16 @@ function useOrgScope() {
   }, [currentTenantId]);
   return [scope, setScope];
 }
-var DEFAULT_PRIVILEGED_ROLES = ["owner", "super_admin"];
 function OrgScopeToggle({
   value,
-  onChange,
-  allowedTenantIds
+  onChange
 }) {
   const { t } = useTranslation();
   const { useAuth, ui } = useJoaSuite();
   const { Button, Badge, Checkbox, Popover, PopoverContent, PopoverTrigger } = ui;
   const { memberships } = useAuth();
   const [open, setOpen] = useState(false);
-  const eligible = allowedTenantIds ? memberships.filter((m) => allowedTenantIds.includes(m.tenant_id)) : memberships.filter((m) => m.roles.some((r) => DEFAULT_PRIVILEGED_ROLES.includes(r)));
+  const eligible = memberships.filter((m) => !m.portal || m.portal === "internal");
   if (eligible.length <= 1) return null;
   const selected = new Set(value.filter((id) => eligible.some((m) => m.tenant_id === id)));
   if (selected.size === 0) selected.add(eligible[0].tenant_id);
@@ -1451,7 +1449,7 @@ function OrgScopeToggle({
         /* @__PURE__ */ jsx("span", { className: "text-xs font-medium text-muted-foreground", children: t("suite.org_scope.select_orgs", "Organizations") }),
         /* @__PURE__ */ jsx("button", { type: "button", className: "text-xs text-primary hover:underline", onClick: toggleAll, children: allSelected ? t("suite.org_scope.reset_to_current", "Reset to current") : t("suite.org_scope.select_all", "Select all") })
       ] }),
-      /* @__PURE__ */ jsx("div", { className: "max-h-72 overflow-y-auto divide-y", children: memberships.map((m) => {
+      /* @__PURE__ */ jsx("div", { className: "max-h-72 overflow-y-auto divide-y", children: eligible.map((m) => {
         const adminRole = m.roles.find((r) => r === "owner" || r === "super_admin");
         return /* @__PURE__ */ jsxs(
           "label",

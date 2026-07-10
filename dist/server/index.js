@@ -201,28 +201,20 @@ function createSetAppUrl(deps) {
 // src/server/org-scope.functions.ts
 async function resolveScopedTenantIds(supabase, userId, tenantIds) {
   if (tenantIds.length === 0) throw new Error("At least one organization is required");
-  const { data, error } = await supabase.from("tenant_users").select("tenant_id").eq("user_id", userId).eq("status", "active").in("tenant_id", tenantIds);
+  const { data, error } = await supabase.from("tenant_users").select("tenant_id, portal").eq("user_id", userId).eq("status", "active").in("tenant_id", tenantIds);
   if (error) throw new Error(error.message);
-  const active = new Set((data ?? []).map((r) => r.tenant_id));
-  const verified = tenantIds.filter((id) => active.has(id));
-  if (verified.length !== tenantIds.length) {
+  const rows = data ?? [];
+  const active = new Set(rows.map((r) => r.tenant_id));
+  if (tenantIds.some((id) => !active.has(id))) {
     throw new Error("Forbidden: one or more organizations are not an active membership");
   }
-  return verified;
-}
-var SUITE_WIDE_ORG_SCOPE_ROLES = ["owner", "super_admin"];
-async function assertOrgScopeAccess(supabase, userId, tenantIds, extraRoles = []) {
-  if (tenantIds.length <= 1) return;
-  const allowedRoles = [...SUITE_WIDE_ORG_SCOPE_ROLES, ...extraRoles];
-  const { data, error } = await supabase.from("user_roles").select("tenant_id, role").eq("user_id", userId).in("tenant_id", tenantIds).in("role", allowedRoles);
-  if (error) throw new Error(error.message);
-  const covered = new Set((data ?? []).map((r) => r.tenant_id));
-  const missing = tenantIds.filter((id) => !covered.has(id));
-  if (missing.length > 0) {
-    throw new Error(
-      "Forbidden: combining multiple organizations requires an elevated role in each selected organization"
-    );
+  if (tenantIds.length > 1) {
+    const nonInternal = rows.filter((r) => r.portal && r.portal !== "internal");
+    if (nonInternal.length > 0) {
+      throw new Error("Forbidden: combining organizations is only available to internal members");
+    }
   }
+  return tenantIds;
 }
 function createListNotifications(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
@@ -1629,6 +1621,6 @@ function createMergeParties(deps) {
   });
 }
 
-export { assertOrgScopeAccess, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createArchiveParty, createCancelApp, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createGetMyProfile, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSetUserAppRoles, createSubscribeApp, createUnarchiveParty, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, resolveScopedTenantIds };
+export { createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createArchiveParty, createCancelApp, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createGetMyProfile, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSetUserAppRoles, createSubscribeApp, createUnarchiveParty, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, resolveScopedTenantIds };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

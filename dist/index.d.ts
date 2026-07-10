@@ -280,21 +280,22 @@ declare function SuiteSettingsHub(): react.JSX.Element;
 declare function AppSubscriptionsSummary(): react.JSX.Element | null;
 
 /**
- * Lets eligible users widen a screen (Dashboard, JoaSuite Home) from "this
- * organization" to a combination of the organizations they belong to.
- * Hidden entirely for everyone else, and for anyone with only one eligible
- * membership — there's nothing to scope.
+ * Lets the user widen a screen (Dashboard, JoaSuite Home) from "this
+ * organization" to any combination of the organizations they belong to.
+ * Hidden entirely for users with only one eligible membership — there's
+ * nothing to scope. No elevated role is required: a user may always
+ * aggregate across organizations they're already an active member of.
  *
- * By default only `owner`/`super_admin` memberships are eligible. Pass
- * `allowedTenantIds` to widen eligibility with app-specific privileged
- * roles (e.g. JoaBooks includes `finance_manager`). This is a UI hint only
- * — the server independently re-checks role eligibility for every
- * requested tenant id (see `assertOrgScopeAccess` in `./server`).
+ * Only `internal` memberships are eligible — `vendor`/`approver`/
+ * `customer` portal grants are narrow, single-purpose access to someone
+ * else's tenant, not "one of my organizations," and must never be folded
+ * into a cross-org aggregate. This is a UI hint only; the server
+ * independently re-verifies portal type for every requested tenant id
+ * (see `resolveScopedTenantIds` in `./server`).
  */
-declare function OrgScopeToggle({ value, onChange, allowedTenantIds, }: {
+declare function OrgScopeToggle({ value, onChange, }: {
     value: string[];
     onChange: (tenantIds: string[]) => void;
-    allowedTenantIds?: string[];
 }): react.JSX.Element | null;
 
 /**
