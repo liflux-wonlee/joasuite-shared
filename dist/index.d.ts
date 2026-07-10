@@ -282,11 +282,16 @@ declare function AppSubscriptionsSummary(): react.JSX.Element | null;
 /**
  * Lets the user widen a screen (Dashboard, JoaSuite Home) from "this
  * organization" to any combination of the organizations they belong to.
- * Hidden entirely for users with only one membership — there's nothing to
- * scope. No elevated role is required: a user may always aggregate across
- * organizations they're already an active member of (the server still
- * re-verifies membership for every requested id — see
- * `resolveScopedTenantIds` in `./server`).
+ * Hidden entirely for users with only one eligible membership — there's
+ * nothing to scope. No elevated role is required: a user may always
+ * aggregate across organizations they're already an active member of.
+ *
+ * Only `internal` memberships are eligible — `vendor`/`approver`/
+ * `customer` portal grants are narrow, single-purpose access to someone
+ * else's tenant, not "one of my organizations," and must never be folded
+ * into a cross-org aggregate. This is a UI hint only; the server
+ * independently re-verifies portal type for every requested tenant id
+ * (see `resolveScopedTenantIds` in `./server`).
  */
 declare function OrgScopeToggle({ value, onChange, }: {
     value: string[];

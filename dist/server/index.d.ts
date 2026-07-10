@@ -104,8 +104,16 @@ declare function createSetAppUrl(deps: Deps$1): _tanstack_start_client_core.Opti
  * before a cross-organization query is allowed to run. No elevated role is
  * required — a user may always aggregate across organizations they already
  * belong to (unlike, say, an internal audit-log view of other users'
- * activity). Throws if any requested id is not an active membership, so a
- * client can never smuggle in an organization the caller doesn't belong to.
+ * activity).
+ *
+ * The one restriction: combining more than one organization is only
+ * available to `internal` memberships. `vendor`/`approver`/`customer`
+ * portal grants are narrow, single-purpose access to someone else's
+ * tenant, not a real membership in "one of my organizations" — they must
+ * never be folded into a cross-org aggregate. A single-organization
+ * request (tenantIds length 1) isn't restricted by portal type; it just
+ * needs to be an active membership, matching the pre-existing
+ * single-tenant behavior.
  *
  * A plain helper rather than a `createServerFn` factory: it has nothing
  * app-specific to inject (no email sender, no app code) and is meant to be
@@ -186,10 +194,10 @@ declare function createInviteUserToWorkspaces(deps: AccountDeps): _tanstack_star
     display_name: string;
     assignments: {
         tenant_id: string;
-        portal: "approver" | "vendor" | "customer" | "internal";
+        portal: "approver" | "internal" | "vendor" | "customer";
         apps: {
             app_code: string;
-            roles: ("owner" | "super_admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "admin" | "vendor" | "customer")[];
+            roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "vendor" | "customer")[];
         }[];
     }[];
     position?: string | undefined;
@@ -205,7 +213,7 @@ declare function createSetUserAppRoles(deps: AccountDeps): _tanstack_start_clien
     tenant_id: string;
     user_id: string;
     app_code: string;
-    roles: ("owner" | "super_admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "admin" | "vendor" | "customer")[];
+    roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "vendor" | "customer")[];
 }, Promise<{
     ok: true;
 }>>;
@@ -299,8 +307,8 @@ declare function createInviteTenantUser(deps: AdminDeps): _tanstack_start_client
     tenant_id: string;
     email: string;
     display_name: string;
-    portal: "approver" | "vendor" | "customer" | "internal";
-    roles: ("owner" | "super_admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "admin" | "vendor" | "customer")[];
+    portal: "approver" | "internal" | "vendor" | "customer";
+    roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "vendor" | "customer")[];
     position?: string | undefined;
     party_id?: string | undefined;
 }, Promise<{
@@ -327,7 +335,7 @@ declare function createSendPasswordResetLink(deps: AdminDeps): _tanstack_start_c
 declare function createUpdateTenantUserRoles(deps: AdminDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
     tenant_id: string;
     user_id: string;
-    roles: ("owner" | "super_admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "admin" | "vendor" | "customer")[];
+    roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "vendor" | "customer")[];
     app_code?: string | undefined;
 }, Promise<{
     ok: true;

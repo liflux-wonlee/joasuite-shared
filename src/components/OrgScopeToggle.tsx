@@ -6,11 +6,16 @@ import { useJoaSuite } from "../context";
 /**
  * Lets the user widen a screen (Dashboard, JoaSuite Home) from "this
  * organization" to any combination of the organizations they belong to.
- * Hidden entirely for users with only one membership — there's nothing to
- * scope. No elevated role is required: a user may always aggregate across
- * organizations they're already an active member of (the server still
- * re-verifies membership for every requested id — see
- * `resolveScopedTenantIds` in `./server`).
+ * Hidden entirely for users with only one eligible membership — there's
+ * nothing to scope. No elevated role is required: a user may always
+ * aggregate across organizations they're already an active member of.
+ *
+ * Only `internal` memberships are eligible — `vendor`/`approver`/
+ * `customer` portal grants are narrow, single-purpose access to someone
+ * else's tenant, not "one of my organizations," and must never be folded
+ * into a cross-org aggregate. This is a UI hint only; the server
+ * independently re-verifies portal type for every requested tenant id
+ * (see `resolveScopedTenantIds` in `./server`).
  */
 export function OrgScopeToggle({
   value,
@@ -25,16 +30,19 @@ export function OrgScopeToggle({
   const { memberships } = useAuth();
   const [open, setOpen] = useState(false);
 
-  if (memberships.length <= 1) return null;
+  const eligible = memberships.filter((m) => !m.portal || m.portal === "internal");
 
-  const selected = new Set(value);
-  const allSelected = memberships.every((m) => selected.has(m.tenant_id));
+  if (eligible.length <= 1) return null;
+
+  const selected = new Set(value.filter((id) => eligible.some((m) => m.tenant_id === id)));
+  if (selected.size === 0) selected.add(eligible[0].tenant_id);
+  const allSelected = eligible.every((m) => selected.has(m.tenant_id));
 
   const label = allSelected
-    ? t("suite.org_scope.all_orgs", "All organizations ({{count}})", { count: memberships.length })
-    : value.length <= 1
+    ? t("suite.org_scope.all_orgs", "All organizations ({{count}})", { count: eligible.length })
+    : selected.size <= 1
       ? t("suite.org_scope.this_org", "This organization")
-      : t("suite.org_scope.n_selected", "{{count}} organizations selected", { count: value.length });
+      : t("suite.org_scope.n_selected", "{{count}} organizations selected", { count: selected.size });
 
   const toggleOne = (tenantId: string) => {
     const next = new Set(selected);
@@ -45,7 +53,7 @@ export function OrgScopeToggle({
   };
 
   const toggleAll = () => {
-    onChange(allSelected ? [memberships[0].tenant_id] : memberships.map((m) => m.tenant_id));
+    onChange(allSelected ? [eligible[0].tenant_id] : eligible.map((m) => m.tenant_id));
   };
 
   return (
@@ -69,7 +77,7 @@ export function OrgScopeToggle({
           </button>
         </div>
         <div className="max-h-72 overflow-y-auto divide-y">
-          {memberships.map((m) => {
+          {eligible.map((m) => {
             const adminRole = m.roles.find((r) => r === "owner" || r === "super_admin");
             return (
               <label

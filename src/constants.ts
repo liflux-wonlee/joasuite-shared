@@ -43,6 +43,7 @@ export const ROLES_BY_APP: Record<AppCode, string[]> = {
   joabooks: [
     "owner",
     "super_admin",
+    "admin",
     "finance_manager",
     "finance_ap",
     "finance_ar",
