@@ -33,3 +33,41 @@ export async function resolveScopedTenantIds(
   }
   return verified;
 }
+
+const SUITE_WIDE_ORG_SCOPE_ROLES = ["owner", "super_admin"];
+
+/**
+ * Combining more than one organization into a single view is an elevated
+ * action, gated to `owner`/`super_admin` (suite-wide) plus whatever
+ * app-specific roles the caller passes in `extraRoles` (e.g. JoaBooks'
+ * `admin`/`finance_manager`). A single-organization request (tenantIds
+ * length 1) never needs this — every member can already see their own
+ * organization's data.
+ *
+ * This mirrors the eligibility check `OrgScopeToggle` does client-side
+ * (see components/OrgScopeToggle.tsx) — that copy is a UI hint only, this
+ * is the real enforcement.
+ */
+export async function assertOrgScopeAccess(
+  supabase: SupabaseClient,
+  userId: string,
+  tenantIds: string[],
+  extraRoles: string[] = [],
+): Promise<void> {
+  if (tenantIds.length <= 1) return;
+  const allowedRoles = [...SUITE_WIDE_ORG_SCOPE_ROLES, ...extraRoles];
+  const { data, error } = await supabase
+    .from("user_roles")
+    .select("tenant_id, role")
+    .eq("user_id", userId)
+    .in("tenant_id", tenantIds)
+    .in("role", allowedRoles);
+  if (error) throw new Error(error.message);
+  const covered = new Set((data ?? []).map((r: any) => r.tenant_id as string));
+  const missing = tenantIds.filter((id) => !covered.has(id));
+  if (missing.length > 0) {
+    throw new Error(
+      "Forbidden: combining multiple organizations requires an elevated role in each selected organization",
+    );
+  }
+}

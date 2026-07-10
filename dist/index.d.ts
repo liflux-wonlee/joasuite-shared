@@ -280,17 +280,21 @@ declare function SuiteSettingsHub(): react.JSX.Element;
 declare function AppSubscriptionsSummary(): react.JSX.Element | null;
 
 /**
- * Lets the user widen a screen (Dashboard, JoaSuite Home) from "this
- * organization" to any combination of the organizations they belong to.
- * Hidden entirely for users with only one membership — there's nothing to
- * scope. No elevated role is required: a user may always aggregate across
- * organizations they're already an active member of (the server still
- * re-verifies membership for every requested id — see
- * `resolveScopedTenantIds` in `./server`).
+ * Lets eligible users widen a screen (Dashboard, JoaSuite Home) from "this
+ * organization" to a combination of the organizations they belong to.
+ * Hidden entirely for everyone else, and for anyone with only one eligible
+ * membership — there's nothing to scope.
+ *
+ * By default only `owner`/`super_admin` memberships are eligible. Pass
+ * `allowedTenantIds` to widen eligibility with app-specific privileged
+ * roles (e.g. JoaBooks includes `finance_manager`). This is a UI hint only
+ * — the server independently re-checks role eligibility for every
+ * requested tenant id (see `assertOrgScopeAccess` in `./server`).
  */
-declare function OrgScopeToggle({ value, onChange, }: {
+declare function OrgScopeToggle({ value, onChange, allowedTenantIds, }: {
     value: string[];
     onChange: (tenantIds: string[]) => void;
+    allowedTenantIds?: string[];
 }): react.JSX.Element | null;
 
 /**

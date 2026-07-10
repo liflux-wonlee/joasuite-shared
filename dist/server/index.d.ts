@@ -113,6 +113,19 @@ declare function createSetAppUrl(deps: Deps$1): _tanstack_start_client_core.Opti
  * `supabase` client and `userId` from its own middleware.
  */
 declare function resolveScopedTenantIds(supabase: SupabaseClient, userId: string, tenantIds: string[]): Promise<string[]>;
+/**
+ * Combining more than one organization into a single view is an elevated
+ * action, gated to `owner`/`super_admin` (suite-wide) plus whatever
+ * app-specific roles the caller passes in `extraRoles` (e.g. JoaBooks'
+ * `admin`/`finance_manager`). A single-organization request (tenantIds
+ * length 1) never needs this — every member can already see their own
+ * organization's data.
+ *
+ * This mirrors the eligibility check `OrgScopeToggle` does client-side
+ * (see components/OrgScopeToggle.tsx) — that copy is a UI hint only, this
+ * is the real enforcement.
+ */
+declare function assertOrgScopeAccess(supabase: SupabaseClient, userId: string, tenantIds: string[], extraRoles?: string[]): Promise<void>;
 
 type Deps = {
     requireSupabaseAuth: any;
@@ -189,7 +202,7 @@ declare function createInviteUserToWorkspaces(deps: AccountDeps): _tanstack_star
         portal: "approver" | "vendor" | "customer" | "internal";
         apps: {
             app_code: string;
-            roles: ("owner" | "super_admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "admin" | "vendor" | "customer")[];
+            roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "vendor" | "customer")[];
         }[];
     }[];
     position?: string | undefined;
@@ -205,7 +218,7 @@ declare function createSetUserAppRoles(deps: AccountDeps): _tanstack_start_clien
     tenant_id: string;
     user_id: string;
     app_code: string;
-    roles: ("owner" | "super_admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "admin" | "vendor" | "customer")[];
+    roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "vendor" | "customer")[];
 }, Promise<{
     ok: true;
 }>>;
@@ -300,7 +313,7 @@ declare function createInviteTenantUser(deps: AdminDeps): _tanstack_start_client
     email: string;
     display_name: string;
     portal: "approver" | "vendor" | "customer" | "internal";
-    roles: ("owner" | "super_admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "admin" | "vendor" | "customer")[];
+    roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "vendor" | "customer")[];
     position?: string | undefined;
     party_id?: string | undefined;
 }, Promise<{
@@ -327,7 +340,7 @@ declare function createSendPasswordResetLink(deps: AdminDeps): _tanstack_start_c
 declare function createUpdateTenantUserRoles(deps: AdminDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
     tenant_id: string;
     user_id: string;
-    roles: ("owner" | "super_admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "admin" | "vendor" | "customer")[];
+    roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "vendor" | "customer")[];
     app_code?: string | undefined;
 }, Promise<{
     ok: true;
@@ -518,4 +531,4 @@ declare function createMergeParties(deps: MergePartiesDeps): _tanstack_start_cli
     reassigned: Record<string, number>;
 }>>;
 
-export { type AccountDeps, type AdminDeps, type AppCatalogEntry, type MergePartiesDeps, type PartyRefTable, type SuiteHomeData, type TenantAppRow, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createArchiveParty, createCancelApp, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createGetMyProfile, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSetUserAppRoles, createSubscribeApp, createUnarchiveParty, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, resolveScopedTenantIds };
+export { type AccountDeps, type AdminDeps, type AppCatalogEntry, type MergePartiesDeps, type PartyRefTable, type SuiteHomeData, type TenantAppRow, assertOrgScopeAccess, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createArchiveParty, createCancelApp, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createGetMyProfile, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSetUserAppRoles, createSubscribeApp, createUnarchiveParty, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, resolveScopedTenantIds };

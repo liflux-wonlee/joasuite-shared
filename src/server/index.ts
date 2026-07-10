@@ -34,7 +34,7 @@ export {
 
 export { createGetSuiteHome, createSetAppUrl, type SuiteHomeData } from "./suite-home.functions";
 
-export { resolveScopedTenantIds } from "./org-scope.functions";
+export { resolveScopedTenantIds, assertOrgScopeAccess } from "./org-scope.functions";
 
 export {
   createListNotifications,

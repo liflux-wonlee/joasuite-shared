@@ -210,6 +210,20 @@ async function resolveScopedTenantIds(supabase, userId, tenantIds) {
   }
   return verified;
 }
+var SUITE_WIDE_ORG_SCOPE_ROLES = ["owner", "super_admin"];
+async function assertOrgScopeAccess(supabase, userId, tenantIds, extraRoles = []) {
+  if (tenantIds.length <= 1) return;
+  const allowedRoles = [...SUITE_WIDE_ORG_SCOPE_ROLES, ...extraRoles];
+  const { data, error } = await supabase.from("user_roles").select("tenant_id, role").eq("user_id", userId).in("tenant_id", tenantIds).in("role", allowedRoles);
+  if (error) throw new Error(error.message);
+  const covered = new Set((data ?? []).map((r) => r.tenant_id));
+  const missing = tenantIds.filter((id) => !covered.has(id));
+  if (missing.length > 0) {
+    throw new Error(
+      "Forbidden: combining multiple organizations requires an elevated role in each selected organization"
+    );
+  }
+}
 function createListNotifications(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({
@@ -1615,6 +1629,6 @@ function createMergeParties(deps) {
   });
 }
 
-export { createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createArchiveParty, createCancelApp, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createGetMyProfile, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSetUserAppRoles, createSubscribeApp, createUnarchiveParty, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, resolveScopedTenantIds };
+export { assertOrgScopeAccess, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createArchiveParty, createCancelApp, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createGetMyProfile, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSetUserAppRoles, createSubscribeApp, createUnarchiveParty, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, resolveScopedTenantIds };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map
