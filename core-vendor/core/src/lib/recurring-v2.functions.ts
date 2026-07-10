@@ -109,7 +109,7 @@ const RecurringInput = z.object({
   description: z.string().nullable().optional(),
   owner_user_id: z.string().uuid().nullable().optional(),
   department_id: z.string().uuid().nullable().optional(),
-  category_id: z.string().uuid().nullable().optional(),
+  category_id: z.string().uuid(),
   status: Status.default("active"),
   amount_type: AmountType.default("fixed"),
   amount: z.number().nullable().optional(),
@@ -119,7 +119,7 @@ const RecurringInput = z.object({
   forecast_method: ForecastMethod.default("fixed"),
   forecast_confidence: z.enum(["high", "medium", "low", "uncertain"]).default("medium"),
   forecast_tag: z.string().nullable().optional(),
-  frequency: Frequency.default("monthly"),
+  frequency: Frequency,
   start_date: z.string().nullable().optional(),
   next_date: z.string().nullable().optional(),
   end_date: z.string().nullable().optional(),
@@ -461,7 +461,20 @@ export const getRecurring = createServerFn({ method: "POST" })
 
 export const createRecurring = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => RecurringInput.parse(i))
+  .inputValidator((i) => {
+    const data = RecurringInput.parse(i);
+    if (data.amount_type === "range") {
+      if (!(Number(data.amount_min ?? 0) > 0) || !(Number(data.amount_max ?? 0) > 0)) {
+        throw new Error("amount_min and amount_max are required");
+      }
+    } else if (!(Number(data.amount ?? 0) > 0)) {
+      throw new Error("amount is required");
+    }
+    if (data.frequency !== "custom" && !data.start_date) {
+      throw new Error("start_date is required");
+    }
+    return data;
+  })
   .handler(async ({ data, context }) => {
     const { plan_lines, ...master } = data;
     const { data: row, error } = await context.supabase
@@ -630,6 +643,7 @@ export const markOccurrencePaid = createServerFn({ method: "POST" })
     occurrence_id: z.string().uuid(),
     amount: z.number().positive(),
     payment_date: z.string(),
+    payment_account_id: z.string().uuid(),
     fully_paid: z.boolean().default(true),
     note: z.string().max(2000).optional().default(""),
     proof_attachment_id: z.string().uuid().nullable().optional(),
@@ -658,6 +672,7 @@ export const markOccurrencePaid = createServerFn({ method: "POST" })
       payment_date: data.payment_date,
       method: "other",
       amount_usd: data.amount,
+      payment_account_id: data.payment_account_id,
       proof_attachment_id: data.proof_attachment_id ?? null,
       paid_by: context.userId,
       note: data.note,
