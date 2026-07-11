@@ -26,7 +26,33 @@ const SubInput = z.object({
   plan: z.string().min(1).max(64).default("basic"),
 });
 
-async function assertOwner(supabase: any, tenantId: string, userId: string) {
+// `has_any_role` (unlike the 4-arg `has_role(..., _app_code)` overload) has
+// no app_code parameter at all - it matches a role by name regardless of
+// which app it was granted for. That's safe for owner/super_admin (always
+// suite-wide, app_code IS NULL by convention) but NOT safe for 'admin' - a
+// user holding 'admin' in a different suite app would incorrectly pass.
+// When deps.supabaseAdmin + deps.appCode are supplied, check user_roles
+// directly with proper app_code scoping instead (supports app-scoped
+// 'admin' correctly). Falls back to the RPC (owner/super_admin only, the
+// original behavior) when they aren't - keeps existing consumers working
+// unchanged until they opt in.
+async function assertOwner(deps: Deps, supabase: any, tenantId: string, userId: string) {
+  if (deps.supabaseAdmin && deps.appCode) {
+    const { data, error } = await deps.supabaseAdmin
+      .from("user_roles")
+      .select("role, app_code")
+      .eq("tenant_id", tenantId)
+      .eq("user_id", userId);
+    if (error) throw new Error(error.message);
+    const ok = (data ?? []).some((r: any) => {
+      const role = r.role as string;
+      const appCode = r.app_code as string | null;
+      if (appCode === null) return role === "owner" || role === "super_admin";
+      return appCode === deps.appCode && role === "admin";
+    });
+    if (!ok) throw new Error("Forbidden");
+    return;
+  }
   const { data: ok } = await supabase.rpc("has_any_role", {
     _tenant: tenantId,
     _user: userId,
@@ -35,7 +61,7 @@ async function assertOwner(supabase: any, tenantId: string, userId: string) {
   if (!ok) throw new Error("Forbidden");
 }
 
-type Deps = { requireSupabaseAuth: any };
+type Deps = { requireSupabaseAuth: any; supabaseAdmin?: any; appCode?: string };
 
 export function createListSuiteApps(deps: Deps) {
   return createServerFn({ method: "POST" })
@@ -94,7 +120,7 @@ export function createSubscribeApp(deps: Deps) {
     .middleware([deps.requireSupabaseAuth])
     .inputValidator((d) => SubInput.parse(d))
     .handler(async ({ data, context }) => {
-      await assertOwner(context.supabase, data.tenantId, context.userId);
+      await assertOwner(deps, context.supabase, data.tenantId, context.userId);
       const { error } = await context.supabase
         .from("tenant_apps")
         .upsert(
@@ -121,7 +147,7 @@ export function createCancelApp(deps: Deps) {
       z.object({ tenantId: z.string().uuid(), appCode: z.string().min(1).max(64) }).parse(d),
     )
     .handler(async ({ data, context }) => {
-      await assertOwner(context.supabase, data.tenantId, context.userId);
+      await assertOwner(deps, context.supabase, data.tenantId, context.userId);
       if (data.appCode === "joabooks") throw new Error("JoaBooks cannot be canceled here");
       const { error } = await context.supabase
         .from("tenant_apps")

@@ -22,6 +22,8 @@ type TenantAppRow = {
 };
 type Deps$2 = {
     requireSupabaseAuth: any;
+    supabaseAdmin?: any;
+    appCode?: string;
 };
 declare function createListSuiteApps(deps: Deps$2): _tanstack_start_client_core.OptionalFetcher<readonly [any], (d: unknown) => {
     tenantId: string;
@@ -56,6 +58,7 @@ type SuiteHomeData = {
         amount_usd: number | null;
         due_date: string | null;
         source_app: string;
+        link_path: string | null;
     }>;
     requestedByMe: Array<{
         id: string;
@@ -87,6 +90,8 @@ type SuiteHomeData = {
 };
 type Deps$1 = {
     requireSupabaseAuth: any;
+    supabaseAdmin?: any;
+    appCode?: string;
 };
 declare function createGetSuiteHome(deps: Deps$1): _tanstack_start_client_core.OptionalFetcher<readonly [any], (d: unknown) => {
     tenantId: string;
