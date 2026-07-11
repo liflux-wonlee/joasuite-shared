@@ -9,7 +9,46 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 // Vendored byte-for-byte into other apps via joasuite-shared/core-vendor
 // (see manifest.txt). APP_CODE is the one line that changes per app copy —
 // everything else stays identical to the canonical JoaBooks source.
+//
+// Deliberately has NO dependency on @joasuite/shared-ui: JoaOffice, which
+// this file is vendored into, doesn't install that package. See
+// resolveScopedTenantIds below — it's a dependency-free duplicate of
+// joasuite-shared's helper of the same name, kept in sync by hand.
 // =========================================================================
+
+/**
+ * Verifies every requested tenant_id is an active membership of `userId`;
+ * combining more than one organization into one query is only allowed when
+ * every one of them is an `internal` membership (vendor/approver/customer
+ * portal grants must never be folded into a cross-org aggregate). A
+ * single-organization request isn't restricted by portal type.
+ */
+async function resolveScopedTenantIds(
+  supabase: any,
+  userId: string,
+  tenantIds: string[],
+): Promise<string[]> {
+  if (tenantIds.length === 0) throw new Error("At least one organization is required");
+  const { data, error } = await supabase
+    .from("tenant_users")
+    .select("tenant_id, portal")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .in("tenant_id", tenantIds);
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as Array<{ tenant_id: string; portal: string | null }>;
+  const active = new Set(rows.map((r) => r.tenant_id));
+  if (tenantIds.some((id) => !active.has(id))) {
+    throw new Error("Forbidden: one or more organizations are not an active membership");
+  }
+  if (tenantIds.length > 1) {
+    const nonInternal = rows.filter((r) => r.portal && r.portal !== "internal");
+    if (nonInternal.length > 0) {
+      throw new Error("Forbidden: combining organizations is only available to internal members");
+    }
+  }
+  return tenantIds;
+}
 
 const APP_CODE: "joabooks" | "joaoffice" = "joabooks";
 const APP_ORIGINS: Record<string, string> = {
@@ -70,7 +109,7 @@ const RecurringInput = z.object({
   description: z.string().nullable().optional(),
   owner_user_id: z.string().uuid().nullable().optional(),
   department_id: z.string().uuid().nullable().optional(),
-  category_id: z.string().uuid().nullable().optional(),
+  category_id: z.string().uuid(),
   status: Status.default("active"),
   amount_type: AmountType.default("fixed"),
   amount: z.number().nullable().optional(),
@@ -80,7 +119,7 @@ const RecurringInput = z.object({
   forecast_method: ForecastMethod.default("fixed"),
   forecast_confidence: z.enum(["high", "medium", "low", "uncertain"]).default("medium"),
   forecast_tag: z.string().nullable().optional(),
-  frequency: Frequency.default("monthly"),
+  frequency: Frequency,
   start_date: z.string().nullable().optional(),
   next_date: z.string().nullable().optional(),
   end_date: z.string().nullable().optional(),
@@ -371,22 +410,27 @@ export const listRecurring = createServerFn({ method: "POST" })
     const list = rows ?? [];
     if (list.length === 0) return list;
 
-    // Attach overdue aggregates (unresolved forecasted occurrences dated
-    // before today) so the list can show a badge without a second round trip.
+    // Attach overdue aggregates (unresolved forecasted/partially_paid
+    // occurrences dated before today) so the list can show a badge without a
+    // second round trip. A partially paid occurrence is still overdue for
+    // whatever remains unpaid — only fully paid/skipped/cancelled occurrences
+    // drop off this count.
     const { data: overdueRows, error: overdueErr } = await context.supabase
       .from("recurring_occurrences")
-      .select("recurring_id, forecast_amount")
+      .select("recurring_id, forecast_amount, actual_amount")
       .eq("tenant_id", data.tenant_id)
-      .eq("status", "forecasted")
+      .in("status", ["forecasted", "partially_paid"])
       .lt("occurrence_date", todayIso())
       .in("recurring_id", list.map((r: any) => r.id));
     if (overdueErr) throw new Error(overdueErr.message);
 
     const overdueByRecurring = new Map<string, { count: number; amount: number }>();
     for (const o of overdueRows ?? []) {
+      const remaining = Math.max(0, Number(o.forecast_amount ?? 0) - Number(o.actual_amount ?? 0));
+      if (remaining <= 0) continue;
       const cur = overdueByRecurring.get(o.recurring_id) ?? { count: 0, amount: 0 };
       cur.count += 1;
-      cur.amount += Number(o.forecast_amount ?? 0);
+      cur.amount += remaining;
       overdueByRecurring.set(o.recurring_id, cur);
     }
 
@@ -417,7 +461,20 @@ export const getRecurring = createServerFn({ method: "POST" })
 
 export const createRecurring = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => RecurringInput.parse(i))
+  .inputValidator((i) => {
+    const data = RecurringInput.parse(i);
+    if (data.amount_type === "range") {
+      if (!(Number(data.amount_min ?? 0) > 0) || !(Number(data.amount_max ?? 0) > 0)) {
+        throw new Error("amount_min and amount_max are required");
+      }
+    } else if (!(Number(data.amount ?? 0) > 0)) {
+      throw new Error("amount is required");
+    }
+    if (data.frequency !== "custom" && !data.start_date) {
+      throw new Error("start_date is required");
+    }
+    return data;
+  })
   .handler(async ({ data, context }) => {
     const { plan_lines, ...master } = data;
     const { data: row, error } = await context.supabase
@@ -534,7 +591,7 @@ export const linkOccurrence = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({
     occurrence_id: z.string().uuid(),
-    linked_kind: z.enum(["bill", "payment_request", "expense", "transaction", "invoice"]),
+    linked_kind: z.enum(["bill", "payment_request", "transaction", "invoice"]),
     linked_id: z.string().uuid(),
     actual_amount: z.number().optional(),
   }).parse(i))
@@ -542,7 +599,6 @@ export const linkOccurrence = createServerFn({ method: "POST" })
     const statusMap: Record<string, string> = {
       bill: "linked_bill",
       payment_request: "linked_payment_request",
-      expense: "linked_expense",
       transaction: "linked_transaction",
       invoice: "linked_transaction",
     };
@@ -571,7 +627,7 @@ export const unlinkOccurrence = createServerFn({ method: "POST" })
   });
 
 // Mark an occurrence as paid/collected directly, without linking it to a real
-// bill/payment_request/expense/transaction row (e.g. an autopay charge or a
+// bill/payment_request/transaction row (e.g. an autopay charge or a
 // bank transfer that was already recorded elsewhere). Distinct from the
 // linked_* statuses set by linkOccurrence.
 //
@@ -586,6 +642,7 @@ export const markOccurrencePaid = createServerFn({ method: "POST" })
     occurrence_id: z.string().uuid(),
     amount: z.number().positive(),
     payment_date: z.string(),
+    payment_account_id: z.string().uuid(),
     fully_paid: z.boolean().default(true),
     note: z.string().max(2000).optional().default(""),
     proof_attachment_id: z.string().uuid().nullable().optional(),
@@ -614,6 +671,7 @@ export const markOccurrencePaid = createServerFn({ method: "POST" })
       payment_date: data.payment_date,
       method: "other",
       amount_usd: data.amount,
+      payment_account_id: data.payment_account_id,
       proof_attachment_id: data.proof_attachment_id ?? null,
       paid_by: context.userId,
       note: data.note,
@@ -656,7 +714,7 @@ export const markOccurrencePaid = createServerFn({ method: "POST" })
 // markOccurrencePaid doesn't double-count them (paidSoFar is recomputed
 // from that table). Audit history of the revert itself is preserved via
 // audit_logs. Only valid for the direct mark-as-paid path (no
-// linked_kind); a linked bill/expense/payment_request should be unlinked
+// linked_kind); a linked bill/transaction/payment_request should be unlinked
 // via unlinkOccurrence instead.
 export const revertOccurrencePayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -694,7 +752,7 @@ export const revertOccurrencePayment = createServerFn({ method: "POST" })
 export const getCashFlowForecast = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({
-    tenant_id: z.string().uuid(),
+    tenant_ids: z.array(z.string().uuid()).min(1),
     from_date: z.string(),
     to_date: z.string(),
     include_committed: z.boolean().default(true),
@@ -703,17 +761,25 @@ export const getCashFlowForecast = createServerFn({ method: "POST" })
     opening_balance: z.number().default(0),
   }).parse(i))
   .handler(async ({ data, context }) => {
-    // Gate: tenant must have the current app (JoaOffice's copy checks its own
-    // subscription, not JoaBooks' — Cash Flow is scoped to each app's own rows).
-    const { data: hasApp } = await context.supabase
-      .rpc("tenant_has_app", { _tenant: data.tenant_id, _app_code: APP_CODE });
-    if (!hasApp) throw new Error(`Cash Flow Manage requires a ${APP_LABEL_BY_APP[APP_CODE]} subscription`);
+    const userId = context.userId;
+    const sb = context.supabase;
+    const tenant_ids = await resolveScopedTenantIds(sb, userId, data.tenant_ids);
+
+    // Gate: every selected tenant must have the current app (JoaOffice's
+    // copy checks its own subscription, not JoaBooks' — Cash Flow is scoped
+    // to each app's own rows).
+    const appChecks = await Promise.all(
+      tenant_ids.map((tid) => sb.rpc("tenant_has_app", { _tenant: tid, _app_code: APP_CODE })),
+    );
+    if (appChecks.some((c) => !c.data)) {
+      throw new Error(`Cash Flow Manage requires a ${APP_LABEL_BY_APP[APP_CODE]} subscription`);
+    }
 
     // Pull recurring occurrences in range
-    const { data: occs, error } = await context.supabase
+    const { data: occs, error } = await sb
       .from("recurring_occurrences")
       .select("occurrence_date, direction, forecast_amount, actual_amount, stage, status, forecast_included, priority, recurring_id, recurring_transactions:recurring_id(name,type,party_id)")
-      .eq("tenant_id", data.tenant_id)
+      .in("tenant_id", tenant_ids)
       .gte("occurrence_date", data.from_date)
       .lte("occurrence_date", data.to_date)
       .eq("forecast_included", true);
@@ -771,15 +837,17 @@ export const getCashFlowForecast = createServerFn({ method: "POST" })
     }
     const months = Object.values(byMonth).sort((a, b) => a.month.localeCompare(b.month));
 
-    // Overdue bucket: forecasted occurrences dated before today, regardless of
-    // the requested from/to window — otherwise an unpaid item just falls out
-    // of a forward-looking range and silently disappears from the forecast.
+    // Overdue bucket: forecasted/partially_paid occurrences dated before
+    // today, regardless of the requested from/to window — otherwise an
+    // unpaid item just falls out of a forward-looking range and silently
+    // disappears from the forecast. A partially paid occurrence stays here
+    // for whatever remains unpaid.
     const today = todayIso();
-    const { data: overdueRows, error: overdueErr } = await context.supabase
+    const { data: overdueRows, error: overdueErr } = await sb
       .from("recurring_occurrences")
-      .select("id, occurrence_date, direction, forecast_amount, priority, recurring_id, recurring_transactions:recurring_id(name,type,party_id)")
-      .eq("tenant_id", data.tenant_id)
-      .eq("status", "forecasted")
+      .select("id, occurrence_date, direction, forecast_amount, actual_amount, priority, recurring_id, recurring_transactions:recurring_id(name,type,party_id)")
+      .in("tenant_id", tenant_ids)
+      .in("status", ["forecasted", "partially_paid"])
       .eq("forecast_included", true)
       .lt("occurrence_date", today)
       .order("priority", { ascending: true })
@@ -790,16 +858,18 @@ export const getCashFlowForecast = createServerFn({ method: "POST" })
     const overdueItems = (overdueRows ?? [])
       .map((o: any) => ({
         ...o,
+        remaining: Math.max(0, Number(o.forecast_amount ?? 0) - Number(o.actual_amount ?? 0)),
         days_overdue: Math.round((new Date(today).getTime() - new Date(o.occurrence_date).getTime()) / 86_400_000),
       }))
+      .filter((o: any) => o.remaining > 0)
       .sort((a: any, b: any) =>
         (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9)
         || b.days_overdue - a.days_overdue
-        || Number(b.forecast_amount ?? 0) - Number(a.forecast_amount ?? 0),
+        || b.remaining - a.remaining,
       );
     const overdueBucket = {
-      pay_total: overdueItems.filter((o: any) => o.direction === "money_out").reduce((s: number, o: any) => s + Number(o.forecast_amount ?? 0), 0),
-      collect_total: overdueItems.filter((o: any) => o.direction === "money_in").reduce((s: number, o: any) => s + Number(o.forecast_amount ?? 0), 0),
+      pay_total: overdueItems.filter((o: any) => o.direction === "money_out").reduce((s: number, o: any) => s + o.remaining, 0),
+      collect_total: overdueItems.filter((o: any) => o.direction === "money_in").reduce((s: number, o: any) => s + o.remaining, 0),
       pay_count: overdueItems.filter((o: any) => o.direction === "money_out").length,
       collect_count: overdueItems.filter((o: any) => o.direction === "money_in").length,
       items: overdueItems,
@@ -826,21 +896,20 @@ export const listRecurringReminderLog = createServerFn({ method: "POST" })
 
 // ------------------------- Convert occurrence -> real doc -------------------------
 
-const ConvertKind = z.enum(["bill", "expense", "payment_request"]);
+const ConvertKind = z.enum(["bill", "money_out", "payment_request"]);
 
 export const convertOccurrenceToDoc = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({
     occurrence_id: z.string().uuid(),
     target_kind: ConvertKind,
-    doc_date: z.string().optional(),     // bill_date / expense_date / due_date
+    doc_date: z.string().optional(),     // bill_date / txn_date / due_date
     amount: z.number().nonnegative().optional(),
     detail: z.string().max(2000).optional(),
     note: z.string().max(2000).optional(),
-    // expense-specific
+    // money_out-specific: which account the payment came out of
     payment_method: z.string().max(40).optional(),
     payment_account_id: z.string().uuid().nullable().optional(),
-    already_paid: z.boolean().default(true),
   }).parse(i))
   .handler(async ({ data, context }) => {
     // Load occurrence + recurring
@@ -864,43 +933,45 @@ export const convertOccurrenceToDoc = createServerFn({ method: "POST" })
 
     if (data.target_kind === "payment_request") {
       // PR creation flow is complex (party bank, signature, approvers).
-      // Return a prefill URL so the UI navigates to the New PR form.
-      const params = new URLSearchParams({
-        from: "recurring_occurrence",
-        from_id: data.occurrence_id,
-        name: r.name ?? "",
-        party_id: r.party_id ?? "",
-        amount: String(amount),
-        currency_code: r.currency_code ?? "USD",
-        description: detail,
-      });
+      // Return a prefill URL so the UI navigates to the New PR form. Param
+      // names match what /app/payment-requests/new's validateSearch reads
+      // (see app.payment-requests.new.tsx) — `vendor` in particular is the
+      // pre-existing param that page's vendor auto-select already consumes.
+      const params = new URLSearchParams({ from: "recurring_occurrence", from_id: data.occurrence_id });
+      if (r.party_id) params.set("vendor", r.party_id);
+      params.set("amount", String(amount));
+      params.set("currency", r.currency_code ?? "USD");
+      if (detail) params.set("detail", detail);
+      if (r.must_pay_by) params.set("due_date", r.must_pay_by);
+      const prNote = occ.note ?? note;
+      if (prNote) params.set("note", prNote);
+      if (r.category_id) params.set("category_id", r.category_id);
       return {
         kind: "redirect" as const,
         path: `/app/payment-requests/new?${params.toString()}`,
       };
     }
 
-    // Direct create for bill / expense via supabaseAdmin
+    // Direct create for bill / money_out via supabaseAdmin
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Permission gate: internal staff only (matches createBill/createExpense)
+    // Permission gate: internal staff only (matches createBill/addAccountTransaction)
     const { data: isStaff, error: roleErr } = await supabaseAdmin.rpc("is_internal_staff", {
       _tenant: tenantId, _user: userId,
     });
     if (roleErr) throw new Error(roleErr.message);
     if (!isStaff) throw new Error("Internal staff role required");
 
-    const { data: docNo, error: nErr } = await supabaseAdmin.rpc("next_doc_number", {
-      _tenant: tenantId,
-      _doc_type: data.target_kind,
-    });
-    if (nErr) throw new Error(nErr.message);
-
     let newId: string;
-    let linkedKind: "bill" | "expense";
-    let newStatus: "linked_bill" | "linked_expense";
+    let linkedKind: "bill" | "transaction";
+    let newStatus: "linked_bill" | "linked_transaction";
 
     if (data.target_kind === "bill") {
+      const { data: docNo, error: nErr } = await supabaseAdmin.rpc("next_doc_number", {
+        _tenant: tenantId,
+        _doc_type: "bill",
+      });
+      if (nErr) throw new Error(nErr.message);
       const { data: row, error } = await supabaseAdmin
         .from("bills")
         .insert({
@@ -933,77 +1004,51 @@ export const convertOccurrenceToDoc = createServerFn({ method: "POST" })
         sort_order: 0,
       });
     } else {
-      const status = data.already_paid ? "paid" : "submitted";
-      const { data: row, error } = await supabaseAdmin
-        .from("expenses")
+      // Money Out means the payment has already happened, so this always
+      // creates a real transactions row directly — no intermediate document,
+      // no unpaid state (that's what a Bill is for). Uses the "transaction"
+      // numbering format (TXN-####), same as every other transactions row,
+      // not a separate "money_out" doc-type prefix.
+      const { data: txnNo, error: nErr } = await supabaseAdmin.rpc("next_doc_number", {
+        _tenant: tenantId,
+        _doc_type: "transaction",
+      });
+      if (nErr) throw new Error(nErr.message);
+      const { data: txn, error: tErr } = await supabaseAdmin
+        .from("transactions")
         .insert({
           tenant_id: tenantId,
-          expense_no: docNo as unknown as string,
-          status,
+          txn_no: txnNo as unknown as string,
+          txn_date: docDate,
+          direction: "out",
           party_id: r.party_id ?? null,
-          expense_date: docDate,
-          amount_usd: amount,
+          description: detail || `Planned transaction: ${r.name}`,
+          amount,
+          fee: 0,
+          category_id: r.category_id ?? null,
           payment_method: data.payment_method ?? r.payment_method ?? null,
           payment_account_id: data.payment_account_id ?? r.payment_account_id ?? null,
-          fee: 0,
-          detail,
-          note,
+          status: "recorded",
+          source_kind: "shared.recurring_occurrence",
+          source_id: data.occurrence_id,
           created_by: userId,
-        })
-        .select("id, expense_no").single();
-      if (error) throw new Error(error.message);
-      newId = row.id as string;
-      linkedKind = "expense";
-      newStatus = "linked_expense";
+          paid_by: userId,
+        } as never)
+        .select("id").single();
+      if (tErr) throw new Error(tErr.message);
+      newId = (txn as any).id as string;
+      linkedKind = "transaction";
+      newStatus = "linked_transaction";
 
-      await supabaseAdmin.from("document_lines").insert({
+      await supabaseAdmin.from("transaction_lines").insert({
         tenant_id: tenantId,
-        doc_kind: "expense",
-        doc_id: newId,
+        transaction_id: newId,
         category_id: r.category_id ?? null,
         description: detail,
         amount,
         note,
         sort_order: 0,
       });
-
-      if (data.already_paid) {
-        const { data: txnNo, error: tnErr } = await supabaseAdmin.rpc("next_doc_number", {
-          _tenant: tenantId, _doc_type: "transaction",
-        });
-        if (tnErr) throw new Error(tnErr.message);
-        const { data: txn, error: tErr } = await supabaseAdmin
-          .from("transactions")
-          .insert({
-            tenant_id: tenantId,
-            txn_no: txnNo as unknown as string,
-            txn_date: docDate,
-            direction: "out",
-            party_id: r.party_id ?? null,
-            description: detail || `Expense ${row.expense_no}`,
-            amount,
-            fee: 0,
-            category_id: r.category_id ?? null,
-            payment_method: data.payment_method ?? r.payment_method ?? null,
-            payment_account_id: data.payment_account_id ?? r.payment_account_id ?? null,
-            status: "recorded",
-            source_kind: "expense",
-            source_id: newId,
-            created_by: userId,
-            paid_by: userId,
-          })
-          .select("id").single();
-        if (tErr) throw new Error(tErr.message);
-        await supabaseAdmin.from("transaction_lines").insert({
-          tenant_id: tenantId,
-          transaction_id: txn.id,
-          category_id: r.category_id ?? null,
-          description: detail,
-          amount,
-          note,
-          sort_order: 0,
-        });
-      }
     }
 
     // Link occurrence
@@ -1014,7 +1059,7 @@ export const convertOccurrenceToDoc = createServerFn({ method: "POST" })
         linked_id: newId,
         actual_amount: amount,
         status: newStatus,
-        stage: (linkedKind === "expense" && data.already_paid ? "paid" : "billed") as "paid" | "billed",
+        stage: (linkedKind === "transaction" ? "paid" : "billed") as "paid" | "billed",
       })
       .eq("id", data.occurrence_id);
     if (linkErr) throw new Error(linkErr.message);
@@ -1032,7 +1077,7 @@ export const convertOccurrenceToDoc = createServerFn({ method: "POST" })
       kind: "created" as const,
       target: linkedKind,
       id: newId,
-      path: linkedKind === "bill" ? `/app/bills/${newId}` : `/app/expenses/${newId}`,
+      path: linkedKind === "bill" ? `/app/bills/${newId}` : `/app/ledger/${newId}`,
     };
   });
 

@@ -25,6 +25,7 @@ var ROLES_BY_APP = {
   joabooks: [
     "owner",
     "super_admin",
+    "admin",
     "finance_manager",
     "finance_ap",
     "finance_ar",
@@ -1421,10 +1422,12 @@ function OrgScopeToggle({
   const { Button, Badge, Checkbox, Popover, PopoverContent, PopoverTrigger } = ui;
   const { memberships } = useAuth();
   const [open, setOpen] = useState(false);
-  if (memberships.length <= 1) return null;
-  const selected = new Set(value);
-  const allSelected = memberships.every((m) => selected.has(m.tenant_id));
-  const label = allSelected ? t("suite.org_scope.all_orgs", "All organizations ({{count}})", { count: memberships.length }) : value.length <= 1 ? t("suite.org_scope.this_org", "This organization") : t("suite.org_scope.n_selected", "{{count}} organizations selected", { count: value.length });
+  const eligible = memberships.filter((m) => !m.portal || m.portal === "internal");
+  if (eligible.length <= 1) return null;
+  const selected = new Set(value.filter((id) => eligible.some((m) => m.tenant_id === id)));
+  if (selected.size === 0) selected.add(eligible[0].tenant_id);
+  const allSelected = eligible.every((m) => selected.has(m.tenant_id));
+  const label = allSelected ? t("suite.org_scope.all_orgs", "All organizations ({{count}})", { count: eligible.length }) : selected.size <= 1 ? t("suite.org_scope.this_org", "This organization") : t("suite.org_scope.n_selected", "{{count}} organizations selected", { count: selected.size });
   const toggleOne = (tenantId) => {
     const next = new Set(selected);
     if (next.has(tenantId)) next.delete(tenantId);
@@ -1433,7 +1436,7 @@ function OrgScopeToggle({
     onChange(Array.from(next));
   };
   const toggleAll = () => {
-    onChange(allSelected ? [memberships[0].tenant_id] : memberships.map((m) => m.tenant_id));
+    onChange(allSelected ? [eligible[0].tenant_id] : eligible.map((m) => m.tenant_id));
   };
   return /* @__PURE__ */ jsxs(Popover, { open, onOpenChange: setOpen, children: [
     /* @__PURE__ */ jsx(PopoverTrigger, { asChild: true, children: /* @__PURE__ */ jsxs(Button, { variant: "outline", size: "sm", className: "gap-2", children: [
@@ -1446,7 +1449,7 @@ function OrgScopeToggle({
         /* @__PURE__ */ jsx("span", { className: "text-xs font-medium text-muted-foreground", children: t("suite.org_scope.select_orgs", "Organizations") }),
         /* @__PURE__ */ jsx("button", { type: "button", className: "text-xs text-primary hover:underline", onClick: toggleAll, children: allSelected ? t("suite.org_scope.reset_to_current", "Reset to current") : t("suite.org_scope.select_all", "Select all") })
       ] }),
-      /* @__PURE__ */ jsx("div", { className: "max-h-72 overflow-y-auto divide-y", children: memberships.map((m) => {
+      /* @__PURE__ */ jsx("div", { className: "max-h-72 overflow-y-auto divide-y", children: eligible.map((m) => {
         const adminRole = m.roles.find((r) => r === "owner" || r === "super_admin");
         return /* @__PURE__ */ jsxs(
           "label",

@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { listAccountsWithBalance } from "@/lib/accounting.functions";
-import { listParties, listCurrencies } from "@/lib/admin.functions";
+import { listParties, listCurrencies, listCategories } from "@/lib/admin.functions";
 import { AddVendorDialog } from "@/components/AddVendorDialog";
 import { previewOccurrenceDates } from "@/lib/recurring-preview";
 import { fmtDate, fmtMoney } from "@/lib/format";
@@ -42,6 +42,7 @@ export type RecurringFormValue = {
   name: string;
   direction: "money_in" | "money_out";
   type: string;
+  category_id: string | null;
   party_id: string | null;
   description: string | null;
   status: "active" | "paused" | "ended" | "draft" | "needs_review" | "cancel_planned" | "cancelled";
@@ -82,6 +83,7 @@ const DEFAULTS: RecurringFormValue = {
   name: "",
   direction: "money_out",
   type: "subscription",
+  category_id: null,
   party_id: null,
   description: null,
   status: "active",
@@ -147,10 +149,16 @@ export function RecurringForm({
   const listPartiesFn = useServerFn(listParties);
   const listCurrenciesFn = useServerFn(listCurrencies);
   const listAccountsFn = useServerFn(listAccountsWithBalance);
+  const listCategoriesFn = useServerFn(listCategories);
   const partiesQ = useQuery({
     queryKey: ["parties-all", tenantId],
     enabled: !!tenantId,
     queryFn: () => listPartiesFn({ data: { tenant_id: tenantId, kind: "all" } }),
+  });
+  const categoriesQ = useQuery({
+    queryKey: ["categories", tenantId],
+    enabled: !!tenantId,
+    queryFn: () => listCategoriesFn({ data: { tenant_id: tenantId } }),
   });
   const currenciesQ = useQuery({
     queryKey: ["currencies", tenantId],
@@ -171,6 +179,8 @@ export function RecurringForm({
   const currencies = ((currenciesQ.data ?? []) as CurrencyOpt[]).filter((c) => c.active !== false);
   type AccountOpt = { id: string; account_name: string; account_type?: string | null; bank_name?: string | null; last4?: string | null; active?: boolean | null };
   const accounts = (((accountsQ.data as { rows?: AccountOpt[] } | undefined)?.rows) ?? []).filter((a) => a.active !== false);
+  type CategoryOpt = { id: string; name: string; type?: string | null; active?: boolean | null };
+  const categories = ((categoriesQ.data ?? []) as CategoryOpt[]).filter((c) => c.active !== false && c.type === "expense");
   const [addVendorOpen, setAddVendorOpen] = useState(false);
 
   // Custom type list persisted per-tenant in localStorage so newly added types
@@ -256,37 +266,54 @@ export function RecurringForm({
     set(key, value);
   };
 
+  const hasValidAmount = v.amount_type === "range"
+    ? Number(v.amount_min ?? 0) > 0 && Number(v.amount_max ?? 0) > 0
+    : Number(v.amount ?? 0) > 0;
+  const hasValidStartDate = v.frequency === "custom" || !!v.start_date;
+  const isValid = !!v.name && !!v.direction && !!v.type && !!v.category_id
+    && !!v.frequency && hasValidAmount && hasValidStartDate;
 
   return (
     <form
       className="space-y-6"
       onSubmit={(e) => { e.preventDefault(); onSubmit(v); }}
     >
-      <FormSection title={t("recurring.section_basic", "Basic information")} columns="md:grid-cols-2">
-        <div className="md:col-span-2">
+      <FormSection title={t("recurring.section_basic", "Basic information")} columns="md:grid-cols-3">
+        <div className="md:col-span-3">
           <Label>{t("recurring.label_title", "Title")} *</Label>
           <Input value={v.name} onChange={(e) => set("name", e.target.value)} required />
         </div>
         <div>
-          <Label>{t("recurring.direction", "Direction")}</Label>
+          <Label>{t("recurring.direction", "Direction")} *</Label>
           <select className="w-full border rounded h-9 px-2 bg-background"
-            value={v.direction}
+            value={v.direction} required
             onChange={(e) => set("direction", e.target.value as any)}>
             <option value="money_out">{t("recurring.money_out", "Money Out")}</option>
             <option value="money_in">{t("recurring.money_in", "Money In")}</option>
           </select>
         </div>
         <div>
-          <Label>{t("recurring.type", "Type")}</Label>
+          <Label>{t("recurring.type", "Type")} *</Label>
           <select className="w-full border rounded h-9 px-2 bg-background"
-            value={v.type} onChange={(e) => handleTypeChange(e.target.value)}>
+            value={v.type} required onChange={(e) => handleTypeChange(e.target.value)}>
             {allTypes.map((k) => (
               <option key={k} value={k}>{k}</option>
             ))}
             <option value="__add_new__">＋ {t("recurring.add_new_type", "Add new type…")}</option>
           </select>
         </div>
-        <div className="md:col-span-2">
+        <div>
+          <Label>{t("recurring.category", "Transaction Category")} *</Label>
+          <select className="w-full border rounded h-9 px-2 bg-background"
+            value={v.category_id ?? ""} required
+            onChange={(e) => set("category_id", e.target.value || null)}>
+            <option value="" disabled>{t("recurring.category_placeholder", "Select category…")}</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="md:col-span-3">
           <div className="flex items-center justify-between mb-1">
             <Label>
               {v.direction === "money_in"
@@ -320,7 +347,7 @@ export function RecurringForm({
             ))}
           </select>
         </div>
-        <div className="md:col-span-2">
+        <div className="md:col-span-3">
           <Label>{t("recurring.description", "Description")}</Label>
           <Textarea rows={2} value={v.description ?? ""} onChange={(e) => set("description", e.target.value || null)} />
         </div>
@@ -365,18 +392,18 @@ export function RecurringForm({
         {v.amount_type === "range" ? (
           <>
             <div>
-              <Label>{t("recurring.amount_min", "Min")}</Label>
-              <Input type="number" step="0.01" value={v.amount_min ?? 0} onChange={(e) => set("amount_min", Number(e.target.value))} />
+              <Label>{t("recurring.amount_min", "Min")} *</Label>
+              <Input type="number" step="0.01" min="0.01" required value={v.amount_min ?? 0} onChange={(e) => set("amount_min", Number(e.target.value))} />
             </div>
             <div>
-              <Label>{t("recurring.amount_max", "Max")}</Label>
-              <Input type="number" step="0.01" value={v.amount_max ?? 0} onChange={(e) => set("amount_max", Number(e.target.value))} />
+              <Label>{t("recurring.amount_max", "Max")} *</Label>
+              <Input type="number" step="0.01" min="0.01" required value={v.amount_max ?? 0} onChange={(e) => set("amount_max", Number(e.target.value))} />
             </div>
           </>
         ) : (
           <div>
-            <Label>{t("recurring.total_amount", "Total Amount")}</Label>
-            <Input type="number" step="0.01" value={v.amount ?? 0} onChange={(e) => set("amount", Number(e.target.value))} />
+            <Label>{t("recurring.total_amount", "Total Amount")} *</Label>
+            <Input type="number" step="0.01" min="0.01" required value={v.amount ?? 0} onChange={(e) => set("amount", Number(e.target.value))} />
           </div>
         )}
         <div>
@@ -475,9 +502,9 @@ export function RecurringForm({
 
       <FormSection title={t("recurring.section_schedule", "Schedule")} columns="md:grid-cols-3">
         <div className="md:col-span-3">
-          <Label>{t("recurring.frequency", "Frequency")}</Label>
+          <Label>{t("recurring.frequency", "Frequency")} *</Label>
           <select className="w-full border rounded h-9 px-2 bg-background"
-            value={v.frequency} onChange={(e) => set("frequency", e.target.value as any)}>
+            value={v.frequency} required onChange={(e) => set("frequency", e.target.value as any)}>
             {["one_time","weekly","biweekly","semi_monthly","monthly","quarterly","yearly","custom","irregular"].map((k) => (
               <option key={k} value={k}>{k}</option>
             ))}
@@ -496,8 +523,8 @@ export function RecurringForm({
         ) : (
           <>
             <div>
-              <Label>{t("recurring.start_date", "Start Date")}</Label>
-              <Input type="date" value={v.start_date ?? ""} onChange={(e) => handleDateChange("start_date", e.target.value)} />
+              <Label>{t("recurring.start_date", "Start Date")} *</Label>
+              <Input type="date" required value={v.start_date ?? ""} onChange={(e) => handleDateChange("start_date", e.target.value)} />
             </div>
             <div>
               <Label>{t("recurring.next_date", "Next Date")}</Label>
@@ -658,7 +685,7 @@ export function RecurringForm({
 
       <div className="flex justify-end gap-2 pt-2 border-t">
         {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>{t("common.cancel", "Cancel")}</Button>}
-        <Button type="submit" disabled={submitting || !v.name}>{submitLabel}</Button>
+        <Button type="submit" disabled={submitting || !isValid}>{submitLabel}</Button>
       </div>
     </form>
   );
