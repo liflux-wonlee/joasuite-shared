@@ -8,7 +8,19 @@ var SubInput = z.object({
   appCode: z.string().min(1).max(64),
   plan: z.string().min(1).max(64).default("basic")
 });
-async function assertOwner(supabase, tenantId, userId) {
+async function assertOwner(deps, supabase, tenantId, userId) {
+  if (deps.supabaseAdmin && deps.appCode) {
+    const { data, error } = await deps.supabaseAdmin.from("user_roles").select("role, app_code").eq("tenant_id", tenantId).eq("user_id", userId);
+    if (error) throw new Error(error.message);
+    const ok2 = (data ?? []).some((r) => {
+      const role = r.role;
+      const appCode = r.app_code;
+      if (appCode === null) return role === "owner" || role === "super_admin";
+      return appCode === deps.appCode && role === "admin";
+    });
+    if (!ok2) throw new Error("Forbidden");
+    return;
+  }
   const { data: ok } = await supabase.rpc("has_any_role", {
     _tenant: tenantId,
     _user: userId,
@@ -45,7 +57,7 @@ function createListSuiteApps(deps) {
 }
 function createSubscribeApp(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((d) => SubInput.parse(d)).handler(async ({ data, context }) => {
-    await assertOwner(context.supabase, data.tenantId, context.userId);
+    await assertOwner(deps, context.supabase, data.tenantId, context.userId);
     const { error } = await context.supabase.from("tenant_apps").upsert(
       {
         tenant_id: data.tenantId,
@@ -66,8 +78,10 @@ function createCancelApp(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (d) => z.object({ tenantId: z.string().uuid(), appCode: z.string().min(1).max(64) }).parse(d)
   ).handler(async ({ data, context }) => {
-    await assertOwner(context.supabase, data.tenantId, context.userId);
-    if (data.appCode === "joabooks") throw new Error("JoaBooks cannot be canceled here");
+    await assertOwner(deps, context.supabase, data.tenantId, context.userId);
+    if (data.appCode === (deps.appCode ?? "joabooks")) {
+      throw new Error("This app cannot be canceled here");
+    }
     const { error } = await context.supabase.from("tenant_apps").update({ status: "canceled", canceled_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("tenant_id", data.tenantId).eq("app_code", data.appCode);
     if (error) throw error;
     return { ok: true };
@@ -81,6 +95,26 @@ var APP_URL_KEYS = [
   "app_url.joaoffice",
   "app_url.joasop"
 ];
+async function assertOwnerOrAdmin(deps, supabase, tenantId, userId) {
+  if (deps.supabaseAdmin && deps.appCode) {
+    const { data, error } = await deps.supabaseAdmin.from("user_roles").select("role, app_code").eq("tenant_id", tenantId).eq("user_id", userId);
+    if (error) throw new Error(error.message);
+    const ok2 = (data ?? []).some((r) => {
+      const role = r.role;
+      const appCode = r.app_code;
+      if (appCode === null) return role === "owner" || role === "super_admin";
+      return appCode === deps.appCode && role === "admin";
+    });
+    if (!ok2) throw new Error("Forbidden");
+    return;
+  }
+  const { data: ok } = await supabase.rpc("has_any_role", {
+    _tenant: tenantId,
+    _user: userId,
+    _roles: ["owner", "super_admin"]
+  });
+  if (!ok) throw new Error("Forbidden");
+}
 function createGetSuiteHome(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((d) => TenantInput2.parse(d)).handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -96,7 +130,7 @@ function createGetSuiteHome(deps) {
       { data: activity }
     ] = await Promise.all([
       supabase.from("settings_kv").select("key, value").eq("tenant_id", tenantId).in("key", APP_URL_KEYS),
-      supabase.from("approvals").select("id, doc_kind, doc_id, sequence_no, created_at").eq("tenant_id", tenantId).eq("assigned_to", userId).eq("status", "pending").order("created_at", { ascending: false }).limit(10),
+      supabase.from("approvals").select("id, doc_kind, doc_id, sequence_no, created_at, source_app, meta, link_path").eq("tenant_id", tenantId).eq("assigned_to", userId).eq("status", "pending").order("created_at", { ascending: false }).limit(10),
       supabase.from("payment_requests").select("id, request_no, status, amount_usd, created_at, due_date").eq("tenant_id", tenantId).eq("submitted_by", userId).order("created_at", { ascending: false }).limit(5),
       supabase.from("bills").select("id, bill_no, status, amount_usd, created_at, due_date").eq("tenant_id", tenantId).eq("created_by", userId).order("created_at", { ascending: false }).limit(5),
       supabase.from("notifications").select("id, kind, title, body, link_path, read_at, created_at, app_code").eq("tenant_id", tenantId).eq("user_id", userId).order("created_at", { ascending: false }).limit(10),
@@ -127,20 +161,30 @@ function createGetSuiteHome(deps) {
       const v = typeof row.value === "string" ? row.value : row.value?.url ?? "";
       if (v) appUrls[code] = v;
     }
+    const { data: activeApps } = await supabase.from("tenant_apps").select("app_code").eq("tenant_id", tenantId).eq("status", "active");
+    const subscribed = new Set((activeApps ?? []).map((r) => r.app_code));
+    const inferApp = (a) => {
+      if (a.source_app) return a.source_app;
+      const k = String(a.doc_kind ?? "");
+      return k.includes(".") ? k.split(".")[0] : "joabooks";
+    };
     return {
       appUrls,
-      myApprovals: (approvals ?? []).map((a) => {
+      myApprovals: (approvals ?? []).filter((a) => subscribed.size === 0 || subscribed.has(inferApp(a))).map((a) => {
+        const meta = a.meta && typeof a.meta === "object" ? a.meta : {};
         const t = titleFor(a.doc_kind, a.doc_id);
+        const title = meta.title ?? t.title ?? String(a.doc_kind ?? "").replace(/^[a-z]+\./, "").replace(/_/g, " ") ?? null;
         return {
           id: a.id,
           doc_kind: a.doc_kind,
           doc_id: a.doc_id,
           sequence_no: a.sequence_no,
           created_at: a.created_at,
-          title: t.title,
-          amount_usd: t.amount_usd,
-          due_date: t.due_date,
-          source_app: "joabooks"
+          title,
+          amount_usd: meta.amount ?? t.amount_usd ?? null,
+          due_date: meta.due_date ?? t.due_date ?? null,
+          source_app: inferApp(a),
+          link_path: a.link_path ?? null
         };
       }),
       requestedByMe: [
@@ -177,12 +221,7 @@ var SetAppUrlInput = z.object({
 function createSetAppUrl(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((d) => SetAppUrlInput.parse(d)).handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data: ok } = await supabase.rpc("has_any_role", {
-      _tenant: data.tenantId,
-      _user: userId,
-      _roles: ["owner", "super_admin"]
-    });
-    if (!ok) throw new Error("Forbidden");
+    await assertOwnerOrAdmin(deps, supabase, data.tenantId, userId);
     const key = `app_url.${data.appCode}`;
     if (!data.url) {
       const { error: error2 } = await supabase.from("settings_kv").delete().eq("tenant_id", data.tenantId).eq("key", key);
@@ -224,11 +263,14 @@ function createListNotifications(deps) {
       limit: z.number().int().min(1).max(100).default(30)
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    let q = context.supabase.from("notifications").select("id, kind, title, body, link_path, read_at, created_at").eq("tenant_id", data.tenant_id).eq("user_id", context.userId).or(`app_code.eq.${deps.appCode},app_code.is.null`).order("created_at", { ascending: false }).limit(data.limit);
+    let q = context.supabase.from("notifications").select("id, kind, title, body, link_path, read_at, created_at, app_code").eq("tenant_id", data.tenant_id).eq("user_id", context.userId).order("created_at", { ascending: false }).limit(data.limit);
+    if (!deps.crossApp) q = q.or(`app_code.eq.${deps.appCode},app_code.is.null`);
     if (data.unread_only) q = q.is("read_at", null);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-    const { count } = await context.supabase.from("notifications").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).eq("user_id", context.userId).or(`app_code.eq.${deps.appCode},app_code.is.null`).is("read_at", null);
+    let countQ = context.supabase.from("notifications").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).eq("user_id", context.userId).is("read_at", null);
+    if (!deps.crossApp) countQ = countQ.or(`app_code.eq.${deps.appCode},app_code.is.null`);
+    const { count } = await countQ;
     return { rows: rows ?? [], unread_count: count ?? 0 };
   });
 }
@@ -253,6 +295,7 @@ var APP_ROLES = [
   "owner",
   "super_admin",
   "admin",
+  "billing_admin",
   "finance_ap",
   "finance_ar",
   "finance_manager",
@@ -260,6 +303,9 @@ var APP_ROLES = [
   "approver",
   "vendor",
   "customer",
+  "hr_manager",
+  "manager",
+  "employee",
   "sop_admin",
   "sop_author",
   "sop_reviewer",
@@ -749,29 +795,45 @@ var APP_ROLES2 = [
   "owner",
   "super_admin",
   "admin",
+  "billing_admin",
   "finance_ap",
   "finance_ar",
   "finance_manager",
   "accountant",
   "approver",
   "vendor",
-  "customer"
+  "customer",
+  "hr_manager",
+  "manager",
+  "employee",
+  "sop_admin",
+  "sop_author",
+  "sop_reviewer",
+  "sop_operator"
 ];
 var AppRole2 = z.enum(APP_ROLES2);
-async function assertOwnerOrAdmin(supabaseAdmin, tenantId, userId) {
-  const { data, error } = await supabaseAdmin.from("user_roles").select("role").eq("tenant_id", tenantId).eq("user_id", userId);
+async function assertOwnerOrAdmin2(supabaseAdmin, appCode, tenantId, userId) {
+  const { data, error } = await supabaseAdmin.from("user_roles").select("role, app_code").eq("tenant_id", tenantId).eq("user_id", userId);
   if (error) throw new Error(error.message);
-  const roles = (data ?? []).map((r) => r.role);
-  const ok = roles.some((r) => ["owner", "super_admin", "finance_manager"].includes(r));
+  const rows = data ?? [];
+  const ok = rows.some((r) => {
+    const role = r.role;
+    const rowAppCode = r.app_code;
+    if (rowAppCode === null) return role === "owner" || role === "super_admin";
+    return rowAppCode === appCode && role === "admin";
+  });
   if (!ok) throw new Error("Forbidden: admin role required");
 }
-async function assertCanEditVendor(supabaseAdmin, tenantId, userId) {
-  const { data, error } = await supabaseAdmin.from("user_roles").select("role").eq("tenant_id", tenantId).eq("user_id", userId);
+async function assertCanEditVendor(supabaseAdmin, appCode, tenantId, userId) {
+  const { data, error } = await supabaseAdmin.from("user_roles").select("role, app_code").eq("tenant_id", tenantId).eq("user_id", userId);
   if (error) throw new Error(error.message);
-  const roles = (data ?? []).map((r) => r.role);
-  const ok = roles.some(
-    (r) => ["owner", "super_admin", "finance_manager", "finance_ap", "accountant"].includes(r)
-  );
+  const rows = data ?? [];
+  const ok = rows.some((r) => {
+    const role = r.role;
+    const rowAppCode = r.app_code;
+    if (rowAppCode === null) return role === "owner" || role === "super_admin";
+    return rowAppCode === appCode && role === "admin";
+  });
   if (!ok) throw new Error("Forbidden: vendor edit role required");
 }
 async function assertTenantMember(supabaseAdmin, tenantId, userId) {
@@ -841,7 +903,7 @@ function createUpdateTenantSettings(deps) {
       settings: z.record(z.string(), z.any()).optional()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertOwnerOrAdmin2(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const patch = {};
     if (data.name) patch.name = data.name;
     if (data.settings) patch.settings = data.settings;
@@ -885,7 +947,7 @@ function createUpdateTenantUserProfile(deps) {
       position: z.string().max(120).optional().nullable()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertOwnerOrAdmin2(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { error } = await deps.supabaseAdmin.from("tenant_users").update({ display_name: data.display_name, position: data.position ?? null }).eq("tenant_id", data.tenant_id).eq("user_id", data.user_id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -904,9 +966,9 @@ function createInviteTenantUser(deps) {
     }).parse(i)
   ).handler(async ({ data, context }) => {
     if (data.portal === "vendor") {
-      await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     } else {
-      await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertOwnerOrAdmin2(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     }
     const invited = await findOrInviteUser(deps, data.email, data.display_name);
     const { data: tenantRow } = await deps.supabaseAdmin.from("tenants").select("name").eq("id", data.tenant_id).single();
@@ -970,7 +1032,7 @@ function createResendInvitation(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({ tenant_id: z.string().uuid(), user_id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertOwnerOrAdmin2(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { data: m, error } = await deps.supabaseAdmin.from("tenant_users").select("email, display_name").eq("tenant_id", data.tenant_id).eq("user_id", data.user_id).single();
     if (error) throw new Error(error.message);
     if (!m.email) throw new Error("User has no email on file");
@@ -996,7 +1058,7 @@ function createSendPasswordResetLink(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({ tenant_id: z.string().uuid(), user_id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertOwnerOrAdmin2(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { data: m, error } = await deps.supabaseAdmin.from("tenant_users").select("email, display_name").eq("tenant_id", data.tenant_id).eq("user_id", data.user_id).single();
     if (error) throw new Error(error.message);
     if (!m.email) throw new Error("User has no email on file");
@@ -1031,7 +1093,7 @@ function createUpdateTenantUserRoles(deps) {
       app_code: z.string().min(1).max(64).optional()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertOwnerOrAdmin2(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const appCode = data.app_code ?? deps.appCode;
     const { error: delErr } = await deps.supabaseAdmin.from("user_roles").delete().eq("tenant_id", data.tenant_id).eq("user_id", data.user_id).eq("app_code", appCode);
     if (delErr) throw new Error(delErr.message);
@@ -1056,7 +1118,7 @@ function createSetTenantUserStatus(deps) {
       status: z.enum(["active", "invited", "suspended"])
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertOwnerOrAdmin2(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { error } = await deps.supabaseAdmin.from("tenant_users").update({ status: data.status }).eq("tenant_id", data.tenant_id).eq("user_id", data.user_id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -1084,10 +1146,14 @@ function createRemoveTenantUser(deps) {
     if ((targetRoles ?? []).some((r) => r.role === "owner")) {
       throw new Error("Cannot remove an owner. Transfer ownership first.");
     }
-    const { error: rolesErr } = await deps.supabaseAdmin.from("user_roles").delete().eq("tenant_id", data.tenant_id).eq("user_id", data.user_id);
+    const { error: rolesErr } = await deps.supabaseAdmin.from("user_roles").delete().eq("tenant_id", data.tenant_id).eq("user_id", data.user_id).eq("app_code", deps.appCode);
     if (rolesErr) throw new Error(rolesErr.message);
-    const { error: memErr } = await deps.supabaseAdmin.from("tenant_users").delete().eq("tenant_id", data.tenant_id).eq("user_id", data.user_id);
-    if (memErr) throw new Error(memErr.message);
+    const { data: remaining, error: remErr } = await deps.supabaseAdmin.from("user_roles").select("id").eq("tenant_id", data.tenant_id).eq("user_id", data.user_id).limit(1);
+    if (remErr) throw new Error(remErr.message);
+    if ((remaining ?? []).length === 0) {
+      const { error: memErr } = await deps.supabaseAdmin.from("tenant_users").delete().eq("tenant_id", data.tenant_id).eq("user_id", data.user_id);
+      if (memErr) throw new Error(memErr.message);
+    }
     return { ok: true };
   });
 }
@@ -1161,7 +1227,7 @@ function createUpsertParty(deps) {
       internal_notes: z.string().max(2e3).optional().nullable()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { id, ...rest } = data;
     const row = {
       ...rest,
@@ -1242,7 +1308,7 @@ function createUpsertPartyContact(deps) {
       active: z.boolean().optional()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const row = {
       tenant_id: data.tenant_id,
       party_id: data.party_id,
@@ -1270,7 +1336,7 @@ function createDeletePartyContact(deps) {
       contact_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { error } = await deps.supabaseAdmin.from("party_contacts").delete().eq("id", data.contact_id).eq("tenant_id", data.tenant_id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -1283,7 +1349,7 @@ function createInvitePartyContact(deps) {
       contact_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { data: c, error: ce } = await deps.supabaseAdmin.from("party_contacts").select("id, name, email, party_id, tenant_id").eq("id", data.contact_id).eq("tenant_id", data.tenant_id).single();
     if (ce) throw new Error(ce.message);
     if (!c.email) throw new Error("Contact has no email");
@@ -1327,7 +1393,7 @@ function createRevokePartyContact(deps) {
       contact_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { error } = await deps.supabaseAdmin.from("party_contacts").update({ linked_user_id: null, invited_at: null }).eq("id", data.contact_id).eq("tenant_id", data.tenant_id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -1386,7 +1452,7 @@ function createUpsertPartyBankAccount(deps) {
       bank: BankAccountInput
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const last4 = data.bank.account_number ? data.bank.account_number.slice(-4) : null;
     const patch = {
       bank_name: data.bank.bank_name ?? null,
@@ -1432,7 +1498,7 @@ function createDeletePartyBankAccount(deps) {
       bank_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { count: refCount } = await deps.supabaseAdmin.from("payment_requests").select("id", { head: true, count: "exact" }).eq("tenant_id", data.tenant_id).eq("party_bank_account_id", data.bank_id);
     if ((refCount ?? 0) > 0) {
       const { error: error2 } = await deps.supabaseAdmin.from("party_bank_accounts").update({
@@ -1490,7 +1556,7 @@ function createCleanupPartyContacts(deps) {
       party_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { data: rows, error } = await deps.supabaseAdmin.from("party_contacts").select("id, email, is_primary, linked_user_id, created_at, active").eq("tenant_id", data.tenant_id).eq("party_id", data.party_id);
     if (error) throw new Error(error.message);
     const groups = /* @__PURE__ */ new Map();
@@ -1535,7 +1601,7 @@ function createMergeParties(deps) {
       target_party_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     if (data.source_party_id === data.target_party_id) {
       throw new Error("Source and target must be different");
     }

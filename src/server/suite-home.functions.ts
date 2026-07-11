@@ -23,6 +23,7 @@ export type SuiteHomeData = {
     amount_usd: number | null;
     due_date: string | null;
     source_app: string;
+    link_path: string | null;
   }>;
   requestedByMe: Array<{
     id: string;
@@ -53,7 +54,37 @@ export type SuiteHomeData = {
   }>;
 };
 
-type Deps = { requireSupabaseAuth: any };
+type Deps = { requireSupabaseAuth: any; supabaseAdmin?: any; appCode?: string };
+
+// See suite.functions.ts's assertOwner comment: has_any_role has no
+// app_code parameter, so it's only safe for owner/super_admin (always
+// suite-wide). When deps.supabaseAdmin + deps.appCode are supplied, check
+// user_roles directly with app_code scoping to support app-scoped 'admin'
+// correctly; otherwise fall back to the original owner/super_admin-only RPC.
+async function assertOwnerOrAdmin(deps: Deps, supabase: any, tenantId: string, userId: string) {
+  if (deps.supabaseAdmin && deps.appCode) {
+    const { data, error } = await deps.supabaseAdmin
+      .from("user_roles")
+      .select("role, app_code")
+      .eq("tenant_id", tenantId)
+      .eq("user_id", userId);
+    if (error) throw new Error(error.message);
+    const ok = (data ?? []).some((r: any) => {
+      const role = r.role as string;
+      const appCode = r.app_code as string | null;
+      if (appCode === null) return role === "owner" || role === "super_admin";
+      return appCode === deps.appCode && role === "admin";
+    });
+    if (!ok) throw new Error("Forbidden");
+    return;
+  }
+  const { data: ok } = await supabase.rpc("has_any_role", {
+    _tenant: tenantId,
+    _user: userId,
+    _roles: ["owner", "super_admin"],
+  });
+  if (!ok) throw new Error("Forbidden");
+}
 
 export function createGetSuiteHome(deps: Deps) {
   return createServerFn({ method: "POST" })
@@ -88,7 +119,7 @@ export function createGetSuiteHome(deps: Deps) {
           .in("key", APP_URL_KEYS as unknown as string[]),
         supabase
           .from("approvals")
-          .select("id, doc_kind, doc_id, sequence_no, created_at")
+          .select("id, doc_kind, doc_id, sequence_no, created_at, source_app, meta, link_path")
           .eq("tenant_id", tenantId)
           .eq("assigned_to", userId)
           .eq("status", "pending")
@@ -189,22 +220,50 @@ export function createGetSuiteHome(deps: Deps) {
         if (v) appUrls[code] = v;
       }
 
+      // Only surface approvals from apps this tenant is currently subscribed
+      // to (contract §9.3) - a canceled app's approvals must not linger here.
+      const { data: activeApps } = await supabase
+        .from("tenant_apps")
+        .select("app_code")
+        .eq("tenant_id", tenantId)
+        .eq("status", "active");
+      const subscribed = new Set((activeApps ?? []).map((r: any) => r.app_code));
+
+      // Infer the writing app from the doc_kind prefix when source_app is
+      // absent (legacy finance kinds predating source_app have no prefix).
+      const inferApp = (a: any): string => {
+        if (a.source_app) return a.source_app;
+        const k = String(a.doc_kind ?? "");
+        return k.includes(".") ? k.split(".")[0] : "joabooks";
+      };
+
       return {
         appUrls,
-        myApprovals: (approvals ?? []).map((a: any) => {
-          const t = titleFor(a.doc_kind, a.doc_id);
-          return {
-            id: a.id,
-            doc_kind: a.doc_kind,
-            doc_id: a.doc_id,
-            sequence_no: a.sequence_no,
-            created_at: a.created_at,
-            title: t.title,
-            amount_usd: t.amount_usd,
-            due_date: t.due_date,
-            source_app: "joabooks",
-          };
-        }),
+        myApprovals: (approvals ?? [])
+          .filter((a: any) => subscribed.size === 0 || subscribed.has(inferApp(a)))
+          .map((a: any) => {
+            const meta = (a.meta && typeof a.meta === "object" ? a.meta : {}) as Record<string, any>;
+            const t = titleFor(a.doc_kind, a.doc_id);
+            // Prefer the cross-app `meta` snapshot, then the JoaBooks title
+            // resolver, else a generic label derived from doc_kind.
+            const title =
+              meta.title ??
+              t.title ??
+              String(a.doc_kind ?? "").replace(/^[a-z]+\./, "").replace(/_/g, " ") ??
+              null;
+            return {
+              id: a.id,
+              doc_kind: a.doc_kind,
+              doc_id: a.doc_id,
+              sequence_no: a.sequence_no,
+              created_at: a.created_at,
+              title,
+              amount_usd: meta.amount ?? t.amount_usd ?? null,
+              due_date: meta.due_date ?? t.due_date ?? null,
+              source_app: inferApp(a),
+              link_path: a.link_path ?? null,
+            };
+          }),
         requestedByMe: [
           ...(prs ?? []).map((r: any) => ({
             id: r.id,
@@ -250,12 +309,7 @@ export function createSetAppUrl(deps: Deps) {
     .inputValidator((d) => SetAppUrlInput.parse(d))
     .handler(async ({ data, context }) => {
       const { supabase, userId } = context;
-      const { data: ok } = await supabase.rpc("has_any_role", {
-        _tenant: data.tenantId,
-        _user: userId,
-        _roles: ["owner", "super_admin"],
-      });
-      if (!ok) throw new Error("Forbidden");
+      await assertOwnerOrAdmin(deps, supabase, data.tenantId, userId);
       const key = `app_url.${data.appCode}`;
       if (!data.url) {
         const { error } = await supabase

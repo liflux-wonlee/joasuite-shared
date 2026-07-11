@@ -58,3 +58,48 @@ src/lib/cron-auth.server.ts
 src/lib/recurring-v2.functions.ts
 src/lib/recurring-preview.ts
 src/components/recurring/RecurringForm.tsx
+
+# Cash Flow Forecast page — reconciled 2026-07-11. Confirmed near-byte-
+# identical between JoaBooks and JoaOffice already (only whitespace/comment
+# noise + a `p-8` wrapper class in JoaOffice's copy). No documented
+# post-pull edits needed beyond that wrapper class, if present.
+src/routes/app.cashflow.tsx
+
+# "New Planned Transaction" page — reconciled 2026-07-11. Required
+# post-pull edits per app:
+#   - Back link: JoaBooks uses an inline `Link` + `ArrowLeft`; JoaOffice
+#     uses its own `BackLink` component (@/components/BackLink) instead.
+#   - Submit flow: JoaBooks uses `useMutation`; JoaOffice uses a plain
+#     async `onSubmit` + local `submitting` state instead (no functional
+#     difference, just a style choice already established elsewhere in
+#     JoaOffice's recurring routes — keep it that way on future pulls).
+#   - `source_app` literal: "joabooks" vs "joaoffice" in the createRecurring
+#     call, same pattern as recurring-v2.functions.ts's APP_CODE line.
+# The FIELD_LABELS map, humanizeError(), the `Search` type + validateSearch
+# (deep-link prefill from name/direction/party_id/amount/currency_code/
+# description/from/from_id), and the initial-value wiring must stay
+# byte-for-byte identical — these were the actual gap found 2026-07-11
+# (JoaOffice's copy had silently dropped deep-link prefill support and
+# humanized Zod error messages entirely).
+src/routes/app.recurring.new.tsx
+
+# NOTE on files intentionally NOT in this manifest:
+#   - app.recurring.index.tsx: JoaOffice's list page has diverged
+#     deliberately (pagination, SavedViewsBar, Clear-filters chip,
+#     admin-gated "New" button, card layout vs JoaBooks' table) - this is
+#     accepted independent UI evolution, not drift to reconcile. Do not
+#     force this one into the strict pull-from-core pattern.
+#   - app.recurring.$id.tsx / $id.index.tsx / $id.edit.tsx: JoaBooks split
+#     view+edit into separate routes (with a pathless `$id.tsx` Outlet
+#     wrapper); JoaOffice keeps a single `$id.tsx` with an inline edit-mode
+#     toggle. Confirmed 2026-07-11 the *feature* surface (mutations,
+#     i18n keys) is equivalent between the two structures - this is a
+#     routing-structure choice, not a content gap. Re-verify feature
+#     parity (not file identity) on future JoaBooks changes to its detail
+#     page: diff the exported mutation/function names on both sides
+#     rather than the raw file text.
+#   - app.settings.recurring.tsx: JoaBooks-only. This is the *legacy*
+#     `recurring_schedules` feature (@/lib/recurring.functions), distinct
+#     from Planned Transactions (@/lib/recurring-v2.functions). Explicitly
+#     out of scope for JoaOffice per the original migration docs - not a
+#     gap.

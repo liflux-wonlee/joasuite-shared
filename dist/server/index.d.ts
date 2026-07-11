@@ -22,6 +22,8 @@ type TenantAppRow = {
 };
 type Deps$2 = {
     requireSupabaseAuth: any;
+    supabaseAdmin?: any;
+    appCode?: string;
 };
 declare function createListSuiteApps(deps: Deps$2): _tanstack_start_client_core.OptionalFetcher<readonly [any], (d: unknown) => {
     tenantId: string;
@@ -56,6 +58,7 @@ type SuiteHomeData = {
         amount_usd: number | null;
         due_date: string | null;
         source_app: string;
+        link_path: string | null;
     }>;
     requestedByMe: Array<{
         id: string;
@@ -87,6 +90,8 @@ type SuiteHomeData = {
 };
 type Deps$1 = {
     requireSupabaseAuth: any;
+    supabaseAdmin?: any;
+    appCode?: string;
 };
 declare function createGetSuiteHome(deps: Deps$1): _tanstack_start_client_core.OptionalFetcher<readonly [any], (d: unknown) => {
     tenantId: string;
@@ -126,6 +131,14 @@ type Deps = {
     requireSupabaseAuth: any;
     supabaseAdmin: any;
     appCode: string;
+    /**
+     * When true, the bell shows notifications from EVERY app the user has
+     * (a single unified cross-app bell), tagging each row with its source
+     * app_code so the UI can badge/deep-link non-current-app notifications.
+     * When false/omitted, only this app's own rows (+ app_code IS NULL
+     * suite-wide rows) are returned - the original, narrower behavior.
+     */
+    crossApp?: boolean;
 };
 declare function createListNotifications(deps: Deps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
     tenant_id: string;
@@ -197,7 +210,7 @@ declare function createInviteUserToWorkspaces(deps: AccountDeps): _tanstack_star
         portal: "approver" | "internal" | "vendor" | "customer";
         apps: {
             app_code: string;
-            roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "vendor" | "customer")[];
+            roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "billing_admin" | "vendor" | "customer" | "hr_manager" | "manager" | "employee")[];
         }[];
     }[];
     position?: string | undefined;
@@ -213,7 +226,7 @@ declare function createSetUserAppRoles(deps: AccountDeps): _tanstack_start_clien
     tenant_id: string;
     user_id: string;
     app_code: string;
-    roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "vendor" | "customer")[];
+    roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "billing_admin" | "vendor" | "customer" | "hr_manager" | "manager" | "employee")[];
 }, Promise<{
     ok: true;
 }>>;
@@ -271,7 +284,12 @@ type AdminDeps = {
     appBaseUrl: string;
     /** Display name used in transactional emails, e.g. "JoaBooks". */
     appName: string;
-    /** Canonical app_code fallback for legacy rows predating multi-app support. */
+    /**
+     * This app's canonical app_code (e.g. "joabooks", "joaoffice"). Used both
+     * as a fallback for legacy rows predating multi-app support, and to scope
+     * app-specific role checks (assertOwnerOrAdmin / assertCanEditVendor) so a
+     * role granted in a different suite app never satisfies this app's checks.
+     */
     appCode: string;
 };
 type MergePartiesDeps = AdminDeps & {
@@ -308,7 +326,7 @@ declare function createInviteTenantUser(deps: AdminDeps): _tanstack_start_client
     email: string;
     display_name: string;
     portal: "approver" | "internal" | "vendor" | "customer";
-    roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "vendor" | "customer")[];
+    roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "billing_admin" | "vendor" | "customer" | "hr_manager" | "manager" | "employee")[];
     position?: string | undefined;
     party_id?: string | undefined;
 }, Promise<{
@@ -335,7 +353,7 @@ declare function createSendPasswordResetLink(deps: AdminDeps): _tanstack_start_c
 declare function createUpdateTenantUserRoles(deps: AdminDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
     tenant_id: string;
     user_id: string;
-    roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "vendor" | "customer")[];
+    roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "billing_admin" | "vendor" | "customer" | "hr_manager" | "manager" | "employee")[];
     app_code?: string | undefined;
 }, Promise<{
     ok: true;

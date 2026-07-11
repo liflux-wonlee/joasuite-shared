@@ -19,10 +19,16 @@ function resolveAppBaseUrl(deps: AccountDeps) {
   return (process.env.APP_BASE_URL || deps.appBaseUrl).replace(/\/$/, "");
 }
 
+// Full public.app_role enum (every role across every JoaSuite app). This is
+// the complete set of role STRINGS a caller may validly grant someone via
+// setUserAppRoles/inviteUserToWorkspaces - actual authorization (who is
+// allowed to grant what) is enforced separately via app_code scoping, not
+// by narrowing this list per app.
 const APP_ROLES = [
   "owner",
   "super_admin",
   "admin",
+  "billing_admin",
   "finance_ap",
   "finance_ar",
   "finance_manager",
@@ -30,6 +36,9 @@ const APP_ROLES = [
   "approver",
   "vendor",
   "customer",
+  "hr_manager",
+  "manager",
+  "employee",
   "sop_admin",
   "sop_author",
   "sop_reviewer",

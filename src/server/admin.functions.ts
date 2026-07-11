@@ -14,7 +14,12 @@ export type AdminDeps = {
   appBaseUrl: string;
   /** Display name used in transactional emails, e.g. "JoaBooks". */
   appName: string;
-  /** Canonical app_code fallback for legacy rows predating multi-app support. */
+  /**
+   * This app's canonical app_code (e.g. "joabooks", "joaoffice"). Used both
+   * as a fallback for legacy rows predating multi-app support, and to scope
+   * app-specific role checks (assertOwnerOrAdmin / assertCanEditVendor) so a
+   * role granted in a different suite app never satisfies this app's checks.
+   */
   appCode: string;
 };
 
@@ -29,13 +34,15 @@ function resolveAppBaseUrl(deps: AdminDeps) {
   return (process.env.APP_BASE_URL || deps.appBaseUrl).replace(/\/$/, "");
 }
 
-// NOTE: this list currently matches JoaBooks' admin.functions.ts. account.functions.ts
-// in the same app maintains its OWN separate AppRole list that has already drifted from
-// this one (extra sop_* roles) — worth unifying into one shared roles module later.
+// Full public.app_role Postgres enum, kept in sync with account.functions.ts's
+// APP_ROLES (both used to drift independently; unified here so inviteTenantUser
+// can accept any valid role, not just the finance-flavored subset JoaBooks
+// originally needed).
 const APP_ROLES = [
   "owner",
   "super_admin",
   "admin",
+  "billing_admin",
   "finance_ap",
   "finance_ar",
   "finance_manager",
@@ -43,32 +50,53 @@ const APP_ROLES = [
   "approver",
   "vendor",
   "customer",
+  "hr_manager",
+  "manager",
+  "employee",
+  "sop_admin",
+  "sop_author",
+  "sop_reviewer",
+  "sop_operator",
 ] as const;
 const AppRole = z.enum(APP_ROLES);
 
-async function assertOwnerOrAdmin(supabaseAdmin: any, tenantId: string, userId: string) {
+// Suite-wide roles (owner/super_admin, app_code IS NULL) satisfy every
+// app's checks. App-scoped roles (e.g. 'admin') only count when scoped to
+// the CALLING app's own appCode - a role held in a different suite app
+// must not grant this app's admin access. appCode comes from the
+// consuming app's AdminDeps (each app passes its own canonical app_code
+// when instantiating these factories).
+async function assertOwnerOrAdmin(supabaseAdmin: any, appCode: string, tenantId: string, userId: string) {
   const { data, error } = await supabaseAdmin
     .from("user_roles")
-    .select("role")
+    .select("role, app_code")
     .eq("tenant_id", tenantId)
     .eq("user_id", userId);
   if (error) throw new Error(error.message);
-  const roles = (data ?? []).map((r: any) => r.role as string);
-  const ok = roles.some((r: string) => ["owner", "super_admin", "finance_manager"].includes(r));
+  const rows = data ?? [];
+  const ok = rows.some((r: any) => {
+    const role = r.role as string;
+    const rowAppCode = r.app_code as string | null;
+    if (rowAppCode === null) return role === "owner" || role === "super_admin";
+    return rowAppCode === appCode && role === "admin";
+  });
   if (!ok) throw new Error("Forbidden: admin role required");
 }
 
-async function assertCanEditVendor(supabaseAdmin: any, tenantId: string, userId: string) {
+async function assertCanEditVendor(supabaseAdmin: any, appCode: string, tenantId: string, userId: string) {
   const { data, error } = await supabaseAdmin
     .from("user_roles")
-    .select("role")
+    .select("role, app_code")
     .eq("tenant_id", tenantId)
     .eq("user_id", userId);
   if (error) throw new Error(error.message);
-  const roles = (data ?? []).map((r: any) => r.role as string);
-  const ok = roles.some((r: string) =>
-    ["owner", "super_admin", "finance_manager", "finance_ap", "accountant"].includes(r),
-  );
+  const rows = data ?? [];
+  const ok = rows.some((r: any) => {
+    const role = r.role as string;
+    const rowAppCode = r.app_code as string | null;
+    if (rowAppCode === null) return role === "owner" || role === "super_admin";
+    return rowAppCode === appCode && role === "admin";
+  });
   if (!ok) throw new Error("Forbidden: vendor edit role required");
 }
 
@@ -178,7 +206,7 @@ export function createUpdateTenantSettings(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertOwnerOrAdmin(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const patch: { name?: string; settings?: Record<string, unknown> } = {};
       if (data.name) patch.name = data.name;
       if (data.settings) patch.settings = data.settings;
@@ -256,7 +284,7 @@ export function createUpdateTenantUserProfile(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertOwnerOrAdmin(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const { error } = await deps.supabaseAdmin
         .from("tenant_users")
         .update({ display_name: data.display_name, position: data.position ?? null })
@@ -283,9 +311,9 @@ export function createInviteTenantUser(deps: AdminDeps) {
     )
     .handler(async ({ data, context }) => {
       if (data.portal === "vendor") {
-        await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+        await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       } else {
-        await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+        await assertOwnerOrAdmin(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       }
       const invited = await findOrInviteUser(deps, data.email, data.display_name);
 
@@ -377,7 +405,7 @@ export function createResendInvitation(deps: AdminDeps) {
       z.object({ tenant_id: z.string().uuid(), user_id: z.string().uuid() }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertOwnerOrAdmin(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const { data: m, error } = await deps.supabaseAdmin
         .from("tenant_users")
         .select("email, display_name")
@@ -419,7 +447,7 @@ export function createSendPasswordResetLink(deps: AdminDeps) {
       z.object({ tenant_id: z.string().uuid(), user_id: z.string().uuid() }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertOwnerOrAdmin(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const { data: m, error } = await deps.supabaseAdmin
         .from("tenant_users")
         .select("email, display_name")
@@ -467,7 +495,7 @@ export function createUpdateTenantUserRoles(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertOwnerOrAdmin(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const appCode = data.app_code ?? deps.appCode;
       const { error: delErr } = await deps.supabaseAdmin
         .from("user_roles")
@@ -501,7 +529,7 @@ export function createSetTenantUserStatus(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertOwnerOrAdmin(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const { error } = await deps.supabaseAdmin
         .from("tenant_users")
         .update({ status: data.status })
@@ -512,7 +540,12 @@ export function createSetTenantUserStatus(deps: AdminDeps) {
     });
 }
 
-// Remove a user from this workspace only. Owner/super_admin only.
+// Remove a user's access to THIS app from this workspace. Owner/super_admin
+// only. App-scoped: deletes ONLY user_roles rows tagged deps.appCode. Roles
+// for other suite apps and suite-wide owner/super_admin rows (app_code IS
+// NULL) are left untouched. The shared tenant_users membership row is only
+// removed when the user has no remaining roles in this tenant at all, so a
+// member who still belongs to other apps keeps showing up there.
 export function createRemoveTenantUser(deps: AdminDeps) {
   return createServerFn({ method: "POST" })
     .middleware([deps.requireSupabaseAuth])
@@ -546,18 +579,34 @@ export function createRemoveTenantUser(deps: AdminDeps) {
       if ((targetRoles ?? []).some((r: any) => r.role === "owner")) {
         throw new Error("Cannot remove an owner. Transfer ownership first.");
       }
+      // Delete ONLY this app's role rows. Never touch other apps' or
+      // suite-wide rows.
       const { error: rolesErr } = await deps.supabaseAdmin
         .from("user_roles")
         .delete()
         .eq("tenant_id", data.tenant_id)
-        .eq("user_id", data.user_id);
+        .eq("user_id", data.user_id)
+        .eq("app_code", deps.appCode);
       if (rolesErr) throw new Error(rolesErr.message);
-      const { error: memErr } = await deps.supabaseAdmin
-        .from("tenant_users")
-        .delete()
+
+      // If the user has no remaining roles in this tenant (any app, incl.
+      // NULL), drop the shared membership row too. Otherwise keep it so
+      // other apps still see the member.
+      const { data: remaining, error: remErr } = await deps.supabaseAdmin
+        .from("user_roles")
+        .select("id")
         .eq("tenant_id", data.tenant_id)
-        .eq("user_id", data.user_id);
-      if (memErr) throw new Error(memErr.message);
+        .eq("user_id", data.user_id)
+        .limit(1);
+      if (remErr) throw new Error(remErr.message);
+      if ((remaining ?? []).length === 0) {
+        const { error: memErr } = await deps.supabaseAdmin
+          .from("tenant_users")
+          .delete()
+          .eq("tenant_id", data.tenant_id)
+          .eq("user_id", data.user_id);
+        if (memErr) throw new Error(memErr.message);
+      }
       return { ok: true };
     });
 }
@@ -645,7 +694,7 @@ export function createUpsertParty(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const { id, ...rest } = data;
       const row = {
         ...rest,
@@ -772,7 +821,7 @@ export function createUpsertPartyContact(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const row = {
         tenant_id: data.tenant_id,
         party_id: data.party_id,
@@ -812,7 +861,7 @@ export function createDeletePartyContact(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const { error } = await deps.supabaseAdmin
         .from("party_contacts")
         .delete()
@@ -836,7 +885,7 @@ export function createInvitePartyContact(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const { data: c, error: ce } = await deps.supabaseAdmin
         .from("party_contacts")
         .select("id, name, email, party_id, tenant_id")
@@ -905,7 +954,7 @@ export function createRevokePartyContact(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const { error } = await deps.supabaseAdmin
         .from("party_contacts")
         .update({ linked_user_id: null, invited_at: null })
@@ -1017,7 +1066,7 @@ export function createUpsertPartyBankAccount(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const last4 = data.bank.account_number ? data.bank.account_number.slice(-4) : null;
       const patch = {
         bank_name: data.bank.bank_name ?? null,
@@ -1088,7 +1137,7 @@ export function createDeletePartyBankAccount(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const { count: refCount } = await deps.supabaseAdmin
         .from("payment_requests")
         .select("id", { head: true, count: "exact" })
@@ -1179,7 +1228,7 @@ export function createCleanupPartyContacts(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const { data: rows, error } = await deps.supabaseAdmin
         .from("party_contacts")
         .select("id, email, is_primary, linked_user_id, created_at, active")
@@ -1244,7 +1293,7 @@ export function createMergeParties(deps: MergePartiesDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       if (data.source_party_id === data.target_party_id) {
         throw new Error("Source and target must be different");
       }
