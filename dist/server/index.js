@@ -257,11 +257,14 @@ function createListNotifications(deps) {
       limit: z.number().int().min(1).max(100).default(30)
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    let q = context.supabase.from("notifications").select("id, kind, title, body, link_path, read_at, created_at").eq("tenant_id", data.tenant_id).eq("user_id", context.userId).or(`app_code.eq.${deps.appCode},app_code.is.null`).order("created_at", { ascending: false }).limit(data.limit);
+    let q = context.supabase.from("notifications").select("id, kind, title, body, link_path, read_at, created_at, app_code").eq("tenant_id", data.tenant_id).eq("user_id", context.userId).order("created_at", { ascending: false }).limit(data.limit);
+    if (!deps.crossApp) q = q.or(`app_code.eq.${deps.appCode},app_code.is.null`);
     if (data.unread_only) q = q.is("read_at", null);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
-    const { count } = await context.supabase.from("notifications").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).eq("user_id", context.userId).or(`app_code.eq.${deps.appCode},app_code.is.null`).is("read_at", null);
+    let countQ = context.supabase.from("notifications").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).eq("user_id", context.userId).is("read_at", null);
+    if (!deps.crossApp) countQ = countQ.or(`app_code.eq.${deps.appCode},app_code.is.null`);
+    const { count } = await countQ;
     return { rows: rows ?? [], unread_count: count ?? 0 };
   });
 }

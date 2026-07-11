@@ -123,6 +123,14 @@ type Deps = {
     requireSupabaseAuth: any;
     supabaseAdmin: any;
     appCode: string;
+    /**
+     * When true, the bell shows notifications from EVERY app the user has
+     * (a single unified cross-app bell), tagging each row with its source
+     * app_code so the UI can badge/deep-link non-current-app notifications.
+     * When false/omitted, only this app's own rows (+ app_code IS NULL
+     * suite-wide rows) are returned - the original, narrower behavior.
+     */
+    crossApp?: boolean;
 };
 declare function createListNotifications(deps: Deps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
     tenant_id: string;
