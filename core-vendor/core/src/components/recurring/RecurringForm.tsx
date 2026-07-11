@@ -180,7 +180,7 @@ export function RecurringForm({
   type AccountOpt = { id: string; account_name: string; account_type?: string | null; bank_name?: string | null; last4?: string | null; active?: boolean | null };
   const accounts = (((accountsQ.data as { rows?: AccountOpt[] } | undefined)?.rows) ?? []).filter((a) => a.active !== false);
   type CategoryOpt = { id: string; name: string; type?: string | null; active?: boolean | null };
-  const categories = ((categoriesQ.data ?? []) as CategoryOpt[]).filter((c) => c.active !== false);
+  const categories = ((categoriesQ.data ?? []) as CategoryOpt[]).filter((c) => c.active !== false && c.type === "expense");
   const [addVendorOpen, setAddVendorOpen] = useState(false);
 
   // Custom type list persisted per-tenant in localStorage so newly added types
