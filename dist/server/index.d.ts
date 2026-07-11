@@ -263,7 +263,12 @@ type AdminDeps = {
     appBaseUrl: string;
     /** Display name used in transactional emails, e.g. "JoaBooks". */
     appName: string;
-    /** Canonical app_code fallback for legacy rows predating multi-app support. */
+    /**
+     * This app's canonical app_code (e.g. "joabooks", "joaoffice"). Used both
+     * as a fallback for legacy rows predating multi-app support, and to scope
+     * app-specific role checks (assertOwnerOrAdmin / assertCanEditVendor) so a
+     * role granted in a different suite app never satisfies this app's checks.
+     */
     appCode: string;
 };
 type MergePartiesDeps = AdminDeps & {

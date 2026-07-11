@@ -752,20 +752,28 @@ var APP_ROLES2 = [
   "customer"
 ];
 var AppRole2 = z.enum(APP_ROLES2);
-async function assertOwnerOrAdmin(supabaseAdmin, tenantId, userId) {
-  const { data, error } = await supabaseAdmin.from("user_roles").select("role").eq("tenant_id", tenantId).eq("user_id", userId);
+async function assertOwnerOrAdmin(supabaseAdmin, appCode, tenantId, userId) {
+  const { data, error } = await supabaseAdmin.from("user_roles").select("role, app_code").eq("tenant_id", tenantId).eq("user_id", userId);
   if (error) throw new Error(error.message);
-  const roles = (data ?? []).map((r) => r.role);
-  const ok = roles.some((r) => ["owner", "super_admin", "finance_manager"].includes(r));
+  const rows = data ?? [];
+  const ok = rows.some((r) => {
+    const role = r.role;
+    const rowAppCode = r.app_code;
+    if (rowAppCode === null) return role === "owner" || role === "super_admin";
+    return rowAppCode === appCode && role === "admin";
+  });
   if (!ok) throw new Error("Forbidden: admin role required");
 }
-async function assertCanEditVendor(supabaseAdmin, tenantId, userId) {
-  const { data, error } = await supabaseAdmin.from("user_roles").select("role").eq("tenant_id", tenantId).eq("user_id", userId);
+async function assertCanEditVendor(supabaseAdmin, appCode, tenantId, userId) {
+  const { data, error } = await supabaseAdmin.from("user_roles").select("role, app_code").eq("tenant_id", tenantId).eq("user_id", userId);
   if (error) throw new Error(error.message);
-  const roles = (data ?? []).map((r) => r.role);
-  const ok = roles.some(
-    (r) => ["owner", "super_admin", "finance_manager", "finance_ap", "accountant"].includes(r)
-  );
+  const rows = data ?? [];
+  const ok = rows.some((r) => {
+    const role = r.role;
+    const rowAppCode = r.app_code;
+    if (rowAppCode === null) return role === "owner" || role === "super_admin";
+    return rowAppCode === appCode && role === "admin";
+  });
   if (!ok) throw new Error("Forbidden: vendor edit role required");
 }
 async function assertTenantMember(supabaseAdmin, tenantId, userId) {
@@ -835,7 +843,7 @@ function createUpdateTenantSettings(deps) {
       settings: z.record(z.string(), z.any()).optional()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertOwnerOrAdmin(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const patch = {};
     if (data.name) patch.name = data.name;
     if (data.settings) patch.settings = data.settings;
@@ -879,7 +887,7 @@ function createUpdateTenantUserProfile(deps) {
       position: z.string().max(120).optional().nullable()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertOwnerOrAdmin(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { error } = await deps.supabaseAdmin.from("tenant_users").update({ display_name: data.display_name, position: data.position ?? null }).eq("tenant_id", data.tenant_id).eq("user_id", data.user_id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -898,9 +906,9 @@ function createInviteTenantUser(deps) {
     }).parse(i)
   ).handler(async ({ data, context }) => {
     if (data.portal === "vendor") {
-      await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     } else {
-      await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertOwnerOrAdmin(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     }
     const invited = await findOrInviteUser(deps, data.email, data.display_name);
     const { data: tenantRow } = await deps.supabaseAdmin.from("tenants").select("name").eq("id", data.tenant_id).single();
@@ -964,7 +972,7 @@ function createResendInvitation(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({ tenant_id: z.string().uuid(), user_id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertOwnerOrAdmin(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { data: m, error } = await deps.supabaseAdmin.from("tenant_users").select("email, display_name").eq("tenant_id", data.tenant_id).eq("user_id", data.user_id).single();
     if (error) throw new Error(error.message);
     if (!m.email) throw new Error("User has no email on file");
@@ -990,7 +998,7 @@ function createSendPasswordResetLink(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({ tenant_id: z.string().uuid(), user_id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertOwnerOrAdmin(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { data: m, error } = await deps.supabaseAdmin.from("tenant_users").select("email, display_name").eq("tenant_id", data.tenant_id).eq("user_id", data.user_id).single();
     if (error) throw new Error(error.message);
     if (!m.email) throw new Error("User has no email on file");
@@ -1025,7 +1033,7 @@ function createUpdateTenantUserRoles(deps) {
       app_code: z.string().min(1).max(64).optional()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertOwnerOrAdmin(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const appCode = data.app_code ?? deps.appCode;
     const { error: delErr } = await deps.supabaseAdmin.from("user_roles").delete().eq("tenant_id", data.tenant_id).eq("user_id", data.user_id).eq("app_code", appCode);
     if (delErr) throw new Error(delErr.message);
@@ -1050,7 +1058,7 @@ function createSetTenantUserStatus(deps) {
       status: z.enum(["active", "invited", "suspended"])
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertOwnerOrAdmin(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertOwnerOrAdmin(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { error } = await deps.supabaseAdmin.from("tenant_users").update({ status: data.status }).eq("tenant_id", data.tenant_id).eq("user_id", data.user_id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -1155,7 +1163,7 @@ function createUpsertParty(deps) {
       internal_notes: z.string().max(2e3).optional().nullable()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { id, ...rest } = data;
     const row = {
       ...rest,
@@ -1236,7 +1244,7 @@ function createUpsertPartyContact(deps) {
       active: z.boolean().optional()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const row = {
       tenant_id: data.tenant_id,
       party_id: data.party_id,
@@ -1264,7 +1272,7 @@ function createDeletePartyContact(deps) {
       contact_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { error } = await deps.supabaseAdmin.from("party_contacts").delete().eq("id", data.contact_id).eq("tenant_id", data.tenant_id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -1277,7 +1285,7 @@ function createInvitePartyContact(deps) {
       contact_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { data: c, error: ce } = await deps.supabaseAdmin.from("party_contacts").select("id, name, email, party_id, tenant_id").eq("id", data.contact_id).eq("tenant_id", data.tenant_id).single();
     if (ce) throw new Error(ce.message);
     if (!c.email) throw new Error("Contact has no email");
@@ -1321,7 +1329,7 @@ function createRevokePartyContact(deps) {
       contact_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { error } = await deps.supabaseAdmin.from("party_contacts").update({ linked_user_id: null, invited_at: null }).eq("id", data.contact_id).eq("tenant_id", data.tenant_id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -1380,7 +1388,7 @@ function createUpsertPartyBankAccount(deps) {
       bank: BankAccountInput
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const last4 = data.bank.account_number ? data.bank.account_number.slice(-4) : null;
     const patch = {
       bank_name: data.bank.bank_name ?? null,
@@ -1426,7 +1434,7 @@ function createDeletePartyBankAccount(deps) {
       bank_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { count: refCount } = await deps.supabaseAdmin.from("payment_requests").select("id", { head: true, count: "exact" }).eq("tenant_id", data.tenant_id).eq("party_bank_account_id", data.bank_id);
     if ((refCount ?? 0) > 0) {
       const { error: error2 } = await deps.supabaseAdmin.from("party_bank_accounts").update({
@@ -1484,7 +1492,7 @@ function createCleanupPartyContacts(deps) {
       party_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { data: rows, error } = await deps.supabaseAdmin.from("party_contacts").select("id, email, is_primary, linked_user_id, created_at, active").eq("tenant_id", data.tenant_id).eq("party_id", data.party_id);
     if (error) throw new Error(error.message);
     const groups = /* @__PURE__ */ new Map();
@@ -1529,7 +1537,7 @@ function createMergeParties(deps) {
       target_party_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     if (data.source_party_id === data.target_party_id) {
       throw new Error("Source and target must be different");
     }
