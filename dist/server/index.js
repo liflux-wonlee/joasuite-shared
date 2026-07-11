@@ -789,13 +789,21 @@ var APP_ROLES2 = [
   "owner",
   "super_admin",
   "admin",
+  "billing_admin",
   "finance_ap",
   "finance_ar",
   "finance_manager",
   "accountant",
   "approver",
   "vendor",
-  "customer"
+  "customer",
+  "hr_manager",
+  "manager",
+  "employee",
+  "sop_admin",
+  "sop_author",
+  "sop_reviewer",
+  "sop_operator"
 ];
 var AppRole2 = z.enum(APP_ROLES2);
 async function assertOwnerOrAdmin2(supabaseAdmin, appCode, tenantId, userId) {
@@ -1132,10 +1140,14 @@ function createRemoveTenantUser(deps) {
     if ((targetRoles ?? []).some((r) => r.role === "owner")) {
       throw new Error("Cannot remove an owner. Transfer ownership first.");
     }
-    const { error: rolesErr } = await deps.supabaseAdmin.from("user_roles").delete().eq("tenant_id", data.tenant_id).eq("user_id", data.user_id);
+    const { error: rolesErr } = await deps.supabaseAdmin.from("user_roles").delete().eq("tenant_id", data.tenant_id).eq("user_id", data.user_id).eq("app_code", deps.appCode);
     if (rolesErr) throw new Error(rolesErr.message);
-    const { error: memErr } = await deps.supabaseAdmin.from("tenant_users").delete().eq("tenant_id", data.tenant_id).eq("user_id", data.user_id);
-    if (memErr) throw new Error(memErr.message);
+    const { data: remaining, error: remErr } = await deps.supabaseAdmin.from("user_roles").select("id").eq("tenant_id", data.tenant_id).eq("user_id", data.user_id).limit(1);
+    if (remErr) throw new Error(remErr.message);
+    if ((remaining ?? []).length === 0) {
+      const { error: memErr } = await deps.supabaseAdmin.from("tenant_users").delete().eq("tenant_id", data.tenant_id).eq("user_id", data.user_id);
+      if (memErr) throw new Error(memErr.message);
+    }
     return { ok: true };
   });
 }

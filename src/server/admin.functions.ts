@@ -34,13 +34,15 @@ function resolveAppBaseUrl(deps: AdminDeps) {
   return (process.env.APP_BASE_URL || deps.appBaseUrl).replace(/\/$/, "");
 }
 
-// NOTE: this list currently matches JoaBooks' admin.functions.ts. account.functions.ts
-// in the same app maintains its OWN separate AppRole list that has already drifted from
-// this one (extra sop_* roles) — worth unifying into one shared roles module later.
+// Full public.app_role Postgres enum, kept in sync with account.functions.ts's
+// APP_ROLES (both used to drift independently; unified here so inviteTenantUser
+// can accept any valid role, not just the finance-flavored subset JoaBooks
+// originally needed).
 const APP_ROLES = [
   "owner",
   "super_admin",
   "admin",
+  "billing_admin",
   "finance_ap",
   "finance_ar",
   "finance_manager",
@@ -48,6 +50,13 @@ const APP_ROLES = [
   "approver",
   "vendor",
   "customer",
+  "hr_manager",
+  "manager",
+  "employee",
+  "sop_admin",
+  "sop_author",
+  "sop_reviewer",
+  "sop_operator",
 ] as const;
 const AppRole = z.enum(APP_ROLES);
 
@@ -531,7 +540,12 @@ export function createSetTenantUserStatus(deps: AdminDeps) {
     });
 }
 
-// Remove a user from this workspace only. Owner/super_admin only.
+// Remove a user's access to THIS app from this workspace. Owner/super_admin
+// only. App-scoped: deletes ONLY user_roles rows tagged deps.appCode. Roles
+// for other suite apps and suite-wide owner/super_admin rows (app_code IS
+// NULL) are left untouched. The shared tenant_users membership row is only
+// removed when the user has no remaining roles in this tenant at all, so a
+// member who still belongs to other apps keeps showing up there.
 export function createRemoveTenantUser(deps: AdminDeps) {
   return createServerFn({ method: "POST" })
     .middleware([deps.requireSupabaseAuth])
@@ -565,18 +579,34 @@ export function createRemoveTenantUser(deps: AdminDeps) {
       if ((targetRoles ?? []).some((r: any) => r.role === "owner")) {
         throw new Error("Cannot remove an owner. Transfer ownership first.");
       }
+      // Delete ONLY this app's role rows. Never touch other apps' or
+      // suite-wide rows.
       const { error: rolesErr } = await deps.supabaseAdmin
         .from("user_roles")
         .delete()
         .eq("tenant_id", data.tenant_id)
-        .eq("user_id", data.user_id);
+        .eq("user_id", data.user_id)
+        .eq("app_code", deps.appCode);
       if (rolesErr) throw new Error(rolesErr.message);
-      const { error: memErr } = await deps.supabaseAdmin
-        .from("tenant_users")
-        .delete()
+
+      // If the user has no remaining roles in this tenant (any app, incl.
+      // NULL), drop the shared membership row too. Otherwise keep it so
+      // other apps still see the member.
+      const { data: remaining, error: remErr } = await deps.supabaseAdmin
+        .from("user_roles")
+        .select("id")
         .eq("tenant_id", data.tenant_id)
-        .eq("user_id", data.user_id);
-      if (memErr) throw new Error(memErr.message);
+        .eq("user_id", data.user_id)
+        .limit(1);
+      if (remErr) throw new Error(remErr.message);
+      if ((remaining ?? []).length === 0) {
+        const { error: memErr } = await deps.supabaseAdmin
+          .from("tenant_users")
+          .delete()
+          .eq("tenant_id", data.tenant_id)
+          .eq("user_id", data.user_id);
+        if (memErr) throw new Error(memErr.message);
+      }
       return { ok: true };
     });
 }

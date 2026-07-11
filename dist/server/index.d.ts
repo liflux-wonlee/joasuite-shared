@@ -318,7 +318,7 @@ declare function createInviteTenantUser(deps: AdminDeps): _tanstack_start_client
     email: string;
     display_name: string;
     portal: "approver" | "vendor" | "customer" | "internal";
-    roles: ("owner" | "super_admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "admin" | "vendor" | "customer")[];
+    roles: ("owner" | "super_admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "admin" | "billing_admin" | "vendor" | "customer" | "hr_manager" | "manager" | "employee")[];
     position?: string | undefined;
     party_id?: string | undefined;
 }, Promise<{
@@ -345,7 +345,7 @@ declare function createSendPasswordResetLink(deps: AdminDeps): _tanstack_start_c
 declare function createUpdateTenantUserRoles(deps: AdminDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
     tenant_id: string;
     user_id: string;
-    roles: ("owner" | "super_admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "admin" | "vendor" | "customer")[];
+    roles: ("owner" | "super_admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "admin" | "billing_admin" | "vendor" | "customer" | "hr_manager" | "manager" | "employee")[];
     app_code?: string | undefined;
 }, Promise<{
     ok: true;
