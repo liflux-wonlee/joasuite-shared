@@ -79,7 +79,9 @@ function createCancelApp(deps) {
     (d) => z.object({ tenantId: z.string().uuid(), appCode: z.string().min(1).max(64) }).parse(d)
   ).handler(async ({ data, context }) => {
     await assertOwner(deps, context.supabase, data.tenantId, context.userId);
-    if (data.appCode === "joabooks") throw new Error("JoaBooks cannot be canceled here");
+    if (data.appCode === (deps.appCode ?? "joabooks")) {
+      throw new Error("This app cannot be canceled here");
+    }
     const { error } = await context.supabase.from("tenant_apps").update({ status: "canceled", canceled_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("tenant_id", data.tenantId).eq("app_code", data.appCode);
     if (error) throw error;
     return { ok: true };

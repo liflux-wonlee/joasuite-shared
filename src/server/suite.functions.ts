@@ -148,7 +148,12 @@ export function createCancelApp(deps: Deps) {
     )
     .handler(async ({ data, context }) => {
       await assertOwner(deps, context.supabase, data.tenantId, context.userId);
-      if (data.appCode === "joabooks") throw new Error("JoaBooks cannot be canceled here");
+      // An app can't cancel its own subscription from within itself -
+      // defaults to "joabooks" (the original hardcoded behavior) when the
+      // calling app doesn't identify itself via deps.appCode.
+      if (data.appCode === (deps.appCode ?? "joabooks")) {
+        throw new Error("This app cannot be canceled here");
+      }
       const { error } = await context.supabase
         .from("tenant_apps")
         .update({ status: "canceled", canceled_at: new Date().toISOString() })
