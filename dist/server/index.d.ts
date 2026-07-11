@@ -202,7 +202,7 @@ declare function createInviteUserToWorkspaces(deps: AccountDeps): _tanstack_star
         portal: "approver" | "vendor" | "customer" | "internal";
         apps: {
             app_code: string;
-            roles: ("owner" | "super_admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "admin" | "vendor" | "customer")[];
+            roles: ("owner" | "super_admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "admin" | "billing_admin" | "vendor" | "customer" | "hr_manager" | "manager" | "employee")[];
         }[];
     }[];
     position?: string | undefined;
@@ -218,7 +218,7 @@ declare function createSetUserAppRoles(deps: AccountDeps): _tanstack_start_clien
     tenant_id: string;
     user_id: string;
     app_code: string;
-    roles: ("owner" | "super_admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "admin" | "vendor" | "customer")[];
+    roles: ("owner" | "super_admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "admin" | "billing_admin" | "vendor" | "customer" | "hr_manager" | "manager" | "employee")[];
 }, Promise<{
     ok: true;
 }>>;
