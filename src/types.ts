@@ -9,6 +9,100 @@ export type Membership = {
   portal?: "internal" | "vendor" | "approver" | "customer";
 };
 
+/**
+ * "Users" (suite login/tenant-membership management) types. Deliberately
+ * named distinctly from the Employee/Contractor Directory types below —
+ * a Suite "user" is a login identity with per-app roles; an "employee" is a
+ * `parties`/`employee_profiles` business record that may or may not have a
+ * login at all. Do not conflate the two.
+ */
+export type UserAppAssignment = {
+  tenant_id: string;
+  portal: string;
+  status: string;
+  joined_at: string | null;
+  position: string | null;
+  apps: Record<string, { roles: string[] }>;
+};
+
+export type ManageableUserRow = {
+  user_id: string;
+  email: string | null;
+  display_name: string | null;
+  position: string | null;
+  joined_at: string | null;
+  last_sign_in_at: string | null;
+  assignments: Record<string, UserAppAssignment>;
+};
+
+export type ManageableTenant = {
+  id: string;
+  name: string;
+  slug: string;
+  app_codes: string[];
+  app_plans?: Record<string, string | null>;
+};
+
+export type InvitePresetKey =
+  | "owner_admin"
+  | "manager"
+  | "finance_staff"
+  | "field_tech"
+  | "approver"
+  | "custom";
+
+/**
+ * Employee/Contractor Directory types (shared across every JoaSuite app
+ * except the future JoaHR app, which owns the full HR surface). These map
+ * to the shared core tables `departments`/`positions`/`parties`/
+ * `employee_profiles` — never to HR-confidential extension tables, which
+ * remain app-owned (e.g. JoaOffice's `office.employee_hr_records`).
+ */
+export type Department = {
+  id: string;
+  name: string;
+  code: string | null;
+};
+
+export type Position = {
+  id: string;
+  name: string;
+  department_id: string;
+};
+
+export type EmployeeDirectoryRow = {
+  party_id: string;
+  linked_user_id: string | null;
+  name_en: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  department_id: string | null;
+  department: string | null;
+  position_id: string | null;
+  position: string | null;
+  manager_id: string | null;
+  employment_status: string | null;
+  hire_date: string | null;
+  termination_date: string | null;
+  worker_type: "employee" | "contractor" | null;
+};
+
+export type EmployeeProfileInput = {
+  tenant_id: string;
+  party_id?: string;
+  linked_user_id?: string;
+  name_en?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  department_id?: string | null;
+  position_id?: string | null;
+  manager_id?: string | null;
+  employment_status?: "active" | "on_leave" | "terminated";
+  hire_date?: string | null;
+  termination_date?: string | null;
+  worker_type: "employee" | "contractor";
+};
+
 export type AppCatalogEntry = {
   code: AppCode | string;
   name: string;

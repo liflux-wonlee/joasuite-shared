@@ -30,9 +30,12 @@ export { SuiteSettingsHub } from "./components/SuiteSettingsHub";
 export { AppSubscriptionsSummary } from "./components/AppSubscriptionsSummary";
 export { OrgScopeToggle } from "./components/OrgScopeToggle";
 export { AppOverviewSection } from "./components/AppOverviewSection";
-export { PeopleListPage } from "./components/people/PeopleListPage";
-export { PeopleInvitePage } from "./components/people/PeopleInvitePage";
-export { PeopleDetailPage } from "./components/people/PeopleDetailPage";
+export { UserListPage } from "./components/users/UserListPage";
+export { UserInvitePage } from "./components/users/UserInvitePage";
+export { UserDetailPage } from "./components/users/UserDetailPage";
+export { EmployeeDirectoryListPage } from "./components/employees/EmployeeDirectoryListPage";
+export { EmployeeProfileForm } from "./components/employees/EmployeeProfileForm";
+export { OrgStructureSettingsPage } from "./components/org-structure/OrgStructureSettingsPage";
 
 // Hooks
 export { useOrgScope } from "./hooks/useOrgScope";

@@ -1,4 +1,4 @@
-export { A as AppCode } from '../constants-CjPROrfF.js';
+export { A as AppCode } from '../constants-Bws7KgDt.js';
 import * as _tanstack_start_client_core from '@tanstack/start-client-core';
 import { SupabaseClient } from '@supabase/supabase-js';
 
@@ -261,6 +261,154 @@ declare function createUpdateMyTimezone(deps: AccountDeps): _tanstack_start_clie
 }>>;
 declare function createUpdateMyDefaultTenant(deps: AccountDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
     tenant_id: string | null;
+}, Promise<{
+    ok: true;
+}>>;
+
+/**
+ * Shared Employee/Contractor Directory — basic identity + org-placement
+ * fields ONLY (name, contact, department, position, manager, employment
+ * status/dates, worker_type). Backed entirely by the shared core tables
+ * `public.parties` (is_employee = true) and `public.employee_profiles`.
+ *
+ * Deliberately excludes every HR-confidential field (compensation,
+ * contracts, emergency contact, performance reviews, leave/timesheet
+ * records) — those remain app-owned (e.g. JoaOffice's
+ * `office.employee_hr_records` / `office.employee_pto_balances`, gated by
+ * their own role checks). This module must never import from, or grow a
+ * dependency on, any app-specific HR schema — every JoaSuite app except
+ * the future JoaHR app is expected to embed this same directory as-is.
+ */
+type EmployeeDirectoryDeps = {
+    requireSupabaseAuth: any;
+    supabaseAdmin: any;
+    assertCanReadEmployeeDirectory: (tenantId: string, userId: string) => Promise<void>;
+    assertCanWriteEmployeeDirectory: (tenantId: string, userId: string) => Promise<void>;
+    /** Called after a successful write, e.g. to append an audit_logs row. Optional. */
+    onWrite?: (input: {
+        tenantId: string;
+        userId: string;
+        partyId: string;
+        created: boolean;
+    }) => Promise<void>;
+};
+declare function createListEmployeeDirectory(deps: EmployeeDirectoryDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    search?: string | undefined;
+}, Promise<{
+    rows: any;
+}>>;
+declare function createGetEmployeeDirectoryEntry(deps: EmployeeDirectoryDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    party_id: string;
+}, Promise<{
+    party_id: any;
+    linked_user_id: any;
+    name_en: any;
+    contact_email: any;
+    contact_phone: any;
+    active: any;
+    department_id: any;
+    department: string | null;
+    position_id: any;
+    position: string | null;
+    manager_id: any;
+    employment_status: any;
+    hire_date: any;
+    termination_date: any;
+    worker_type: any;
+}>>;
+/**
+ * Create-or-update a directory entry. Accepts EITHER an existing `party_id`
+ * (the common case for apps managing employees/contractors that have no
+ * login — e.g. JoaOffice) OR a `linked_user_id` (the common case for
+ * resolving/creating the employee record tied to an existing tenant login —
+ * e.g. JoaSOP's Users detail page), OR neither for a brand-new directory
+ * entry created from scratch (name/contact fields required in that case).
+ *
+ * Always leaves both a `parties` row (is_employee = true) and a matching
+ * `employee_profiles` row in place — this is the fix for the historical gap
+ * where creating a party alone (e.g. via a Parties/Vendors admin screen)
+ * never created the accompanying employee_profiles row.
+ */
+declare function createUpsertEmployeeDirectoryEntry(deps: EmployeeDirectoryDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    worker_type: "employee" | "contractor";
+    party_id?: string | undefined;
+    linked_user_id?: string | undefined;
+    name_en?: string | undefined;
+    contact_email?: string | null | undefined;
+    contact_phone?: string | null | undefined;
+    department_id?: string | null | undefined;
+    position_id?: string | null | undefined;
+    manager_id?: string | null | undefined;
+    employment_status?: "active" | "on_leave" | "terminated" | undefined;
+    hire_date?: string | null | undefined;
+    termination_date?: string | null | undefined;
+}, Promise<{
+    party_id: string;
+    created: boolean;
+}>>;
+
+/**
+ * Departments/positions are shared JoaSuite core tables (used by every app
+ * that manages an Employee/Contractor Directory entry). Authorization is
+ * intentionally injected rather than hardcoded here, since "who may edit
+ * org structure" differs per app (e.g. JoaSOP's `sop_admin` vs JoaOffice's
+ * `admin`/`hr_manager`) — see docs/joasuite-app-integration-contract.md.
+ */
+type OrgStructureDeps = {
+    requireSupabaseAuth: any;
+    supabaseAdmin: any;
+    /** Read-gate: any tenant member who may see the org structure. */
+    assertCanReadOrgStructure: (tenantId: string, userId: string) => Promise<void>;
+    /** Write-gate: who may create/edit/delete departments and positions. */
+    assertCanManageOrgStructure: (tenantId: string, userId: string) => Promise<void>;
+};
+declare function createListDepartmentsAndPositions(deps: OrgStructureDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+}, Promise<{
+    departments: any;
+    positions: any;
+}>>;
+declare function createCreateDepartment(deps: OrgStructureDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    name: string;
+    code?: string | null | undefined;
+}, Promise<{
+    id: any;
+}>>;
+declare function createUpdateDepartment(deps: OrgStructureDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    id: string;
+    name: string;
+    code?: string | null | undefined;
+}, Promise<{
+    ok: true;
+}>>;
+declare function createDeleteDepartment(deps: OrgStructureDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    id: string;
+}, Promise<{
+    ok: true;
+}>>;
+declare function createCreatePosition(deps: OrgStructureDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    department_id: string;
+    name: string;
+}, Promise<{
+    id: any;
+}>>;
+declare function createUpdatePosition(deps: OrgStructureDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    id: string;
+    name: string;
+}, Promise<{
+    ok: true;
+}>>;
+declare function createDeletePosition(deps: OrgStructureDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    id: string;
 }, Promise<{
     ok: true;
 }>>;
@@ -544,4 +692,4 @@ declare function createMergeParties(deps: MergePartiesDeps): _tanstack_start_cli
     reassigned: Record<string, number>;
 }>>;
 
-export { type AccountDeps, type AdminDeps, type AppCatalogEntry, type MergePartiesDeps, type PartyRefTable, type SuiteHomeData, type TenantAppRow, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createArchiveParty, createCancelApp, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createGetMyProfile, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSetUserAppRoles, createSubscribeApp, createUnarchiveParty, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, resolveScopedTenantIds };
+export { type AccountDeps, type AdminDeps, type AppCatalogEntry, type EmployeeDirectoryDeps, type MergePartiesDeps, type OrgStructureDeps, type PartyRefTable, type SuiteHomeData, type TenantAppRow, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createArchiveParty, createCancelApp, createCleanupPartyContacts, createCreateDepartment, createCreatePosition, createDeleteDepartment, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDeletePosition, createGetEmployeeDirectoryEntry, createGetMyProfile, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListDepartmentsAndPositions, createListEmployeeDirectory, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSetUserAppRoles, createSubscribeApp, createUnarchiveParty, createUpdateDepartment, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdatePosition, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertEmployeeDirectoryEntry, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, resolveScopedTenantIds };

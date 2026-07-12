@@ -5,16 +5,13 @@ import { ArrowLeft, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useJoaSuite } from "../../context";
 import { ROLES_BY_APP } from "../../constants";
-
-type Tenant = { id: string; name: string; slug: string; app_codes: string[] };
+import type { InvitePresetKey, ManageableTenant } from "../../types";
 
 function rolesForApp(code: string): string[] {
   return (ROLES_BY_APP as Record<string, string[]>)[code] ?? ["owner", "super_admin", "approver"];
 }
 
-type PresetKey = "owner_admin" | "manager" | "finance_staff" | "field_tech" | "approver" | "custom";
-
-function applyPreset(preset: PresetKey, appCode: string): string | null {
+function applyPreset(preset: InvitePresetKey, appCode: string): string | null {
   // returns role for this app, or null = no access
   switch (preset) {
     case "owner_admin":
@@ -40,7 +37,7 @@ function applyPreset(preset: PresetKey, appCode: string): string | null {
   }
 }
 
-export function PeopleInvitePage() {
+export function UserInvitePage() {
   const { t } = useTranslation();
   const { ui, router, fns } = useJoaSuite();
   const { Link, useNavigate } = router;
@@ -60,15 +57,15 @@ export function PeopleInvitePage() {
   } = ui;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["account-people"],
+    queryKey: ["account-users"],
     queryFn: () => fns.listManageableUsers(),
   });
-  const tenants: Tenant[] = (data?.tenants as Tenant[] | undefined) ?? [];
+  const tenants: ManageableTenant[] = (data?.tenants as ManageableTenant[] | undefined) ?? [];
   const ownerTenantIds = new Set<string>(
     (data?.caller_owner_tenant_ids as string[] | undefined) ?? [],
   );
   const tenantById = useMemo(() => {
-    const m = new Map<string, Tenant>();
+    const m = new Map<string, ManageableTenant>();
     tenants.forEach((tn) => m.set(tn.id, tn));
     return m;
   }, [tenants]);
@@ -83,7 +80,7 @@ export function PeopleInvitePage() {
   const [displayName, setDisplayName] = useState("");
   const [orgIds, setOrgIds] = useState<string[]>([]);
   const [primaryTenantId, setPrimaryTenantId] = useState<string>("");
-  const [preset, setPreset] = useState<PresetKey>("custom");
+  const [preset, setPreset] = useState<InvitePresetKey>("custom");
   // selections[tenantId][appCode] = role string
   const [selections, setSelections] = useState<Record<string, Record<string, string>>>({});
 
@@ -95,7 +92,7 @@ export function PeopleInvitePage() {
     });
   };
 
-  const applyPresetToAll = (p: PresetKey) => {
+  const applyPresetToAll = (p: InvitePresetKey) => {
     setPreset(p);
     const next: Record<string, Record<string, string>> = {};
     for (const tid of orgIds) {
@@ -119,7 +116,7 @@ export function PeopleInvitePage() {
       if (!ownerTenantIds.has(tid)) {
         toast.error(
           t(
-            "people.owner_requires_owner",
+            "users.owner_requires_owner",
             "Only an Owner can grant the Owner role to another user.",
           ),
         );
@@ -127,7 +124,7 @@ export function PeopleInvitePage() {
       }
       const ok = window.confirm(
         t(
-          "people.confirm_owner_grant",
+          "users.confirm_owner_grant",
           "You're about to grant Owner access. Owners have full control of the organization, including the ability to remove other owners and delete the workspace. Continue?",
         ),
       );
@@ -160,10 +157,10 @@ export function PeopleInvitePage() {
     onSuccess: (res: any) => {
       toast.success(
         res?.created
-          ? t("people.invited", "Invited to {{count}} organization(s)", {
+          ? t("users.invited", "Invited to {{count}} organization(s)", {
               count: res.tenants_added,
             })
-          : t("people.added_existing", "Added existing user to {{count}} organization(s)", {
+          : t("users.added_existing", "Added existing user to {{count}} organization(s)", {
               count: res.tenants_added,
             }),
       );
@@ -188,23 +185,23 @@ export function PeopleInvitePage() {
     5: true,
   };
 
-  const PRESETS: { key: PresetKey; label: string }[] = [
-    { key: "owner_admin", label: t("people.preset_owner_admin", "Owner / Admin") },
-    { key: "manager", label: t("people.preset_manager", "Manager") },
-    { key: "finance_staff", label: t("people.preset_finance_staff", "Finance staff") },
-    { key: "field_tech", label: t("people.preset_field_tech", "Field technician") },
-    { key: "approver", label: t("people.preset_approver", "Approver") },
-    { key: "custom", label: t("people.preset_custom", "Custom") },
+  const PRESETS: { key: InvitePresetKey; label: string }[] = [
+    { key: "owner_admin", label: t("users.preset_owner_admin", "Owner / Admin") },
+    { key: "manager", label: t("users.preset_manager", "Manager") },
+    { key: "finance_staff", label: t("users.preset_finance_staff", "Finance staff") },
+    { key: "field_tech", label: t("users.preset_field_tech", "Field technician") },
+    { key: "approver", label: t("users.preset_approver", "Approver") },
+    { key: "custom", label: t("users.preset_custom", "Custom") },
   ];
 
   return (
     <div className="p-6 lg:p-8 max-w-3xl mx-auto space-y-6">
       <Link to="/app/people" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" /> {t("people.back", "Back to People")}
+        <ArrowLeft className="h-4 w-4" /> {t("users.back", "Back to Users")}
       </Link>
 
       <div>
-        <h1 className="text-2xl font-semibold">{t("people.invite", "Invite person")}</h1>
+        <h1 className="text-2xl font-semibold">{t("users.invite", "Invite user")}</h1>
         <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
           {[1, 2, 3, 4, 5].map((n) => (
             <div key={n} className="flex items-center gap-1">
@@ -228,7 +225,7 @@ export function PeopleInvitePage() {
       <div className="border rounded-lg bg-card p-5 space-y-4">
         {step === 1 && (
           <div className="space-y-3">
-            <h2 className="font-semibold">{t("people.step_person", "Step 1 · Person")}</h2>
+            <h2 className="font-semibold">{t("users.step_person", "Step 1 · Person")}</h2>
             <div>
               <Label>{t("common.email")} *</Label>
               <EmailInput value={email} onChange={(e: any) => setEmail(e.target.value)} />
@@ -242,7 +239,7 @@ export function PeopleInvitePage() {
 
         {step === 2 && (
           <div className="space-y-3">
-            <h2 className="font-semibold">{t("people.step_org", "Step 2 · Organization")}</h2>
+            <h2 className="font-semibold">{t("users.step_org", "Step 2 · Organization")}</h2>
             <div className="border rounded-md divide-y max-h-72 overflow-y-auto">
               {tenants.map((tn) => (
                 <label key={tn.id} className="flex items-center gap-3 p-2 cursor-pointer text-sm">
@@ -259,10 +256,10 @@ export function PeopleInvitePage() {
             </div>
             {orgIds.length > 0 && (
               <div>
-                <Label>{t("people.primary_org", "Primary organization (for invitation email & login)")}</Label>
+                <Label>{t("users.primary_org", "Primary organization (for invitation email & login)")}</Label>
                 <Select value={primaryTenantId} onValueChange={setPrimaryTenantId}>
                   <SelectTrigger>
-                    <SelectValue placeholder={t("people.choose_primary", "Choose primary org")} />
+                    <SelectValue placeholder={t("users.choose_primary", "Choose primary org")} />
                   </SelectTrigger>
                   <SelectContent>
                     {orgIds.map((id) => (
@@ -279,10 +276,10 @@ export function PeopleInvitePage() {
 
         {step === 3 && (
           <div className="space-y-3">
-            <h2 className="font-semibold">{t("people.step_preset", "Step 3 · Access preset")}</h2>
+            <h2 className="font-semibold">{t("users.step_preset", "Step 3 · Access preset")}</h2>
             <p className="text-xs text-muted-foreground">
               {t(
-                "people.preset_hint",
+                "users.preset_hint",
                 "Pick a preset to fill app roles, then adjust in the next step.",
               )}
             </p>
@@ -303,7 +300,7 @@ export function PeopleInvitePage() {
 
         {step === 4 && (
           <div className="space-y-4">
-            <h2 className="font-semibold">{t("people.step_apps", "Step 4 · App access")}</h2>
+            <h2 className="font-semibold">{t("users.step_apps", "Step 4 · App access")}</h2>
             {orgIds.map((tid) => {
               const tn = tenantById.get(tid);
               if (!tn) return null;
@@ -313,7 +310,7 @@ export function PeopleInvitePage() {
                   {tn.app_codes.length === 0 ? (
                     <div className="text-xs text-muted-foreground">
                       {t(
-                        "people.no_apps_subscribed_short",
+                        "users.no_apps_subscribed_short",
                         "This organization has no apps subscribed.",
                       )}
                     </div>
@@ -362,7 +359,7 @@ export function PeopleInvitePage() {
 
         {step === 5 && (
           <div className="space-y-3">
-            <h2 className="font-semibold">{t("people.step_review", "Step 5 · Review & send")}</h2>
+            <h2 className="font-semibold">{t("users.step_review", "Step 5 · Review & send")}</h2>
             <div className="text-sm space-y-2">
               <div>
                 <span className="text-muted-foreground">{t("common.email")}:</span>{" "}
@@ -382,13 +379,13 @@ export function PeopleInvitePage() {
                         {tn?.name}{" "}
                         {tid === primaryTenantId && (
                           <Badge variant="secondary" className="text-[10px]">
-                            {t("people.primary", "primary")}
+                            {t("users.primary", "primary")}
                           </Badge>
                         )}
                       </div>
                       {apps.length === 0 ? (
                         <div className="text-xs text-muted-foreground">
-                          {t("people.no_app_access", "No app access")}
+                          {t("users.no_app_access", "No app access")}
                         </div>
                       ) : (
                         <ul className="text-xs text-muted-foreground list-disc pl-4">
@@ -426,7 +423,7 @@ export function PeopleInvitePage() {
           <Button onClick={() => invite.mutate()} disabled={invite.isPending}>
             {invite.isPending
               ? t("set.sending", "Sending…")
-              : t("people.send_invite", "Send invitation")}
+              : t("users.send_invite", "Send invitation")}
           </Button>
         )}
       </div>
