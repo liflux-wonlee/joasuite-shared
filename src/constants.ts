@@ -3,7 +3,7 @@
  * exact values used in `app_catalog`, `tenant_apps`, `user_roles.app_code`,
  * `settings_kv` (`app_url.<code>`), `approvals.source_app`, etc.
  */
-export const APP_CODES = ["joabooks", "joaapproval", "joacrm", "joaoffice", "joasop"] as const;
+export const APP_CODES = ["joabooks", "joaapproval", "joacrm", "joaoffice", "joasop", "joahr"] as const;
 export type AppCode = (typeof APP_CODES)[number];
 
 /**
@@ -20,6 +20,7 @@ export const APP_DISPLAY: Array<{
   { code: "joacrm", name: "JoaCRM", description: "Customer relationships" },
   { code: "joaoffice", name: "JoaOffice", description: "Admin, assets, contracts" },
   { code: "joasop", name: "JoaSOP", description: "Policies, SOPs, training" },
+  { code: "joahr", name: "JoaHR", description: "HR — people, time off, org chart" },
 ];
 
 /**
@@ -32,6 +33,7 @@ export const DEFAULT_APP_URLS: Record<AppCode, string> = {
   joacrm: "https://crm.joasuite.com",
   joaoffice: "https://office.joasuite.com",
   joasop: "https://sop.joasuite.com",
+  joahr: "https://hr.joasuite.com",
 };
 
 /**
@@ -54,6 +56,7 @@ export const ROLES_BY_APP: Record<AppCode, string[]> = {
   joaoffice: ["owner", "super_admin", "approver"],
   joaapproval: ["owner", "super_admin", "approver"],
   joacrm: ["owner", "super_admin", "approver"],
+  joahr: ["owner", "super_admin", "approver"],
 };
 
 export const SETTINGS_KV_APP_URL_KEYS = APP_CODES.map((c) => `app_url.${c}` as const);
