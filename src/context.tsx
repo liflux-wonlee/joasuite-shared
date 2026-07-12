@@ -109,6 +109,27 @@ export type BoundServerFns = {
   accountResendInvitation: (input: { user_id: string }) => Promise<any>;
   accountSendPasswordReset: (input: { user_id: string }) => Promise<any>;
   accountUpdateUserProfile: (input: any) => Promise<any>;
+  listEmployeeDirectory: (input: { tenant_id: string; search?: string }) => Promise<{ rows: any[] }>;
+  getEmployeeDirectoryEntry: (input: { tenant_id: string; party_id: string }) => Promise<any>;
+  upsertEmployeeDirectoryEntry: (input: any) => Promise<{ party_id: string; created: boolean }>;
+  listDepartmentsAndPositions: (input: {
+    tenant_id: string;
+  }) => Promise<{ departments: any[]; positions: any[] }>;
+  createDepartment: (input: { tenant_id: string; name: string; code?: string | null }) => Promise<any>;
+  updateDepartment: (input: {
+    tenant_id: string;
+    id: string;
+    name: string;
+    code?: string | null;
+  }) => Promise<any>;
+  deleteDepartment: (input: { tenant_id: string; id: string }) => Promise<any>;
+  createPosition: (input: {
+    tenant_id: string;
+    department_id: string;
+    name: string;
+  }) => Promise<any>;
+  updatePosition: (input: { tenant_id: string; id: string; name: string }) => Promise<any>;
+  deletePosition: (input: { tenant_id: string; id: string }) => Promise<any>;
 };
 
 export type JoaSuiteContextValue = {

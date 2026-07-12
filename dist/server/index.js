@@ -788,6 +788,294 @@ function createUpdateMyDefaultTenant(deps) {
     return { ok: true };
   });
 }
+var WORKER_TYPES = ["employee", "contractor"];
+var EMPLOYMENT_STATUSES = ["active", "on_leave", "terminated"];
+async function loadDeptPosNames(supabaseAdmin, tenantId, deptIds, posIds) {
+  const [{ data: depts }, { data: positions }] = await Promise.all([
+    deptIds.length ? supabaseAdmin.from("departments").select("id, name").eq("tenant_id", tenantId).in("id", deptIds) : Promise.resolve({ data: [] }),
+    posIds.length ? supabaseAdmin.from("positions").select("id, name").eq("tenant_id", tenantId).in("id", posIds) : Promise.resolve({ data: [] })
+  ]);
+  return {
+    deptName: new Map((depts ?? []).map((d) => [d.id, d.name])),
+    posName: new Map((positions ?? []).map((p) => [p.id, p.name]))
+  };
+}
+function createListEmployeeDirectory(deps) {
+  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
+    (i) => z.object({ tenant_id: z.string().uuid(), search: z.string().max(200).optional() }).parse(i)
+  ).handler(async ({ data, context }) => {
+    await deps.assertCanReadEmployeeDirectory(data.tenant_id, context.userId);
+    let pq = deps.supabaseAdmin.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active").eq("tenant_id", data.tenant_id).eq("is_employee", true).order("name_en");
+    if (data.search?.trim()) {
+      const s = data.search.trim();
+      pq = pq.or(`name_en.ilike.%${s}%,contact_email.ilike.%${s}%`);
+    }
+    const { data: parties, error: pErr } = await pq;
+    if (pErr) throw new Error(pErr.message);
+    const partyIds = (parties ?? []).map((p) => p.id);
+    let profiles = [];
+    if (partyIds.length) {
+      const { data: profileRows, error: prErr } = await deps.supabaseAdmin.from("employee_profiles").select(
+        "party_id, department_id, position_id, manager_id, employment_status, hire_date, termination_date, worker_type"
+      ).eq("tenant_id", data.tenant_id).in("party_id", partyIds);
+      if (prErr) throw new Error(prErr.message);
+      profiles = profileRows ?? [];
+    }
+    const byParty = new Map(profiles.map((pr) => [pr.party_id, pr]));
+    const deptIds = Array.from(new Set(profiles.map((p) => p.department_id).filter(Boolean)));
+    const posIds = Array.from(new Set(profiles.map((p) => p.position_id).filter(Boolean)));
+    const { deptName, posName } = await loadDeptPosNames(deps.supabaseAdmin, data.tenant_id, deptIds, posIds);
+    return {
+      rows: (parties ?? []).map((p) => {
+        const prof = byParty.get(p.id);
+        return {
+          party_id: p.id,
+          linked_user_id: p.linked_user_id ?? null,
+          name_en: p.name_en,
+          contact_email: p.contact_email,
+          contact_phone: p.contact_phone,
+          active: p.active,
+          department_id: prof?.department_id ?? null,
+          department: prof?.department_id ? deptName.get(prof.department_id) ?? null : null,
+          position_id: prof?.position_id ?? null,
+          position: prof?.position_id ? posName.get(prof.position_id) ?? null : null,
+          manager_id: prof?.manager_id ?? null,
+          employment_status: prof?.employment_status ?? null,
+          hire_date: prof?.hire_date ?? null,
+          termination_date: prof?.termination_date ?? null,
+          worker_type: prof?.worker_type ?? null
+        };
+      })
+    };
+  });
+}
+function createGetEmployeeDirectoryEntry(deps) {
+  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
+    (i) => z.object({ tenant_id: z.string().uuid(), party_id: z.string().uuid() }).parse(i)
+  ).handler(async ({ data, context }) => {
+    await deps.assertCanReadEmployeeDirectory(data.tenant_id, context.userId);
+    const { data: party, error: pErr } = await deps.supabaseAdmin.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active, is_employee").eq("tenant_id", data.tenant_id).eq("id", data.party_id).maybeSingle();
+    if (pErr) throw new Error(pErr.message);
+    if (!party || !party.is_employee) throw new Error("Employee not found");
+    const { data: profile, error: prErr } = await deps.supabaseAdmin.from("employee_profiles").select(
+      "party_id, department_id, position_id, manager_id, employment_status, hire_date, termination_date, worker_type"
+    ).eq("tenant_id", data.tenant_id).eq("party_id", data.party_id).maybeSingle();
+    if (prErr) throw new Error(prErr.message);
+    const { deptName, posName } = await loadDeptPosNames(
+      deps.supabaseAdmin,
+      data.tenant_id,
+      profile?.department_id ? [profile.department_id] : [],
+      profile?.position_id ? [profile.position_id] : []
+    );
+    return {
+      party_id: party.id,
+      linked_user_id: party.linked_user_id ?? null,
+      name_en: party.name_en,
+      contact_email: party.contact_email,
+      contact_phone: party.contact_phone,
+      active: party.active,
+      department_id: profile?.department_id ?? null,
+      department: profile?.department_id ? deptName.get(profile.department_id) ?? null : null,
+      position_id: profile?.position_id ?? null,
+      position: profile?.position_id ? posName.get(profile.position_id) ?? null : null,
+      manager_id: profile?.manager_id ?? null,
+      employment_status: profile?.employment_status ?? null,
+      hire_date: profile?.hire_date ?? null,
+      termination_date: profile?.termination_date ?? null,
+      worker_type: profile?.worker_type ?? null
+    };
+  });
+}
+function createUpsertEmployeeDirectoryEntry(deps) {
+  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
+    (i) => z.object({
+      tenant_id: z.string().uuid(),
+      party_id: z.string().uuid().optional(),
+      linked_user_id: z.string().uuid().optional(),
+      name_en: z.string().min(1).max(200).optional(),
+      contact_email: z.string().email().optional().nullable(),
+      contact_phone: z.string().max(60).optional().nullable(),
+      department_id: z.string().uuid().optional().nullable(),
+      position_id: z.string().uuid().optional().nullable(),
+      manager_id: z.string().uuid().optional().nullable(),
+      employment_status: z.enum(EMPLOYMENT_STATUSES).optional(),
+      hire_date: z.string().optional().nullable(),
+      termination_date: z.string().optional().nullable(),
+      worker_type: z.enum(WORKER_TYPES).default("employee")
+    }).parse(i)
+  ).handler(async ({ data, context }) => {
+    const callerId = context.userId;
+    await deps.assertCanWriteEmployeeDirectory(data.tenant_id, callerId);
+    let partyId;
+    let created = false;
+    if (data.party_id) {
+      partyId = data.party_id;
+      const patch = {};
+      if (data.name_en !== void 0) patch.name_en = data.name_en;
+      if (data.contact_email !== void 0) patch.contact_email = data.contact_email;
+      if (data.contact_phone !== void 0) patch.contact_phone = data.contact_phone;
+      if (Object.keys(patch).length > 0) {
+        const { error } = await deps.supabaseAdmin.from("parties").update({ ...patch, is_employee: true }).eq("id", partyId).eq("tenant_id", data.tenant_id);
+        if (error) throw new Error(error.message);
+      } else {
+        const { error } = await deps.supabaseAdmin.from("parties").update({ is_employee: true }).eq("id", partyId).eq("tenant_id", data.tenant_id);
+        if (error) throw new Error(error.message);
+      }
+    } else if (data.linked_user_id) {
+      const { data: existingParty, error: findErr } = await deps.supabaseAdmin.from("parties").select("id").eq("tenant_id", data.tenant_id).eq("linked_user_id", data.linked_user_id).eq("is_employee", true).maybeSingle();
+      if (findErr) throw new Error(findErr.message);
+      if (existingParty) {
+        partyId = existingParty.id;
+      } else {
+        const { data: member, error: mErr } = await deps.supabaseAdmin.from("tenant_users").select("display_name, email").eq("tenant_id", data.tenant_id).eq("user_id", data.linked_user_id).maybeSingle();
+        if (mErr) throw new Error(mErr.message);
+        if (!member) throw new Error("This person is not a member of this workspace");
+        const { data: newParty, error: insErr } = await deps.supabaseAdmin.from("parties").insert({
+          tenant_id: data.tenant_id,
+          linked_user_id: data.linked_user_id,
+          name_en: data.name_en ?? member.display_name ?? member.email ?? "Unnamed",
+          contact_email: data.contact_email ?? member.email ?? null,
+          is_employee: true
+        }).select("id").single();
+        if (insErr) throw new Error(insErr.message);
+        partyId = newParty.id;
+        created = true;
+      }
+    } else {
+      if (!data.name_en) throw new Error("name_en is required to create a new directory entry");
+      const { data: newParty, error: insErr } = await deps.supabaseAdmin.from("parties").insert({
+        tenant_id: data.tenant_id,
+        name_en: data.name_en,
+        contact_email: data.contact_email ?? null,
+        contact_phone: data.contact_phone ?? null,
+        is_employee: true
+      }).select("id").single();
+      if (insErr) throw new Error(insErr.message);
+      partyId = newParty.id;
+      created = true;
+    }
+    const { data: existingProfile, error: findProfErr } = await deps.supabaseAdmin.from("employee_profiles").select("id").eq("tenant_id", data.tenant_id).eq("party_id", partyId).maybeSingle();
+    if (findProfErr) throw new Error(findProfErr.message);
+    const profilePatch = {
+      department_id: data.department_id ?? null,
+      position_id: data.position_id ?? null,
+      manager_id: data.manager_id ?? null,
+      worker_type: data.worker_type,
+      ...data.hire_date !== void 0 ? { hire_date: data.hire_date } : {},
+      ...data.termination_date !== void 0 ? { termination_date: data.termination_date } : {},
+      ...data.employment_status ? { employment_status: data.employment_status } : {}
+    };
+    if (existingProfile) {
+      const { error } = await deps.supabaseAdmin.from("employee_profiles").update(profilePatch).eq("id", existingProfile.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await deps.supabaseAdmin.from("employee_profiles").insert({
+        tenant_id: data.tenant_id,
+        party_id: partyId,
+        employment_status: data.employment_status ?? "active",
+        ...profilePatch
+      });
+      if (error) throw new Error(error.message);
+    }
+    if (deps.onWrite) {
+      await deps.onWrite({ tenantId: data.tenant_id, userId: callerId, partyId, created });
+    }
+    return { party_id: partyId, created };
+  });
+}
+function createListDepartmentsAndPositions(deps) {
+  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => z.object({ tenant_id: z.string().uuid() }).parse(i)).handler(async ({ data, context }) => {
+    await deps.assertCanReadOrgStructure(data.tenant_id, context.userId);
+    const [{ data: departments, error: dErr }, { data: positions, error: pErr }] = await Promise.all([
+      deps.supabaseAdmin.from("departments").select("id, name, code").eq("tenant_id", data.tenant_id).order("name"),
+      deps.supabaseAdmin.from("positions").select("id, name, department_id").eq("tenant_id", data.tenant_id).order("name")
+    ]);
+    if (dErr) throw new Error(dErr.message);
+    if (pErr) throw new Error(pErr.message);
+    return { departments: departments ?? [], positions: positions ?? [] };
+  });
+}
+function createCreateDepartment(deps) {
+  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
+    (i) => z.object({
+      tenant_id: z.string().uuid(),
+      name: z.string().min(1).max(120),
+      code: z.string().max(20).optional().nullable()
+    }).parse(i)
+  ).handler(async ({ data, context }) => {
+    await deps.assertCanManageOrgStructure(data.tenant_id, context.userId);
+    const { data: dept, error } = await deps.supabaseAdmin.from("departments").insert({
+      tenant_id: data.tenant_id,
+      name: data.name,
+      code: data.code ? data.code.toUpperCase() : null
+    }).select("id").single();
+    if (error) throw new Error(error.message);
+    return { id: dept.id };
+  });
+}
+function createUpdateDepartment(deps) {
+  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
+    (i) => z.object({
+      tenant_id: z.string().uuid(),
+      id: z.string().uuid(),
+      name: z.string().min(1).max(120),
+      code: z.string().max(20).optional().nullable()
+    }).parse(i)
+  ).handler(async ({ data, context }) => {
+    await deps.assertCanManageOrgStructure(data.tenant_id, context.userId);
+    const { error } = await deps.supabaseAdmin.from("departments").update({ name: data.name, code: data.code ? data.code.toUpperCase() : null }).eq("id", data.id).eq("tenant_id", data.tenant_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+}
+function createDeleteDepartment(deps) {
+  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
+    (i) => z.object({ tenant_id: z.string().uuid(), id: z.string().uuid() }).parse(i)
+  ).handler(async ({ data, context }) => {
+    await deps.assertCanManageOrgStructure(data.tenant_id, context.userId);
+    const { error } = await deps.supabaseAdmin.from("departments").delete().eq("id", data.id).eq("tenant_id", data.tenant_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+}
+function createCreatePosition(deps) {
+  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
+    (i) => z.object({
+      tenant_id: z.string().uuid(),
+      department_id: z.string().uuid(),
+      name: z.string().min(1).max(120)
+    }).parse(i)
+  ).handler(async ({ data, context }) => {
+    await deps.assertCanManageOrgStructure(data.tenant_id, context.userId);
+    const { data: pos, error } = await deps.supabaseAdmin.from("positions").insert({ tenant_id: data.tenant_id, department_id: data.department_id, name: data.name }).select("id").single();
+    if (error) throw new Error(error.message);
+    return { id: pos.id };
+  });
+}
+function createUpdatePosition(deps) {
+  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
+    (i) => z.object({
+      tenant_id: z.string().uuid(),
+      id: z.string().uuid(),
+      name: z.string().min(1).max(120)
+    }).parse(i)
+  ).handler(async ({ data, context }) => {
+    await deps.assertCanManageOrgStructure(data.tenant_id, context.userId);
+    const { error } = await deps.supabaseAdmin.from("positions").update({ name: data.name }).eq("id", data.id).eq("tenant_id", data.tenant_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+}
+function createDeletePosition(deps) {
+  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
+    (i) => z.object({ tenant_id: z.string().uuid(), id: z.string().uuid() }).parse(i)
+  ).handler(async ({ data, context }) => {
+    await deps.assertCanManageOrgStructure(data.tenant_id, context.userId);
+    const { error } = await deps.supabaseAdmin.from("positions").delete().eq("id", data.id).eq("tenant_id", data.tenant_id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+}
 function resolveAppBaseUrl2(deps) {
   return (process.env.APP_BASE_URL || deps.appBaseUrl).replace(/\/$/, "");
 }
@@ -1687,6 +1975,6 @@ function createMergeParties(deps) {
   });
 }
 
-export { createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createArchiveParty, createCancelApp, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createGetMyProfile, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSetUserAppRoles, createSubscribeApp, createUnarchiveParty, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, resolveScopedTenantIds };
+export { createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createArchiveParty, createCancelApp, createCleanupPartyContacts, createCreateDepartment, createCreatePosition, createDeleteDepartment, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDeletePosition, createGetEmployeeDirectoryEntry, createGetMyProfile, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListDepartmentsAndPositions, createListEmployeeDirectory, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSetUserAppRoles, createSubscribeApp, createUnarchiveParty, createUpdateDepartment, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdatePosition, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertEmployeeDirectoryEntry, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, resolveScopedTenantIds };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

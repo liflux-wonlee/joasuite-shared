@@ -14,27 +14,11 @@ import {
 import { toast } from "sonner";
 import { useJoaSuite } from "../../context";
 import { ROLES_BY_APP } from "../../constants";
+import type { ManageableTenant, ManageableUserRow } from "../../types";
 
 function rolesForApp(code: string): string[] {
   return (ROLES_BY_APP as Record<string, string[]>)[code] ?? ["owner", "super_admin", "approver"];
 }
-
-type Assignment = {
-  tenant_id: string;
-  portal: string;
-  status: string;
-  joined_at: string | null;
-  apps: Record<string, { roles: string[] }>;
-};
-type UserRowT = {
-  user_id: string;
-  email: string | null;
-  display_name: string | null;
-  joined_at: string | null;
-  last_sign_in_at: string | null;
-  assignments: Record<string, Assignment>;
-};
-type Tenant = { id: string; name: string; slug: string; app_codes: string[]; app_plans?: Record<string, string | null> };
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -42,7 +26,7 @@ function formatDate(iso: string | null): string {
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
 }
 
-export function PeopleDetailPage({ userId }: { userId: string }) {
+export function UserDetailPage({ userId }: { userId: string }) {
   const { t } = useTranslation();
   const { useAuth, ui, router, fns } = useJoaSuite();
   const { Link, useNavigate } = router;
@@ -73,15 +57,15 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
   } = ui;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["account-people"],
+    queryKey: ["account-users"],
     queryFn: () => fns.listManageableUsers(),
   });
-  const tenants: Tenant[] = (data?.tenants as Tenant[] | undefined) ?? [];
-  const users: UserRowT[] = (data?.users as UserRowT[] | undefined) ?? [];
+  const tenants: ManageableTenant[] = (data?.tenants as ManageableTenant[] | undefined) ?? [];
+  const users: ManageableUserRow[] = (data?.users as ManageableUserRow[] | undefined) ?? [];
   const user = users.find((u) => u.user_id === userId);
 
   const tenantById = useMemo(() => {
-    const m = new Map<string, Tenant>();
+    const m = new Map<string, ManageableTenant>();
     tenants.forEach((tn) => m.set(tn.id, tn));
     return m;
   }, [tenants]);
@@ -110,7 +94,7 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
       fns.accountUpdateUserProfile(i),
     onSuccess: () => {
       toast.success(t("set.updated", "Updated"));
-      qc.invalidateQueries({ queryKey: ["account-people"] });
+      qc.invalidateQueries({ queryKey: ["account-users"] });
       setEditing(false);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -118,12 +102,12 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
 
   const resend = useMutation({
     mutationFn: () => fns.accountResendInvitation({ user_id: userId }),
-    onSuccess: () => toast.success(t("people.invite_resent", "Invitation resent")),
+    onSuccess: () => toast.success(t("users.invite_resent", "Invitation resent")),
     onError: (e: Error) => toast.error(e.message),
   });
   const reset = useMutation({
     mutationFn: () => fns.accountSendPasswordReset({ user_id: userId }),
-    onSuccess: () => toast.success(t("people.reset_sent", "Password reset link sent")),
+    onSuccess: () => toast.success(t("users.reset_sent", "Password reset link sent")),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -137,7 +121,7 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
       }),
     onSuccess: () => {
       toast.success(t("set.roles_updated", "Roles updated"));
-      qc.invalidateQueries({ queryKey: ["account-people"] });
+      qc.invalidateQueries({ queryKey: ["account-users"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -146,7 +130,7 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
     mutationFn: (tenant_id: string) => fns.removeTenantUser({ tenant_id, user_id: userId }),
     onSuccess: () => {
       toast.success(t("set.user_removed", "User removed"));
-      qc.invalidateQueries({ queryKey: ["account-people"] });
+      qc.invalidateQueries({ queryKey: ["account-users"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -168,8 +152,8 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
       });
     },
     onSuccess: () => {
-      toast.success(t("people.added_to_org", "Added to organization"));
-      qc.invalidateQueries({ queryKey: ["account-people"] });
+      toast.success(t("users.added_to_org", "Added to organization"));
+      qc.invalidateQueries({ queryKey: ["account-users"] });
       setAddOrgOpen(false);
       setAddTenantId("");
       setAddApps({});
@@ -188,10 +172,10 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
     return (
       <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-4">
         <Link to="/app/people" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> {t("people.back", "Back to People")}
+          <ArrowLeft className="h-4 w-4" /> {t("users.back", "Back to Users")}
         </Link>
         <div className="border rounded-lg p-6 text-sm text-muted-foreground">
-          {t("people.user_not_found", "User not found or you don't have access.")}
+          {t("users.user_not_found", "User not found or you don't have access.")}
         </div>
       </div>
     );
@@ -203,7 +187,7 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
       <Link to="/app/people" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" /> {t("people.back", "Back to People")}
+        <ArrowLeft className="h-4 w-4" /> {t("users.back", "Back to Users")}
       </Link>
 
       {/* Overview */}
@@ -213,8 +197,8 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
             <h1 className="text-2xl font-semibold">{user.display_name ?? user.email ?? "—"}</h1>
             <div className="text-sm text-muted-foreground">{user.email}</div>
             <div className="text-xs text-muted-foreground mt-2">
-              {t("people.joined", "Joined")}: {formatDate(user.joined_at)} ·{" "}
-              {t("people.last_active", "Last active")}: {formatDate(user.last_sign_in_at)}
+              {t("users.joined", "Joined")}: {formatDate(user.joined_at)} ·{" "}
+              {t("users.last_active", "Last active")}: {formatDate(user.last_sign_in_at)}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -222,10 +206,10 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
               <Pencil className="h-3.5 w-3.5" /> {t("common.edit", "Edit")}
             </Button>
             <Button size="sm" variant="outline" onClick={() => resend.mutate()} disabled={resend.isPending}>
-              <Mail className="h-3.5 w-3.5" /> {t("people.resend_invite", "Resend invitation")}
+              <Mail className="h-3.5 w-3.5" /> {t("users.resend_invite", "Resend invitation")}
             </Button>
             <Button size="sm" variant="outline" onClick={() => reset.mutate()} disabled={reset.isPending}>
-              <KeyRound className="h-3.5 w-3.5" /> {t("people.send_reset", "Send password reset")}
+              <KeyRound className="h-3.5 w-3.5" /> {t("users.send_reset", "Send password reset")}
             </Button>
           </div>
         </div>
@@ -236,7 +220,7 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
         <div className="flex items-center justify-between p-4 border-b">
           <h2 className="text-base font-semibold flex items-center gap-2">
             <Building2 className="h-4 w-4" />
-            {t("people.org_memberships", "Organization memberships")}
+            {t("users.org_memberships", "Organization memberships")}
           </h2>
           {unassignedTenants.length > 0 && (
             <Button
@@ -248,14 +232,14 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
                 setAddOrgOpen(true);
               }}
             >
-              <Plus className="h-3.5 w-3.5" /> {t("people.add_to_org", "Add to organization")}
+              <Plus className="h-3.5 w-3.5" /> {t("users.add_to_org", "Add to organization")}
             </Button>
           )}
         </div>
 
         {memberships.length === 0 ? (
           <div className="p-6 text-sm text-center text-muted-foreground">
-            {t("people.no_memberships", "Not a member of any organization yet.")}
+            {t("users.no_memberships", "Not a member of any organization yet.")}
           </div>
         ) : (
           <Tabs defaultValue={memberships[0].tenant_id} className="w-full">
@@ -289,11 +273,11 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
                   {/* Org summary */}
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span>
-                      {t("people.joined", "Joined")}: {formatDate(a.joined_at)}
+                      {t("users.joined", "Joined")}: {formatDate(a.joined_at)}
                     </span>
                     <span>·</span>
                     <span>
-                      {t("people.subscribed_apps", "Subscribed apps")}: {subscribedCodes.length}
+                      {t("users.subscribed_apps", "Subscribed apps")}: {subscribedCodes.length}
                     </span>
                     <div className="ml-auto">
                       {!isSelf && !isOwner && (
@@ -318,12 +302,12 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
                   <div>
                     <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-2">
                       <AppWindow className="h-3.5 w-3.5" />
-                      {t("people.app_access", "App access & roles")}
+                      {t("users.app_access", "App access & roles")}
                     </div>
                     <div className="border rounded-md divide-y">
                       {allCodes.length === 0 && (
                         <div className="p-3 text-sm text-muted-foreground">
-                          {t("people.no_apps_subscribed_short", "This organization has no apps subscribed.")}
+                          {t("users.no_apps_subscribed_short", "This organization has no apps subscribed.")}
                         </div>
                       )}
                       {allCodes.map((code) => {
@@ -345,13 +329,13 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="text-[10px]">
-                                {t("people.not_subscribed", "Not subscribed")}
+                                {t("users.not_subscribed", "Not subscribed")}
                               </Badge>
                             )}
                             <div className="flex-1">
                               {!subscribed ? (
                                 <span className="text-xs text-muted-foreground">
-                                  {t("people.org_not_subscribed_hint", "Organization is not subscribed to this app. Subscribe in Suite settings to assign roles.")}
+                                  {t("users.org_not_subscribed_hint", "Organization is not subscribed to this app. Subscribe in Suite settings to assign roles.")}
                                 </span>
                               ) : (
                                 <Select
@@ -370,7 +354,7 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="__none__" className="text-xs text-muted-foreground">
-                                      {t("people.no_access", "No access")}
+                                      {t("users.no_access", "No access")}
                                     </SelectItem>
                                     {options.map((r) => (
                                       <SelectItem key={r} value={r} className="text-xs">
@@ -398,7 +382,7 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
       <Dialog open={editing} onOpenChange={setEditing}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{t("people.user_details", "User details")}</DialogTitle>
+            <DialogTitle>{t("users.user_details", "User details")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
@@ -435,11 +419,11 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
       <Dialog open={addOrgOpen} onOpenChange={setAddOrgOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{t("people.add_to_org", "Add to organization")}</DialogTitle>
+            <DialogTitle>{t("users.add_to_org", "Add to organization")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>{t("people.organization", "Organization")}</Label>
+              <Label>{t("users.organization", "Organization")}</Label>
               <Select
                 value={addTenantId}
                 onValueChange={(v: string) => {
@@ -461,10 +445,10 @@ export function PeopleDetailPage({ userId }: { userId: string }) {
             </div>
             {addTenantId && (
               <div className="space-y-1.5">
-                <Label>{t("people.app_roles", "App access & roles")}</Label>
+                <Label>{t("users.app_roles", "App access & roles")}</Label>
                 {(tenantById.get(addTenantId)?.app_codes ?? []).length === 0 ? (
                   <div className="text-xs text-muted-foreground">
-                    {t("people.no_apps_subscribed_short", "This organization has no apps subscribed.")}
+                    {t("users.no_apps_subscribed_short", "This organization has no apps subscribed.")}
                   </div>
                 ) : (
                   (tenantById.get(addTenantId)?.app_codes ?? []).map((code) => {

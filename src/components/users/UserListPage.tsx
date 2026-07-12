@@ -4,25 +4,9 @@ import { useTranslation } from "react-i18next";
 import { Plus, Mail, KeyRound, MoreHorizontal, Users as UsersIcon, Search } from "lucide-react";
 import { toast } from "sonner";
 import { useJoaSuite } from "../../context";
+import type { ManageableTenant, ManageableUserRow } from "../../types";
 
-type Assignment = {
-  tenant_id: string;
-  portal: string;
-  status: string;
-  joined_at: string | null;
-  apps: Record<string, { roles: string[] }>;
-};
-type UserRowT = {
-  user_id: string;
-  email: string | null;
-  display_name: string | null;
-  joined_at: string | null;
-  last_sign_in_at: string | null;
-  assignments: Record<string, Assignment>;
-};
-type Tenant = { id: string; name: string; slug: string; app_codes: string[] };
-
-function deriveStatus(u: UserRowT): "active" | "invited" | "suspended" {
+function deriveStatus(u: ManageableUserRow): "active" | "invited" | "suspended" {
   const vals = Object.values(u.assignments);
   if (vals.length === 0) return "invited";
   if (vals.every((a) => a.status === "suspended")) return "suspended";
@@ -36,7 +20,7 @@ function formatDate(iso: string | null): string {
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
 }
 
-export function PeopleListPage() {
+export function UserListPage() {
   const { t } = useTranslation();
   const { ui, router, fns } = useJoaSuite();
   const { Link, useNavigate } = router;
@@ -58,11 +42,11 @@ export function PeopleListPage() {
   } = ui;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["account-people"],
+    queryKey: ["account-users"],
     queryFn: () => fns.listManageableUsers(),
   });
-  const tenants: Tenant[] = (data?.tenants as Tenant[] | undefined) ?? [];
-  const users: UserRowT[] = (data?.users as UserRowT[] | undefined) ?? [];
+  const tenants: ManageableTenant[] = (data?.tenants as ManageableTenant[] | undefined) ?? [];
+  const users: ManageableUserRow[] = (data?.users as ManageableUserRow[] | undefined) ?? [];
 
   const [search, setSearch] = useState("");
   const [orgFilter, setOrgFilter] = useState<string>("all");
@@ -96,12 +80,12 @@ export function PeopleListPage() {
 
   const resend = useMutation({
     mutationFn: (uid: string) => fns.accountResendInvitation({ user_id: uid }),
-    onSuccess: () => toast.success(t("people.invite_resent", "Invitation resent")),
+    onSuccess: () => toast.success(t("users.invite_resent", "Invitation resent")),
     onError: (e: Error) => toast.error(e.message),
   });
   const reset = useMutation({
     mutationFn: (uid: string) => fns.accountSendPasswordReset({ user_id: uid }),
-    onSuccess: () => toast.success(t("people.reset_sent", "Password reset link sent")),
+    onSuccess: () => toast.success(t("users.reset_sent", "Password reset link sent")),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -118,10 +102,10 @@ export function PeopleListPage() {
       <div className="p-6 lg:p-8 max-w-6xl mx-auto space-y-4">
         <h1 className="text-2xl font-semibold flex items-center gap-2">
           <UsersIcon className="h-6 w-6" />
-          {t("suite.tile.people", "People")}
+          {t("suite.tile.users", "Users")}
         </h1>
         <div className="border rounded-lg p-6 bg-card text-sm text-muted-foreground text-center">
-          {t("people.no_manageable_tenants", "You don't own or super-admin any organizations yet.")}
+          {t("users.no_manageable_tenants", "You don't own or super-admin any organizations yet.")}
         </div>
       </div>
     );
@@ -133,18 +117,18 @@ export function PeopleListPage() {
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
             <UsersIcon className="h-6 w-6" />
-            {t("suite.tile.people", "People")}
+            {t("suite.tile.users", "Users")}
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             {t(
-              "people.desc",
+              "users.desc",
               "Manage users across all organizations where you are owner or super admin.",
             )}
           </p>
         </div>
         <Button size="sm" onClick={() => nav({ to: "/app/people/invite" })}>
           <Plus className="h-4 w-4" />
-          {t("people.invite", "Invite person")}
+          {t("users.invite", "Invite user")}
         </Button>
       </div>
 
@@ -152,7 +136,7 @@ export function PeopleListPage() {
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder={t("people.search_placeholder", "Search name or email")}
+            placeholder={t("users.search_placeholder", "Search name or email")}
             value={search}
             onChange={(e: any) => setSearch(e.target.value)}
             className="pl-8"
@@ -163,7 +147,7 @@ export function PeopleListPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t("people.all_orgs", "All organizations")}</SelectItem>
+            <SelectItem value="all">{t("users.all_orgs", "All organizations")}</SelectItem>
             {tenants.map((tn) => (
               <SelectItem key={tn.id} value={tn.id}>
                 {tn.name}
@@ -176,7 +160,7 @@ export function PeopleListPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t("people.all_apps", "All apps")}</SelectItem>
+            <SelectItem value="all">{t("users.all_apps", "All apps")}</SelectItem>
             {allAppCodes.map((c) => (
               <SelectItem key={c} value={c} className="uppercase">
                 {c}
@@ -189,10 +173,10 @@ export function PeopleListPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t("people.all_status", "All status")}</SelectItem>
-            <SelectItem value="active">{t("people.status_active", "Active")}</SelectItem>
-            <SelectItem value="invited">{t("people.status_invited", "Invited")}</SelectItem>
-            <SelectItem value="suspended">{t("people.status_suspended", "Suspended")}</SelectItem>
+            <SelectItem value="all">{t("users.all_status", "All status")}</SelectItem>
+            <SelectItem value="active">{t("users.status_active", "Active")}</SelectItem>
+            <SelectItem value="invited">{t("users.status_invited", "Invited")}</SelectItem>
+            <SelectItem value="suspended">{t("users.status_suspended", "Suspended")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -201,12 +185,12 @@ export function PeopleListPage() {
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-left">
             <tr>
-              <th className="px-3 py-2 min-w-[220px]">{t("people.col_name", "Name")}</th>
-              <th className="px-3 py-2 min-w-[110px]">{t("people.col_status", "Status")}</th>
-              <th className="px-3 py-2 min-w-[80px]">{t("people.col_orgs", "Orgs")}</th>
-              <th className="px-3 py-2 min-w-[200px]">{t("people.col_apps", "Apps")}</th>
+              <th className="px-3 py-2 min-w-[220px]">{t("users.col_name", "Name")}</th>
+              <th className="px-3 py-2 min-w-[110px]">{t("users.col_status", "Status")}</th>
+              <th className="px-3 py-2 min-w-[80px]">{t("users.col_orgs", "Orgs")}</th>
+              <th className="px-3 py-2 min-w-[200px]">{t("users.col_apps", "Apps")}</th>
               <th className="px-3 py-2 min-w-[110px] whitespace-nowrap">
-                {t("people.last_active", "Last active")}
+                {t("users.last_active", "Last active")}
               </th>
               <th className="px-3 py-2 w-12"></th>
             </tr>
@@ -252,7 +236,7 @@ export function PeopleListPage() {
                       }
                       className="capitalize"
                     >
-                      {t(`people.status_${status}`, status)}
+                      {t(`users.status_${status}`, status)}
                     </Badge>
                   </td>
                   <td className="px-3 py-2 text-sm">{orgCount}</td>
@@ -290,7 +274,7 @@ export function PeopleListPage() {
                             to="/app/people/$userId"
                             params={{ userId: u.user_id }}
                           >
-                            {t("people.manage_access", "Manage access")}
+                            {t("users.manage_access", "Manage access")}
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem
@@ -298,14 +282,14 @@ export function PeopleListPage() {
                           disabled={resend.isPending}
                         >
                           <Mail className="h-3.5 w-3.5" />
-                          {t("people.resend_invite", "Resend invitation")}
+                          {t("users.resend_invite", "Resend invitation")}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => reset.mutate(u.user_id)}
                           disabled={reset.isPending}
                         >
                           <KeyRound className="h-3.5 w-3.5" />
-                          {t("people.send_reset", "Send password reset")}
+                          {t("users.send_reset", "Send password reset")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
