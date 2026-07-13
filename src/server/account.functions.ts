@@ -223,7 +223,7 @@ async function getTargetEmail(
   return { email: data.email as string, display_name: (data.display_name as string | null) ?? null };
 }
 
-// Tenants the caller can manage in the People matrix.
+// Tenants the caller can manage in the Users matrix.
 export function createListManageableTenants(deps: AccountDeps) {
   return createServerFn({ method: "POST" })
     .middleware([deps.requireSupabaseAuth])
@@ -241,7 +241,7 @@ export function createListManageableTenants(deps: AccountDeps) {
     });
 }
 
-// Matrix of users across all manageable tenants.
+// Users matrix across all manageable tenants.
 // Returns rows keyed by user_id with email/display_name and an assignments map.
 export function createListManageableUsers(deps: AccountDeps) {
   return createServerFn({ method: "POST" })

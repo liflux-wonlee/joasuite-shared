@@ -23,7 +23,7 @@ joasuite-shared/
     ├── types.ts                ✅ (Membership, AppCatalogEntry, TenantAppRow, …)
     ├── context.tsx             ✅ (JoaSuiteProvider, useJoaSuite, UiAdapter, RouterAdapter, BoundServerFns)
     ├── i18n-helper.ts          ✅ (mergeSharedResources, SUPPORTED_LANGUAGES)
-    ├── i18n/                   ✅ en/ko/zh/es/vi (JoaBooks에서 추출한 suite/people/account/bell/common/set)
+    ├── i18n/                   ✅ en/ko/zh/es/vi (JoaBooks에서 추출한 suite/users/account/bell/common/set + directory)
     ├── components/
     │   ├── ThemeToggle.tsx      ✅
     │   ├── LanguageSwitcher.tsx ✅
@@ -33,17 +33,24 @@ joasuite-shared/
     │   ├── SuiteHomePage.tsx    ✅ 포팅 완료
     │   ├── SuiteSettingsHub.tsx ✅ 포팅 완료
     │   ├── ui/                  ⚠️ 미사용 shadcn 원본 사본 — 어디서도 import 안 됨, DI 설계상 필요 없음 (정리 후보)
-    │   └── people/
-    │       ├── PeopleListPage.tsx   ✅ 포팅 완료
-    │       ├── PeopleInvitePage.tsx ✅ 포팅 완료 (ROLES_BY_APP은 이제 ../../constants에서 가져옴)
-    │       └── PeopleDetailPage.tsx ✅ 포팅 완료 (userId를 prop으로 받음, Route.useParams() 아님)
+    │   ├── users/                (테넌트 로그인 사용자 관리 — 예전 "People", 2026-07-12 리네이밍)
+    │   │   ├── UserListPage.tsx   ✅
+    │   │   ├── UserInvitePage.tsx ✅ (ROLES_BY_APP은 ../../constants에서 가져옴)
+    │   │   └── UserDetailPage.tsx ✅ (userId를 prop으로 받음, Route.useParams() 아님)
+    │   ├── employees/             (직원/계약자 기본정보 — JoaHR 이외 모든 앱이 공유, 2026-07-12 신설)
+    │   │   ├── EmployeeDirectoryListPage.tsx ✅
+    │   │   └── EmployeeProfileForm.tsx       ✅
+    │   └── org-structure/
+    │       └── OrgStructureSettingsPage.tsx ✅ (부서/직급 CRUD, 원래 JoaSOP 전용이던 것을 공유로 승격)
     └── server/
         ├── index.ts                  ✅ 전체 re-export 완료
         ├── suite.functions.ts        ✅ createListSuiteApps / createSubscribeApp / createCancelApp
         ├── suite-home.functions.ts   ✅ createGetSuiteHome / createSetAppUrl
         ├── notifications.functions.ts ✅ createListNotifications 등 (appCode 하드코딩 버그 수정됨)
         ├── account.functions.ts      ✅ + getMyProfile/updateMyTimezone/updateMyDefaultTenant 추가
-        └── admin.functions.ts        ✅ tenant_users + parties 계열만 (재무 설정 함수는 의도적으로 제외, 아래 참고)
+        ├── admin.functions.ts        ✅ tenant_users + parties 계열만 (재무 설정 함수는 의도적으로 제외, 아래 참고)
+        ├── employee-directory.functions.ts ✅ parties/employee_profiles 기본정보 CRUD (HR 기밀 테이블은 절대 다루지 않음)
+        └── org-structure.functions.ts      ✅ departments/positions CRUD
 ```
 
 ### admin.functions.ts에서 의도적으로 제외한 것
@@ -196,9 +203,9 @@ App-specific 키가 동일 path에서 shared 키를 덮어쓸 수 있도록 deep
    - `@/i18n` 의 `SUPPORTED_LANGUAGES` → 패키지의 `SUPPORTED_LANGUAGES` (이미 LanguageSwitcher 완료)
 
 2. **`createFileRoute` 제거**
-   - People/Suite 페이지 컴포넌트는 라우트가 아니라 **순수 컴포넌트**로 변환
+   - Users/Suite 페이지 컴포넌트는 라우트가 아니라 **순수 컴포넌트**로 변환
    - `export const Route = createFileRoute(...)({ component: X })` 삭제
-   - 각 앱이 자기 라우트 파일에서 `<PeopleListPage appCode="joabooks" />` 형태로 마운트
+   - 각 앱이 자기 라우트 파일에서 `<UserListPage />` 형태로 마운트 (prop 없음 — 앱 구분은 `JoaSuiteProvider`의 `currentApp`으로 처리)
 
 3. **하드코딩된 `"joabooks"` 제거**
    - SuiteSwitcher, SuiteHomePage: 현재 앱 비교에 `useJoaSuite().currentApp` 사용
@@ -254,7 +261,7 @@ bun add github:joasuite/joasuite-shared#v0.1.0
 2. `src/i18n/index.ts`를 `mergeSharedResources` 사용으로 교체
 3. `src/routes/app.tsx`에 `<JoaSuiteProvider>` 추가
 4. `src/components/SuiteSwitcher.tsx`, `UserBadge.tsx`, `NotificationsBell.tsx`, `ThemeToggle.tsx`, `LanguageSwitcher.tsx` 삭제 → `@joasuite/shared-ui` import로 교체
-5. `src/routes/app.people.*.tsx`, `app.suite.tsx`, `app.suite.settings.tsx` 안에 페이지 컴포넌트만 `<PeopleListPage appCode="joabooks" />` 등으로 교체
+5. `src/routes/app.people.*.tsx`, `app.suite.tsx`, `app.suite.settings.tsx` 안에 페이지 컴포넌트만 `<UserListPage />` 등으로 교체
 6. `src/lib/suite.functions.ts` 등 server fn 파일은 패키지 factory를 호출하는 8줄짜리 wrapper로 축소
 7. Playwright로 헤더/Suite/People 시각 회귀 확인
 

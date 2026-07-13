@@ -41,7 +41,7 @@ export function SuiteSwitcher() {
   } = ui;
   const { currentMembership, memberships } = useAuth();
   const tenantId = currentMembership?.tenant_id ?? "";
-  const canManagePeople = (memberships ?? []).some((m) =>
+  const canManageUsers = (memberships ?? []).some((m) =>
     (m.roles ?? []).some((r) => r === "owner" || r === "super_admin"),
   );
 
@@ -178,11 +178,11 @@ export function SuiteSwitcher() {
             <span>{t("suite.settings.title", "Suite Settings")}</span>
           </Link>
         </DropdownMenuItem>
-        {canManagePeople && (
+        {canManageUsers && (
           <DropdownMenuItem asChild>
             <Link to="/app/people" className="flex items-center gap-2 cursor-pointer">
               <Users className="h-4 w-4 opacity-70" />
-              <span>{t("suite.tile.people", "People")}</span>
+              <span>{t("suite.tile.users", "Users")}</span>
             </Link>
           </DropdownMenuItem>
         )}

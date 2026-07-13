@@ -37,7 +37,7 @@ export const DEFAULT_APP_URLS: Record<AppCode, string> = {
 };
 
 /**
- * Roles available per app. Used by People > Invite and the role editor.
+ * Roles available per app. Used by Users > Invite and the role editor.
  * Suite-wide roles (`owner`, `super_admin`) satisfy any app's role check
  * when stored with `user_roles.app_code IS NULL`.
  */

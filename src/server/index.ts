@@ -57,6 +57,24 @@ export {
 } from "./account.functions";
 
 export {
+  createListEmployeeDirectory,
+  createGetEmployeeDirectoryEntry,
+  createUpsertEmployeeDirectoryEntry,
+  type EmployeeDirectoryDeps,
+} from "./employee-directory.functions";
+
+export {
+  createListDepartmentsAndPositions,
+  createCreateDepartment,
+  createUpdateDepartment,
+  createDeleteDepartment,
+  createCreatePosition,
+  createUpdatePosition,
+  createDeletePosition,
+  type OrgStructureDeps,
+} from "./org-structure.functions";
+
+export {
   createGetTenantSettings,
   createUpdateTenantSettings,
   createListTenantUsers,

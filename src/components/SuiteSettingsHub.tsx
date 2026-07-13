@@ -43,10 +43,10 @@ export function SuiteSettingsHub() {
     {
       to: "/app/people",
       icon: Users,
-      label: t("suite.tile.people", "People"),
+      label: t("suite.tile.users", "Users"),
       description: t(
-        "suite.tile.people_desc",
-        "Invite people across all organizations and assign per-app roles.",
+        "suite.tile.users_desc",
+        "Invite users across all organizations and assign per-app roles.",
       ),
     },
     {
