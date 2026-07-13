@@ -260,6 +260,13 @@
     "edit_position": "编辑职位",
     "position_name": "名称",
     "no_positions": "该部门暂无职位。",
-    "confirm_delete": "确定删除吗？"
+    "confirm_delete": "确定删除吗？",
+    "title_employee": "员工",
+    "title_contractor": "承包商",
+    "desc_employee": "在册员工列表，跨所有 JoaSuite 应用共享。",
+    "desc_contractor": "外部承包商和供应商列表，跨所有 JoaSuite 应用共享。",
+    "add_employee": "添加员工",
+    "add_contractor": "添加承包商",
+    "team_group": "团队"
   }
 }

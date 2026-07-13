@@ -16,6 +16,8 @@ export type EmployeeProfileFormProps = {
   linkedUserId?: string;
   /** Disable all fields; used for self-view / read-only embeds. */
   readOnly?: boolean;
+  /** Preselect worker type for a brand-new entry (e.g. opened from a Contractor-only view). Still editable. */
+  defaultWorkerType?: "employee" | "contractor";
   onSaved?: (result: { party_id: string; created: boolean }) => void;
 };
 
@@ -35,6 +37,7 @@ export function EmployeeProfileForm({
   partyId,
   linkedUserId,
   readOnly,
+  defaultWorkerType,
   onSaved,
 }: EmployeeProfileFormProps) {
   const { t } = useTranslation();
@@ -61,7 +64,7 @@ export function EmployeeProfileForm({
   const [positionId, setPositionId] = useState<string>(ANY);
   const [employmentStatus, setEmploymentStatus] = useState<string>("active");
   const [hireDate, setHireDate] = useState<string>("");
-  const [workerType, setWorkerType] = useState<string>("employee");
+  const [workerType, setWorkerType] = useState<string>(defaultWorkerType ?? "employee");
 
   useEffect(() => {
     const e: any = entryQ.data;

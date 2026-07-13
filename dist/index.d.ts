@@ -305,6 +305,7 @@ type BoundServerFns = {
     listEmployeeDirectory: (input: {
         tenant_id: string;
         search?: string;
+        worker_type?: "employee" | "contractor";
     }) => Promise<{
         rows: any[];
     }>;
@@ -567,8 +568,10 @@ declare function UserDetailPage({ userId }: {
     userId: string;
 }): react.JSX.Element;
 
-declare function EmployeeDirectoryListPage({ tenantId }: {
+declare function EmployeeDirectoryListPage({ tenantId, workerType, }: {
     tenantId: string;
+    /** Restrict this view to one worker type. Omit to show the combined directory. */
+    workerType?: "employee" | "contractor";
 }): react.JSX.Element;
 
 type EmployeeProfileFormProps = {
@@ -579,6 +582,8 @@ type EmployeeProfileFormProps = {
     linkedUserId?: string;
     /** Disable all fields; used for self-view / read-only embeds. */
     readOnly?: boolean;
+    /** Preselect worker type for a brand-new entry (e.g. opened from a Contractor-only view). Still editable. */
+    defaultWorkerType?: "employee" | "contractor";
     onSaved?: (result: {
         party_id: string;
         created: boolean;
@@ -595,7 +600,7 @@ type EmployeeProfileFormProps = {
  * read-only Profile tab) or wrap it in their own Dialog (e.g. an "Add
  * employee" flow) as fits the surrounding page.
  */
-declare function EmployeeProfileForm({ tenantId, partyId, linkedUserId, readOnly, onSaved, }: EmployeeProfileFormProps): react.JSX.Element;
+declare function EmployeeProfileForm({ tenantId, partyId, linkedUserId, readOnly, defaultWorkerType, onSaved, }: EmployeeProfileFormProps): react.JSX.Element;
 
 declare function OrgStructureSettingsPage({ tenantId }: {
     tenantId: string;

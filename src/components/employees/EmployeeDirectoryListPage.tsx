@@ -5,7 +5,14 @@ import { Plus, Users, Search } from "lucide-react";
 import { useJoaSuite } from "../../context";
 import { EmployeeProfileForm } from "./EmployeeProfileForm";
 
-export function EmployeeDirectoryListPage({ tenantId }: { tenantId: string }) {
+export function EmployeeDirectoryListPage({
+  tenantId,
+  workerType,
+}: {
+  tenantId: string;
+  /** Restrict this view to one worker type. Omit to show the combined directory. */
+  workerType?: "employee" | "contractor";
+}) {
   const { t } = useTranslation();
   const { ui, fns } = useJoaSuite();
   const {
@@ -24,11 +31,31 @@ export function EmployeeDirectoryListPage({ tenantId }: { tenantId: string }) {
   const [addOpen, setAddOpen] = useState(false);
 
   const listQ = useQuery({
-    queryKey: ["directory-list", tenantId, search],
+    queryKey: ["directory-list", tenantId, search, workerType],
     enabled: !!tenantId,
-    queryFn: () => fns.listEmployeeDirectory({ tenant_id: tenantId, search: search || undefined }),
+    queryFn: () =>
+      fns.listEmployeeDirectory({ tenant_id: tenantId, search: search || undefined, worker_type: workerType }),
   });
   const rows = listQ.data?.rows ?? [];
+
+  const title =
+    workerType === "employee"
+      ? t("directory.title_employee", "Employees")
+      : workerType === "contractor"
+        ? t("directory.title_contractor", "Contractors")
+        : t("directory.title", "Employee Directory");
+  const desc =
+    workerType === "employee"
+      ? t("directory.desc_employee", "People on payroll, shared across JoaSuite apps.")
+      : workerType === "contractor"
+        ? t("directory.desc_contractor", "External contractors and vendors, shared across JoaSuite apps.")
+        : t("directory.desc", "Basic employee and contractor info shared across JoaSuite apps.");
+  const addLabel =
+    workerType === "employee"
+      ? t("directory.add_employee", "Add employee")
+      : workerType === "contractor"
+        ? t("directory.add_contractor", "Add contractor")
+        : t("directory.add", "Add person");
 
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-4">
@@ -36,18 +63,13 @@ export function EmployeeDirectoryListPage({ tenantId }: { tenantId: string }) {
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
             <Users className="h-6 w-6" />
-            {t("directory.title", "Employee Directory")}
+            {title}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t(
-              "directory.desc",
-              "Basic employee and contractor info shared across JoaSuite apps.",
-            )}
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">{desc}</p>
         </div>
         <Button size="sm" onClick={() => setAddOpen(true)}>
           <Plus className="h-4 w-4" />
-          {t("directory.add", "Add person")}
+          {addLabel}
         </Button>
       </div>
 
@@ -68,14 +90,16 @@ export function EmployeeDirectoryListPage({ tenantId }: { tenantId: string }) {
               <th className="px-3 py-2 min-w-[220px]">{t("directory.col_name", "Name")}</th>
               <th className="px-3 py-2 min-w-[140px]">{t("directory.department", "Department")}</th>
               <th className="px-3 py-2 min-w-[140px]">{t("directory.position", "Position")}</th>
-              <th className="px-3 py-2 min-w-[110px]">{t("directory.worker_type", "Worker type")}</th>
+              {!workerType && (
+                <th className="px-3 py-2 min-w-[110px]">{t("directory.worker_type", "Worker type")}</th>
+              )}
               <th className="px-3 py-2 min-w-[100px]">{t("directory.employment_status", "Status")}</th>
             </tr>
           </thead>
           <tbody>
             {!listQ.isLoading && rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">
+                <td colSpan={workerType ? 4 : 5} className="px-3 py-6 text-center text-muted-foreground">
                   {t("directory.empty", "No directory entries yet.")}
                 </td>
               </tr>
@@ -92,11 +116,13 @@ export function EmployeeDirectoryListPage({ tenantId }: { tenantId: string }) {
                 </td>
                 <td className="px-3 py-2">{r.department ?? "—"}</td>
                 <td className="px-3 py-2">{r.position ?? "—"}</td>
-                <td className="px-3 py-2">
-                  <Badge variant="outline" className="capitalize text-[10px]">
-                    {t(`directory.worker_type_${r.worker_type ?? "employee"}`, r.worker_type ?? "employee")}
-                  </Badge>
-                </td>
+                {!workerType && (
+                  <td className="px-3 py-2">
+                    <Badge variant="outline" className="capitalize text-[10px]">
+                      {t(`directory.worker_type_${r.worker_type ?? "employee"}`, r.worker_type ?? "employee")}
+                    </Badge>
+                  </td>
+                )}
                 <td className="px-3 py-2">
                   {r.employment_status
                     ? t(`directory.status_${r.employment_status}`, String(r.employment_status))
@@ -111,9 +137,13 @@ export function EmployeeDirectoryListPage({ tenantId }: { tenantId: string }) {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{t("directory.add", "Add person")}</DialogTitle>
+            <DialogTitle>{addLabel}</DialogTitle>
           </DialogHeader>
-          <EmployeeProfileForm tenantId={tenantId} onSaved={() => setAddOpen(false)} />
+          <EmployeeProfileForm
+            tenantId={tenantId}
+            defaultWorkerType={workerType}
+            onSaved={() => setAddOpen(false)}
+          />
         </DialogContent>
       </Dialog>
 

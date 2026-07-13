@@ -295,6 +295,7 @@ type EmployeeDirectoryDeps = {
 declare function createListEmployeeDirectory(deps: EmployeeDirectoryDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
     tenant_id: string;
     search?: string | undefined;
+    worker_type?: "employee" | "contractor" | undefined;
 }, Promise<{
     rows: any;
 }>>;

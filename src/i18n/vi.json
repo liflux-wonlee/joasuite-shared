@@ -263,6 +263,13 @@
     "edit_position": "Sửa chức vụ",
     "position_name": "Tên",
     "no_positions": "Phòng ban này chưa có chức vụ nào.",
-    "confirm_delete": "Xóa mục này?"
+    "confirm_delete": "Xóa mục này?",
+    "title_employee": "Nhân viên",
+    "title_contractor": "Nhà thầu",
+    "desc_employee": "Danh sách nhân viên hưởng lương, dùng chung cho mọi ứng dụng JoaSuite.",
+    "desc_contractor": "Nhà thầu và nhà cung cấp bên ngoài, dùng chung cho mọi ứng dụng JoaSuite.",
+    "add_employee": "Thêm nhân viên",
+    "add_contractor": "Thêm nhà thầu",
+    "team_group": "Nhóm"
   }
 }

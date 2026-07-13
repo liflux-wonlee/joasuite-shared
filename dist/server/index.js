@@ -802,7 +802,11 @@ async function loadDeptPosNames(supabaseAdmin, tenantId, deptIds, posIds) {
 }
 function createListEmployeeDirectory(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({ tenant_id: z.string().uuid(), search: z.string().max(200).optional() }).parse(i)
+    (i) => z.object({
+      tenant_id: z.string().uuid(),
+      search: z.string().max(200).optional(),
+      worker_type: z.enum(WORKER_TYPES).optional()
+    }).parse(i)
   ).handler(async ({ data, context }) => {
     await deps.assertCanReadEmployeeDirectory(data.tenant_id, context.userId);
     let pq = deps.supabaseAdmin.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active").eq("tenant_id", data.tenant_id).eq("is_employee", true).order("name_en");
@@ -825,28 +829,30 @@ function createListEmployeeDirectory(deps) {
     const deptIds = Array.from(new Set(profiles.map((p) => p.department_id).filter(Boolean)));
     const posIds = Array.from(new Set(profiles.map((p) => p.position_id).filter(Boolean)));
     const { deptName, posName } = await loadDeptPosNames(deps.supabaseAdmin, data.tenant_id, deptIds, posIds);
-    return {
-      rows: (parties ?? []).map((p) => {
-        const prof = byParty.get(p.id);
-        return {
-          party_id: p.id,
-          linked_user_id: p.linked_user_id ?? null,
-          name_en: p.name_en,
-          contact_email: p.contact_email,
-          contact_phone: p.contact_phone,
-          active: p.active,
-          department_id: prof?.department_id ?? null,
-          department: prof?.department_id ? deptName.get(prof.department_id) ?? null : null,
-          position_id: prof?.position_id ?? null,
-          position: prof?.position_id ? posName.get(prof.position_id) ?? null : null,
-          manager_id: prof?.manager_id ?? null,
-          employment_status: prof?.employment_status ?? null,
-          hire_date: prof?.hire_date ?? null,
-          termination_date: prof?.termination_date ?? null,
-          worker_type: prof?.worker_type ?? null
-        };
-      })
-    };
+    let rows = (parties ?? []).map((p) => {
+      const prof = byParty.get(p.id);
+      return {
+        party_id: p.id,
+        linked_user_id: p.linked_user_id ?? null,
+        name_en: p.name_en,
+        contact_email: p.contact_email,
+        contact_phone: p.contact_phone,
+        active: p.active,
+        department_id: prof?.department_id ?? null,
+        department: prof?.department_id ? deptName.get(prof.department_id) ?? null : null,
+        position_id: prof?.position_id ?? null,
+        position: prof?.position_id ? posName.get(prof.position_id) ?? null : null,
+        manager_id: prof?.manager_id ?? null,
+        employment_status: prof?.employment_status ?? null,
+        hire_date: prof?.hire_date ?? null,
+        termination_date: prof?.termination_date ?? null,
+        worker_type: prof?.worker_type ?? "employee"
+      };
+    });
+    if (data.worker_type) {
+      rows = rows.filter((r) => r.worker_type === data.worker_type);
+    }
+    return { rows };
   });
 }
 function createGetEmployeeDirectoryEntry(deps) {

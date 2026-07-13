@@ -278,6 +278,13 @@
     "edit_position": "Edit position",
     "position_name": "Name",
     "no_positions": "No positions in this department yet.",
-    "confirm_delete": "Delete this?"
+    "confirm_delete": "Delete this?",
+    "title_employee": "Employees",
+    "title_contractor": "Contractors",
+    "desc_employee": "People on payroll, shared across JoaSuite apps.",
+    "desc_contractor": "External contractors and vendors, shared across JoaSuite apps.",
+    "add_employee": "Add employee",
+    "add_contractor": "Add contractor",
+    "team_group": "Team"
   }
 }

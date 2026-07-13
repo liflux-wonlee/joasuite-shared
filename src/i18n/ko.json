@@ -275,6 +275,13 @@
     "edit_position": "직급 편집",
     "position_name": "이름",
     "no_positions": "이 부서에는 아직 직급이 없습니다.",
-    "confirm_delete": "삭제할까요?"
+    "confirm_delete": "삭제할까요?",
+    "title_employee": "직원",
+    "title_contractor": "협력업체",
+    "desc_employee": "급여 대상 직원 목록 — 모든 JoaSuite 앱에서 공유됩니다.",
+    "desc_contractor": "외부 협력업체 및 벤더 목록 — 모든 JoaSuite 앱에서 공유됩니다.",
+    "add_employee": "직원 추가",
+    "add_contractor": "협력업체 추가",
+    "team_group": "팀"
   }
 }

@@ -263,6 +263,13 @@
     "edit_position": "Editar puesto",
     "position_name": "Nombre",
     "no_positions": "Este departamento aún no tiene puestos.",
-    "confirm_delete": "¿Eliminar esto?"
+    "confirm_delete": "¿Eliminar esto?",
+    "title_employee": "Empleados",
+    "title_contractor": "Contratistas",
+    "desc_employee": "Personas en nómina, compartidas entre las apps de JoaSuite.",
+    "desc_contractor": "Contratistas y proveedores externos, compartidos entre las apps de JoaSuite.",
+    "add_employee": "Agregar empleado",
+    "add_contractor": "Agregar contratista",
+    "team_group": "Equipo"
   }
 }
