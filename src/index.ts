@@ -37,5 +37,17 @@ export { EmployeeDirectoryListPage } from "./components/employees/EmployeeDirect
 export { EmployeeProfileForm } from "./components/employees/EmployeeProfileForm";
 export { OrgStructureSettingsPage } from "./components/org-structure/OrgStructureSettingsPage";
 
+// Billing (organization-scoped; identical across every JoaSuite app)
+export { BillingLayout } from "./components/billing/BillingLayout";
+export { BillingOverviewPage } from "./components/billing/BillingOverviewPage";
+export { PlansSection } from "./components/billing/PlansSection";
+export { BillingPaymentMethodsPage } from "./components/billing/BillingPaymentMethodsPage";
+export { BillingInvoicesPage } from "./components/billing/BillingInvoicesPage";
+export { BillingDiscountsPage } from "./components/billing/BillingDiscountsPage";
+export { BillingReferralsPage } from "./components/billing/BillingReferralsPage";
+export { BillingUsagePage } from "./components/billing/BillingUsagePage";
+export { BillingDetailsPage } from "./components/billing/BillingDetailsPage";
+export { BillingComparePage } from "./components/billing/BillingComparePage";
+
 // Hooks
 export { useOrgScope } from "./hooks/useOrgScope";

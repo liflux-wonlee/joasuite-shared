@@ -1,5 +1,5 @@
-import { A as AppCode } from './constants-Bws7KgDt.js';
-export { a as APP_CODES, b as APP_DISPLAY, D as DEFAULT_APP_URLS, R as ROLES_BY_APP, S as SETTINGS_KV_APP_URL_KEYS } from './constants-Bws7KgDt.js';
+import { A as AppCode } from './constants-B39zophS.js';
+export { a as APP_CODES, b as APP_DISPLAY, D as DEFAULT_APP_URLS, R as ROLES_BY_APP, S as SETTINGS_KV_APP_URL_KEYS } from './constants-B39zophS.js';
 import * as react from 'react';
 import { ComponentType, ReactNode } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';
@@ -205,6 +205,7 @@ type UiAdapter = {
     SelectValue: ComponentType<any>;
     Dialog: ComponentType<any>;
     DialogContent: ComponentType<any>;
+    DialogDescription: ComponentType<any>;
     DialogFooter: ComponentType<any>;
     DialogHeader: ComponentType<any>;
     DialogTitle: ComponentType<any>;
@@ -213,6 +214,7 @@ type UiAdapter = {
     TabsList: ComponentType<any>;
     TabsTrigger: ComponentType<any>;
     TabsContent: ComponentType<any>;
+    Textarea: ComponentType<any>;
     EmailInput: ComponentType<any>;
 };
 /**
@@ -226,6 +228,8 @@ type RouterAdapter = {
         to: string;
         params?: Record<string, string>;
     }) => void;
+    /** Current location pathname, for active-tab/nav highlighting in layout-style components. */
+    usePathname: () => string;
 };
 /**
  * Bound server function. The host app exports a `useServerFn`-wrapped
@@ -347,6 +351,121 @@ type BoundServerFns = {
         tenant_id: string;
         id: string;
     }) => Promise<any>;
+    canManageBillingFn: (input: {
+        tenant_id: string;
+    }) => Promise<{
+        can_manage: boolean;
+        can_view: boolean;
+        roles: string[];
+    }>;
+    getBillingOverview: (input: {
+        tenant_id: string;
+    }) => Promise<any>;
+    updateBillingCustomer: (input: any) => Promise<any>;
+    listBillingPlans: (input?: {
+        app_code?: string;
+        interval?: "month" | "year";
+    }) => Promise<any[]>;
+    changeSubscriptionPlan: (input: {
+        tenant_id: string;
+        app_code: string;
+        plan_code: string;
+        interval?: "month" | "year";
+        seats?: number;
+    }) => Promise<any>;
+    cancelSubscription: (input: {
+        tenant_id: string;
+        app_code: string;
+        at_period_end?: boolean;
+    }) => Promise<any>;
+    listBillingInvoices: (input: {
+        tenant_id: string;
+        limit?: number;
+    }) => Promise<any[]>;
+    getBillingInvoice: (input: {
+        tenant_id: string;
+        id: string;
+    }) => Promise<any>;
+    retryInvoicePayment: (input: {
+        tenant_id: string;
+        id: string;
+    }) => Promise<any>;
+    seedSampleBillingInvoices: (input: {
+        tenant_id: string;
+    }) => Promise<any>;
+    listBillingPaymentMethods: (input: {
+        tenant_id: string;
+    }) => Promise<any[]>;
+    addMockPaymentMethod: (input: {
+        tenant_id: string;
+        brand: string;
+        last4: string;
+        exp_month: number;
+        exp_year: number;
+        make_default?: boolean;
+    }) => Promise<any>;
+    setDefaultPaymentMethod: (input: {
+        tenant_id: string;
+        id: string;
+    }) => Promise<any>;
+    removePaymentMethod: (input: {
+        tenant_id: string;
+        id: string;
+    }) => Promise<any>;
+    startTrial: (input: {
+        tenant_id: string;
+        app_code: string;
+        plan_code?: string;
+        interval?: "month" | "year";
+        trial_days?: number;
+    }) => Promise<any>;
+    reactivateSubscription: (input: {
+        tenant_id: string;
+        app_code: string;
+    }) => Promise<any>;
+    addAppSubscription: (input: {
+        tenant_id: string;
+        app_code: string;
+        plan_code?: string;
+        interval?: "month" | "year";
+    }) => Promise<any>;
+    removeAppSubscription: (input: {
+        tenant_id: string;
+        app_code: string;
+    }) => Promise<any>;
+    listAvailablePromotions: (input: {
+        tenant_id: string;
+    }) => Promise<any[]>;
+    listTenantDiscounts: (input: {
+        tenant_id: string;
+    }) => Promise<any[]>;
+    redeemPromoCode: (input: {
+        tenant_id: string;
+        code: string;
+    }) => Promise<any>;
+    removeTenantDiscount: (input: {
+        tenant_id: string;
+        discount_id: string;
+    }) => Promise<any>;
+    getReferralProgram: (input: {
+        tenant_id: string;
+    }) => Promise<any>;
+    addMockReferral: (input: {
+        tenant_id: string;
+        referee_email: string;
+        referee_org_name?: string;
+        status?: "pending" | "signed_up" | "subscribed";
+    }) => Promise<any>;
+    updateReferralStatus: (input: {
+        tenant_id: string;
+        referral_id: string;
+        status: "pending" | "signed_up" | "subscribed" | "canceled";
+    }) => Promise<any>;
+    getTenantUsage: (input: {
+        tenant_id: string;
+        app_code?: string;
+    }) => Promise<any>;
+    listActiveBundleRules: () => Promise<any[]>;
 };
 type JoaSuiteContextValue = {
     /** The current host app's canonical code. */
@@ -482,6 +601,37 @@ declare function OrgStructureSettingsPage({ tenantId }: {
     tenantId: string;
 }): react.JSX.Element;
 
+declare function BillingLayout({ children }: {
+    children: React.ReactNode;
+}): react.JSX.Element;
+
+declare function BillingOverviewPage(): react.JSX.Element | null;
+
+declare function PlansSection(): react.JSX.Element;
+
+declare function BillingPaymentMethodsPage(): react.JSX.Element;
+
+declare function BillingInvoicesPage(): react.JSX.Element;
+
+declare function BillingDiscountsPage(): react.JSX.Element;
+
+declare function BillingReferralsPage(): react.JSX.Element;
+
+declare function BillingUsagePage(): react.JSX.Element;
+
+declare function BillingDetailsPage(): react.JSX.Element;
+
+/**
+ * Plan comparison for a single app. `appCode` is supplied by the host route
+ * file's own `validateSearch` (each app's `/app/account/billing/compare`
+ * route reads its own typed `app` search param and passes it down) —
+ * this component can't call `useSearch()` itself since that hook is typed
+ * to the host's own route tree.
+ */
+declare function BillingComparePage({ appCode }: {
+    appCode: string;
+}): react.JSX.Element;
+
 /**
  * Local "which organizations am I looking at" state for a screen that wants
  * an org-scope selector (Dashboard, JoaSuite Home). Defaults to the user's
@@ -491,4 +641,4 @@ declare function OrgStructureSettingsPage({ tenantId }: {
  */
 declare function useOrgScope(): [string[], (tenantIds: string[]) => void];
 
-export { type AppCatalogEntry, AppCode, AppOverviewSection, AppSubscriptionsSummary, type AppSummaryTile, type ApprovalSummary, type AuthState, type BoundServerFns, type Department, EmployeeDirectoryListPage, type EmployeeDirectoryRow, EmployeeProfileForm, type EmployeeProfileInput, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, type Position, type RouterAdapter, SUPPORTED_LANGUAGES, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
+export { type AppCatalogEntry, AppCode, AppOverviewSection, AppSubscriptionsSummary, type AppSummaryTile, type ApprovalSummary, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type Department, EmployeeDirectoryListPage, type EmployeeDirectoryRow, EmployeeProfileForm, type EmployeeProfileInput, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, type RouterAdapter, SUPPORTED_LANGUAGES, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };

@@ -1,25 +1,27 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
-import { Moon, Sun, Globe, User, Shield, Briefcase, CreditCard, LogOut, Bell, Check, Layers, Home, ChevronDown, FileText, Users, ClipboardCheck, BookOpen, Lock, Settings2, ScrollText, Building2, LayoutGrid, AlertCircle, Inbox, Send, ArrowRight, ExternalLink, Contact2, Link, AppWindow, Plus, Search, MoreHorizontal, Mail, KeyRound, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
+import { Moon, Sun, Globe, User, Shield, Briefcase, CreditCard, LogOut, Bell, Check, Layers, Home, ChevronDown, UserCog, FileText, Users, ClipboardCheck, BookOpen, Lock, Settings2, ScrollText, Building2, LayoutGrid, AlertCircle, Inbox, Send, ArrowRight, ExternalLink, Contact2, Link, AppWindow, Plus, Search, MoreHorizontal, Mail, KeyRound, ArrowLeft, Pencil, Trash2, CalendarClock, Zap, AlertTriangle, Sparkles, Clock, RefreshCw, XCircle, GitCompare, ShieldAlert, Package, Gift, Receipt, Landmark, Star, Eye, Download, RefreshCcw, Ticket, Tag, DollarSign, Copy, ArrowUpRight, Activity, Info, ArrowUp, ArrowDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 // src/constants.ts
-var APP_CODES = ["joabooks", "joaapproval", "joacrm", "joaoffice", "joasop"];
+var APP_CODES = ["joabooks", "joaapproval", "joacrm", "joaoffice", "joasop", "joahr"];
 var APP_DISPLAY = [
   { code: "joabooks", name: "JoaBooks", description: "Finance \u2014 AP, AR, expenses, ledger" },
   { code: "joaapproval", name: "JoaApproval", description: "Cross-app approval inbox" },
   { code: "joacrm", name: "JoaCRM", description: "Customer relationships" },
   { code: "joaoffice", name: "JoaOffice", description: "Admin, assets, contracts" },
-  { code: "joasop", name: "JoaSOP", description: "Policies, SOPs, training" }
+  { code: "joasop", name: "JoaSOP", description: "Policies, SOPs, training" },
+  { code: "joahr", name: "JoaHR", description: "HR \u2014 people, time off, org chart" }
 ];
 var DEFAULT_APP_URLS = {
   joabooks: "https://books.joasuite.com",
   joaapproval: "https://approval.joasuite.com",
   joacrm: "https://crm.joasuite.com",
   joaoffice: "https://office.joasuite.com",
-  joasop: "https://sop.joasuite.com"
+  joasop: "https://sop.joasuite.com",
+  joahr: "https://hr.joasuite.com"
 };
 var ROLES_BY_APP = {
   joabooks: [
@@ -35,7 +37,8 @@ var ROLES_BY_APP = {
   joasop: ["sop_admin", "sop_author", "sop_reviewer", "sop_operator"],
   joaoffice: ["owner", "super_admin", "approver"],
   joaapproval: ["owner", "super_admin", "approver"],
-  joacrm: ["owner", "super_admin", "approver"]
+  joacrm: ["owner", "super_admin", "approver"],
+  joahr: ["owner", "super_admin", "approver"]
 };
 var SETTINGS_KV_APP_URL_KEYS = APP_CODES.map((c) => `app_url.${c}`);
 var JoaSuiteContext = createContext(null);
@@ -1704,7 +1707,8 @@ var APP_ICONS = {
   joaapproval: ClipboardCheck,
   joacrm: Users,
   joaoffice: Briefcase,
-  joasop: FileText
+  joasop: FileText,
+  joahr: UserCog
 };
 function SuiteSwitcher() {
   const { t } = useTranslation();
@@ -2141,7 +2145,8 @@ var APP_ICONS2 = {
   joaapproval: ClipboardCheck,
   joacrm: Users,
   joaoffice: Briefcase,
-  joasop: FileText
+  joasop: FileText,
+  joahr: UserCog
 };
 function planBadgeStyle(plan) {
   const p = (plan ?? "").toLowerCase();
@@ -2728,6 +2733,7 @@ function UserInvitePage() {
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [position, setPosition] = useState("");
   const [orgIds, setOrgIds] = useState([]);
   const [primaryTenantId, setPrimaryTenantId] = useState("");
   const [preset, setPreset] = useState("custom");
@@ -2795,6 +2801,7 @@ function UserInvitePage() {
       return fns.inviteUserToWorkspaces({
         email,
         display_name: displayName,
+        position: position.trim() || void 0,
         primary_tenant_id: primaryTenantId || void 0,
         assignments
       });
@@ -2864,6 +2871,17 @@ function UserInvitePage() {
             " *"
           ] }),
           /* @__PURE__ */ jsx(Input, { value: displayName, onChange: (e) => setDisplayName(e.target.value) })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { children: [
+          /* @__PURE__ */ jsx(Label, { children: t("users.position", "Position / Title") }),
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              value: position,
+              onChange: (e) => setPosition(e.target.value),
+              placeholder: t("users.position_placeholder", "e.g. Accountant, Operations Manager")
+            }
+          )
         ] })
       ] }),
       step === 2 && /* @__PURE__ */ jsxs("div", { className: "space-y-3", children: [
@@ -3059,6 +3077,7 @@ function UserDetailPage({ userId }) {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
+  const [editPosition, setEditPosition] = useState("");
   const [addOrgOpen, setAddOrgOpen] = useState(false);
   const [addTenantId, setAddTenantId] = useState("");
   const [addApps, setAddApps] = useState({});
@@ -3066,6 +3085,7 @@ function UserDetailPage({ userId }) {
     if (!user) return;
     setEditName(user.display_name ?? "");
     setEditEmail(user.email ?? "");
+    setEditPosition(user.position ?? "");
     setEditing(true);
   };
   const updateProfile = useMutation({
@@ -3158,6 +3178,7 @@ function UserDetailPage({ userId }) {
       /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
         /* @__PURE__ */ jsx("h1", { className: "text-2xl font-semibold", children: user.display_name ?? user.email ?? "\u2014" }),
         /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: user.email }),
+        user.position && /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: user.position }),
         /* @__PURE__ */ jsxs("div", { className: "text-xs text-muted-foreground mt-2", children: [
           t("users.joined", "Joined"),
           ": ",
@@ -3230,9 +3251,11 @@ function UserDetailPage({ userId }) {
           const tn = tenantById.get(a.tenant_id);
           if (!tn) return null;
           const subscribedCodes = tn.app_codes ?? [];
-          const allCodes = Array.from(
-            /* @__PURE__ */ new Set([...subscribedCodes, ...Object.keys(a.apps)])
-          ).sort();
+          const merged = /* @__PURE__ */ new Set([...APP_CODES, ...subscribedCodes, ...Object.keys(a.apps)]);
+          const allCodes = [
+            ...APP_CODES.filter((c) => merged.has(c)),
+            ...Array.from(merged).filter((c) => !APP_CODES.includes(c)).sort()
+          ];
           const isOwner = Object.values(a.apps).some((v) => v.roles.includes("owner"));
           return /* @__PURE__ */ jsxs(TabsContent, { value: a.tenant_id, className: "p-4 pt-2 space-y-4", children: [
             /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-center gap-2 text-xs text-muted-foreground", children: [
@@ -3283,7 +3306,11 @@ function UserDetailPage({ userId }) {
                   return /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-3 p-3", children: [
                     /* @__PURE__ */ jsx(Badge, { variant: subscribed ? "default" : "outline", className: "w-20 justify-center uppercase text-[10px]", children: code }),
                     subscribed ? /* @__PURE__ */ jsx(Badge, { variant: "secondary", className: "text-[10px] capitalize", children: plan ?? "\u2014" }) : /* @__PURE__ */ jsx(Badge, { variant: "outline", className: "text-[10px]", children: t("users.not_subscribed", "Not subscribed") }),
-                    /* @__PURE__ */ jsx("div", { className: "flex-1", children: !subscribed ? /* @__PURE__ */ jsx("span", { className: "text-xs text-muted-foreground", children: t("users.org_not_subscribed_hint", "Organization is not subscribed to this app. Subscribe in Suite settings to assign roles.") }) : /* @__PURE__ */ jsxs(
+                    /* @__PURE__ */ jsx("div", { className: "flex-1", children: !subscribed ? /* @__PURE__ */ jsxs("span", { className: "text-xs text-muted-foreground", children: [
+                      t("users.org_not_subscribed_hint", "Organization is not subscribed to this app. Subscribe in Suite settings to assign roles."),
+                      " ",
+                      /* @__PURE__ */ jsx(Link, { to: "/app/suite", className: "underline text-primary", children: t("users.go_to_suite", "Open Suite settings") })
+                    ] }) : /* @__PURE__ */ jsxs(
                       Select,
                       {
                         value: hasAccess ? currentRole : "__none__",
@@ -3320,6 +3347,17 @@ function UserDetailPage({ userId }) {
         /* @__PURE__ */ jsxs("div", { children: [
           /* @__PURE__ */ jsx(Label, { children: t("common.email") }),
           /* @__PURE__ */ jsx(EmailInput, { value: editEmail, onChange: (e) => setEditEmail(e.target.value) })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { children: [
+          /* @__PURE__ */ jsx(Label, { children: t("users.position", "Position / Title") }),
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              value: editPosition,
+              onChange: (e) => setEditPosition(e.target.value),
+              placeholder: t("users.position_placeholder", "e.g. Accountant, Operations Manager")
+            }
+          )
         ] })
       ] }),
       /* @__PURE__ */ jsxs(DialogFooter, { children: [
@@ -3330,7 +3368,8 @@ function UserDetailPage({ userId }) {
             onClick: () => {
               const payload = {
                 user_id: user.user_id,
-                display_name: editName.trim()
+                display_name: editName.trim(),
+                position: editPosition.trim() ? editPosition.trim() : null
               };
               if (editEmail && editEmail !== user.email) payload.email = editEmail.trim();
               updateProfile.mutate(payload);
@@ -3911,7 +3950,1911 @@ function OrgStructureSettingsPage({ tenantId }) {
     ) }) })
   ] });
 }
+var TABS = [
+  { to: "/app/account/billing", key: "plans", exact: true, activeBg: "#FDE8E8", activeFg: "#9B1C1C" },
+  { to: "/app/account/billing/payment-methods", key: "payment_methods", activeBg: "#DCFCE7", activeFg: "#166534" },
+  { to: "/app/account/billing/invoices", key: "invoices", activeBg: "#DBEAFE", activeFg: "#1E40AF" },
+  { to: "/app/account/billing/discounts", key: "discounts", activeBg: "#FCE7F3", activeFg: "#9D174D" },
+  { to: "/app/account/billing/referrals", key: "referrals", activeBg: "#EDE9FE", activeFg: "#5B21B6" },
+  { to: "/app/account/billing/usage", key: "usage", activeBg: "#CFFAFE", activeFg: "#155E75" },
+  { to: "/app/account/billing/details", key: "details", activeBg: "#FFEDD5", activeFg: "#9A3412" }
+];
+var STATUS_TONE = {
+  active: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30",
+  trialing: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30",
+  past_due: "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30",
+  canceled: "bg-muted text-muted-foreground border-border",
+  inactive: "bg-muted text-muted-foreground border-border",
+  incomplete: "bg-amber-500/15 text-amber-800 dark:text-amber-300 border-amber-500/30"
+};
+function rollupStatus(subs) {
+  if (!subs.length) return "inactive";
+  const set = new Set(subs.map((s) => s.status));
+  if (set.has("past_due")) return "past_due";
+  if (set.has("active")) return "active";
+  if (set.has("trialing")) return "trialing";
+  if (set.has("canceled")) return "canceled";
+  return "inactive";
+}
+function fmtMoney(cents, currency = "usd") {
+  return new Intl.NumberFormat(void 0, {
+    style: "currency",
+    currency: currency.toUpperCase()
+  }).format((cents ?? 0) / 100);
+}
+function fmtDate(iso) {
+  if (!iso) return "\u2014";
+  return new Date(iso).toLocaleDateString(void 0, {
+    year: "numeric",
+    month: "long",
+    day: "numeric"
+  });
+}
+function BillingLayout({ children }) {
+  const { t } = useTranslation();
+  const { useAuth, router, fns } = useJoaSuite();
+  const { currentTenantId, currentMembership } = useAuth();
+  const { Link, useNavigate, usePathname } = router;
+  const nav = useNavigate();
+  const path = usePathname();
+  const { data: perm, isLoading } = useQuery({
+    queryKey: ["billing-perm", currentTenantId],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.canManageBillingFn({ tenant_id: currentTenantId })
+  });
+  const overviewQ = useQuery({
+    queryKey: ["billing-overview", currentTenantId],
+    enabled: !!currentTenantId && !!perm?.can_view,
+    queryFn: () => fns.getBillingOverview({ tenant_id: currentTenantId })
+  });
+  const bundleRulesQ = useQuery({
+    queryKey: ["billing-bundle-rules"],
+    enabled: !!perm?.can_view,
+    queryFn: () => fns.listActiveBundleRules()
+  });
+  useEffect(() => {
+    if (!isLoading && perm && !perm.can_view) {
+      nav({ to: "/app/account" });
+    }
+  }, [isLoading, perm, nav]);
+  const summary = useMemo(() => {
+    const data = overviewQ.data;
+    const subs = data?.subscriptions ?? [];
+    const status2 = rollupStatus(subs);
+    const nextEnd2 = subs.map((s) => s.current_period_end).filter(Boolean).sort()[0];
+    const paidApps = subs.filter((s) => s.plan_code && s.plan_code !== "free");
+    const rules = bundleRulesQ.data ?? [];
+    const matchingRule = rules.filter((r) => paidApps.length >= r.minimum_active_apps).sort((a, b) => Number(b.discount_percent) - Number(a.discount_percent))[0];
+    const discountPct = matchingRule ? Number(matchingRule.discount_percent) : 0;
+    const subtotalCents = data?.next_invoice_estimate_cents ?? 0;
+    const discountCents2 = Math.round(subtotalCents * (discountPct / 100));
+    const totalCents2 = Math.max(0, subtotalCents - discountCents2);
+    const trialing = subs.filter((s) => s.status === "trialing" && s.trial_end);
+    const soonestTrialEnd = trialing.map((s) => s.trial_end).filter(Boolean).sort()[0];
+    const trialDaysLeft2 = soonestTrialEnd ? Math.ceil((new Date(soonestTrialEnd).getTime() - Date.now()) / 864e5) : null;
+    return { data, status: status2, nextEnd: nextEnd2, totalCents: totalCents2, discountCents: discountCents2, trialDaysLeft: trialDaysLeft2 };
+  }, [overviewQ.data, bundleRulesQ.data]);
+  if (!currentTenantId) {
+    return /* @__PURE__ */ jsx("div", { className: "text-muted-foreground", children: t("common.loading") });
+  }
+  if (isLoading) return /* @__PURE__ */ jsx("div", { className: "text-muted-foreground", children: t("common.loading") });
+  if (!perm?.can_view) {
+    return /* @__PURE__ */ jsx("div", { className: "border rounded-lg p-6 text-sm text-muted-foreground", children: t("billing.no_access", "You don't have permission to view billing for this organization.") });
+  }
+  const orgName = summary.data?.tenant?.name ?? currentMembership?.tenant_name ?? "";
+  const { status, nextEnd, totalCents, discountCents, trialDaysLeft } = summary;
+  const pm = summary.data?.default_payment_method;
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-5", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap items-start justify-between gap-4", children: [
+      /* @__PURE__ */ jsxs("div", { children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground", children: [
+          /* @__PURE__ */ jsx(Building2, { className: "h-3.5 w-3.5" }),
+          t("billing.org_billing", "Organization Billing")
+        ] }),
+        /* @__PURE__ */ jsxs("h2", { className: "text-xl font-semibold mt-1", children: [
+          t("billing.title_for", "Billing for"),
+          " ",
+          orgName
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "mt-2 flex items-center gap-2", children: [
+          /* @__PURE__ */ jsxs("span", { className: "text-xs text-muted-foreground", children: [
+            t("billing.status", "Status"),
+            ":"
+          ] }),
+          /* @__PURE__ */ jsx("span", { className: `text-[11px] font-semibold uppercase px-2 py-0.5 rounded border ${STATUS_TONE[status]}`, children: t(`billing.status_${status}`, status.replace("_", " ")) })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "text-right", children: [
+        /* @__PURE__ */ jsx("div", { className: "text-xs text-muted-foreground", children: t("billing.estimated_monthly_total", "Estimated Monthly Total") }),
+        /* @__PURE__ */ jsx("div", { className: "text-2xl font-semibold", children: fmtMoney(totalCents) }),
+        discountCents > 0 && /* @__PURE__ */ jsxs("div", { className: "text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5", children: [
+          "\u2212",
+          fmtMoney(discountCents),
+          " ",
+          t("billing.discount_applied", "discount applied")
+        ] })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3", children: [
+      /* @__PURE__ */ jsxs("div", { className: "border rounded-lg bg-card p-4", children: [
+        /* @__PURE__ */ jsxs("div", { className: "text-xs text-muted-foreground flex items-center gap-1.5", children: [
+          /* @__PURE__ */ jsx(CalendarClock, { className: "h-3.5 w-3.5" }),
+          t("billing.next_payment_date", "Next Payment Date")
+        ] }),
+        /* @__PURE__ */ jsx("div", { className: "mt-1 font-medium", children: fmtDate(nextEnd) })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "border rounded-lg bg-card p-4", children: [
+        /* @__PURE__ */ jsxs("div", { className: "text-xs text-muted-foreground flex items-center gap-1.5", children: [
+          /* @__PURE__ */ jsx(CreditCard, { className: "h-3.5 w-3.5" }),
+          t("billing.payment_method", "Payment Method")
+        ] }),
+        /* @__PURE__ */ jsx("div", { className: "mt-1 font-medium", children: pm ? /* @__PURE__ */ jsxs("span", { className: "capitalize", children: [
+          pm.brand,
+          " \u2022\u2022\u2022\u2022 ",
+          pm.last4
+        ] }) : /* @__PURE__ */ jsx("span", { className: "text-muted-foreground", children: t("billing.not_connected_yet", "Not connected yet") }) })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "border rounded-lg bg-card p-4", children: [
+        /* @__PURE__ */ jsxs("div", { className: "text-xs text-muted-foreground flex items-center gap-1.5", children: [
+          /* @__PURE__ */ jsx(Zap, { className: "h-3.5 w-3.5" }),
+          t("billing.trial_status", "Trial Status")
+        ] }),
+        /* @__PURE__ */ jsx("div", { className: "mt-1 font-medium", children: trialDaysLeft === null ? t("billing.no_trial", "No active trial") : trialDaysLeft > 0 ? t("billing.trial_days_left", "{{days}} days left", { days: trialDaysLeft }) : t("billing.trial_ended", "Trial ended") })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 px-3 py-2 text-xs flex items-start gap-2", children: [
+      /* @__PURE__ */ jsx(AlertTriangle, { className: "h-4 w-4 mt-0.5 shrink-0" }),
+      /* @__PURE__ */ jsx("span", { children: t(
+        "billing.mock_banner",
+        "Stripe is not connected yet \u2014 plan changes and payment methods on this page are simulated for preview."
+      ) })
+    ] }),
+    /* @__PURE__ */ jsx("nav", { className: "flex flex-wrap gap-1 border-b", children: TABS.map((tab) => {
+      const active = tab.exact ? path === tab.to : path.startsWith(tab.to);
+      return /* @__PURE__ */ jsx(
+        Link,
+        {
+          to: tab.to,
+          className: `px-3 py-2 text-sm rounded-t-md border-b-2 -mb-px transition-colors ${active ? "font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`,
+          style: active ? { backgroundColor: tab.activeBg, color: tab.activeFg, borderBottomColor: tab.activeFg } : void 0,
+          children: t(`billing.tab.${tab.key}`)
+        },
+        tab.key
+      );
+    }) }),
+    children
+  ] });
+}
+var APPS = APP_DISPLAY.map((a) => ({
+  code: a.code,
+  name: a.name,
+  description: a.description,
+  removable: a.code !== "joabooks"
+}));
+var PLAN_BADGE_STYLE = {
+  basic: { backgroundColor: "#DEE545", color: "#1a1a1a" },
+  pro: { backgroundColor: "#E56F3F", color: "#ffffff" },
+  business: { backgroundColor: "#454545", color: "#ffffff" },
+  enterprise: { backgroundColor: "#454545", color: "#ffffff" }
+};
+function planBadgeStyle2(plan) {
+  if (!plan) return void 0;
+  return PLAN_BADGE_STYLE[plan.toLowerCase()];
+}
+function fmtMoney2(cents) {
+  return new Intl.NumberFormat(void 0, { style: "currency", currency: "USD" }).format((cents ?? 0) / 100);
+}
+function fmtDate2(iso) {
+  if (!iso) return "\u2014";
+  return new Date(iso).toLocaleDateString(void 0, { year: "numeric", month: "short", day: "numeric" });
+}
+function PlansSection() {
+  const { t } = useTranslation();
+  const { useAuth, ui, router, fns } = useJoaSuite();
+  const { currentTenantId } = useAuth();
+  const { Link, Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, Button } = ui;
+  const qc = useQueryClient();
+  const [changeFor, setChangeFor] = useState(null);
+  const plansQ = useQuery({ queryKey: ["billing-plans", "all"], queryFn: () => fns.listBillingPlans() });
+  const overviewQ = useQuery({
+    queryKey: ["billing-overview", currentTenantId],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.getBillingOverview({ tenant_id: currentTenantId })
+  });
+  const permQ = useQuery({
+    queryKey: ["billing-perm", currentTenantId],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.canManageBillingFn({ tenant_id: currentTenantId })
+  });
+  const canManage = !!permQ.data?.can_manage;
+  const subByApp = useMemo(() => {
+    const m = /* @__PURE__ */ new Map();
+    (overviewQ.data?.subscriptions ?? []).forEach((s) => m.set(s.app_code, s));
+    return m;
+  }, [overviewQ.data]);
+  const plansByApp = useMemo(() => {
+    const m = /* @__PURE__ */ new Map();
+    (plansQ.data ?? []).forEach((p) => {
+      const arr = m.get(p.app_code) ?? [];
+      arr.push(p);
+      m.set(p.app_code, arr);
+    });
+    return m;
+  }, [plansQ.data]);
+  function invalidate() {
+    qc.invalidateQueries({ queryKey: ["billing-overview"] });
+  }
+  const wrap = (fn, successMsg) => useMutation({
+    mutationFn: fn,
+    onSuccess: () => {
+      toast.success(successMsg);
+      invalidate();
+    },
+    onError: (e) => toast.error(e.message)
+  });
+  const mChange = wrap(
+    (input) => fns.changeSubscriptionPlan({ tenant_id: currentTenantId, app_code: input.app_code, plan_code: input.plan_code, interval: input.interval, seats: 1 }),
+    t("billing.plan_change_success", "Plan updated (simulated)")
+  );
+  const mCancel = wrap(
+    (input) => fns.cancelSubscription({ tenant_id: currentTenantId, app_code: input.app_code, at_period_end: true }),
+    t("billing.cancel_success", "Will cancel at period end (simulated)")
+  );
+  const mReactivate = wrap(
+    (input) => fns.reactivateSubscription({ tenant_id: currentTenantId, app_code: input.app_code }),
+    t("billing.reactivate_success", "Subscription reactivated (simulated)")
+  );
+  const mTrial = wrap(
+    (input) => fns.startTrial({ tenant_id: currentTenantId, app_code: input.app_code, plan_code: "pro", interval: "month", trial_days: 14 }),
+    t("billing.trial_started", "14-day trial started (simulated)")
+  );
+  const mAdd = wrap(
+    (input) => fns.addAppSubscription({ tenant_id: currentTenantId, app_code: input.app_code, plan_code: "basic", interval: "month" }),
+    t("billing.app_added", "App added (simulated)")
+  );
+  const mRemove = wrap(
+    (input) => fns.removeAppSubscription({ tenant_id: currentTenantId, app_code: input.app_code }),
+    t("billing.app_removed", "App removed (simulated)")
+  );
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-4", children: [
+    /* @__PURE__ */ jsxs("div", { className: "rounded-md border border-blue-500/40 bg-blue-500/10 text-blue-900 dark:text-blue-200 px-3 py-2 text-xs flex items-start gap-2", children: [
+      /* @__PURE__ */ jsx(Sparkles, { className: "h-4 w-4 mt-0.5 shrink-0" }),
+      /* @__PURE__ */ jsx("span", { children: t("billing.stripe_future", "Stripe payment will be connected in a future phase. All actions on this page update local data only.") })
+    ] }),
+    /* @__PURE__ */ jsx("div", { className: "hidden md:block border rounded-lg bg-card overflow-hidden", children: /* @__PURE__ */ jsxs("table", { className: "w-full text-sm", children: [
+      /* @__PURE__ */ jsx("thead", { children: /* @__PURE__ */ jsxs("tr", { className: "border-b bg-muted/50", children: [
+        /* @__PURE__ */ jsx("th", { className: "text-left px-4 py-2.5 font-medium text-muted-foreground", children: t("billing.app", "App") }),
+        /* @__PURE__ */ jsx("th", { className: "text-left px-4 py-2.5 font-medium text-muted-foreground", children: t("billing.current_plan", "Plan") }),
+        /* @__PURE__ */ jsx("th", { className: "text-right px-4 py-2.5 font-medium text-muted-foreground", children: t("billing.monthly", "Monthly") }),
+        /* @__PURE__ */ jsx("th", { className: "text-right px-4 py-2.5 font-medium text-muted-foreground", children: t("billing.yearly", "Yearly") }),
+        /* @__PURE__ */ jsx("th", { className: "text-left px-4 py-2.5 font-medium text-muted-foreground", children: t("billing.status", "Status") }),
+        /* @__PURE__ */ jsx("th", { className: "text-right px-4 py-2.5 font-medium text-muted-foreground", children: t("billing.actions", "Actions") })
+      ] }) }),
+      /* @__PURE__ */ jsx("tbody", { className: "divide-y", children: APPS.map((app) => {
+        const sub = subByApp.get(app.code);
+        const plans = plansByApp.get(app.code) ?? [];
+        const status = sub?.status ?? "inactive";
+        const currentPlan = sub?.plan_code ?? "\u2014";
+        const currentInterval = sub?.interval ?? "month";
+        const monthly = plans.find((p) => p.plan_code === currentPlan && p.interval === "month");
+        const yearly = plans.find((p) => p.plan_code === currentPlan && p.interval === "year");
+        const isTrialing = status === "trialing";
+        const isCanceled = status === "canceled" || sub?.cancel_at_period_end;
+        const hasSub = !!sub && !sub.synthetic && status !== "inactive";
+        return /* @__PURE__ */ jsxs("tr", { className: "hover:bg-muted/30", children: [
+          /* @__PURE__ */ jsxs("td", { className: "px-4 py-3 align-top", children: [
+            /* @__PURE__ */ jsx("div", { className: "font-medium", children: app.name }),
+            /* @__PURE__ */ jsx("div", { className: "text-xs text-muted-foreground", children: app.description })
+          ] }),
+          /* @__PURE__ */ jsx("td", { className: "px-4 py-3 align-top", children: /* @__PURE__ */ jsxs("span", { className: "font-medium capitalize", children: [
+            currentPlan,
+            " ",
+            /* @__PURE__ */ jsxs("span", { className: "text-muted-foreground font-normal", children: [
+              "/ ",
+              currentInterval
+            ] })
+          ] }) }),
+          /* @__PURE__ */ jsx("td", { className: "px-4 py-3 align-top text-right tabular-nums", children: monthly ? fmtMoney2(monthly.price_cents) : "\u2014" }),
+          /* @__PURE__ */ jsx("td", { className: "px-4 py-3 align-top text-right tabular-nums", children: yearly ? fmtMoney2(yearly.price_cents) : "\u2014" }),
+          /* @__PURE__ */ jsxs("td", { className: "px-4 py-3 align-top", children: [
+            !hasSub ? /* @__PURE__ */ jsx("span", { className: "inline-flex text-[10px] uppercase font-semibold px-2 py-0.5 rounded border bg-muted text-muted-foreground border-border", children: t("billing.not_subscribed", "Not subscribed") }) : /* @__PURE__ */ jsxs(
+              "span",
+              {
+                className: "inline-flex text-[10px] uppercase font-semibold px-2 py-0.5 rounded",
+                style: planBadgeStyle2(currentPlan) ?? { backgroundColor: "#454545", color: "#fff" },
+                children: [
+                  currentPlan,
+                  isTrialing ? ` \xB7 ${t("billing.trial", "Trial")}` : "",
+                  isCanceled ? ` \xB7 ${t("billing.canceling", "Canceling")}` : ""
+                ]
+              }
+            ),
+            isTrialing && sub?.trial_end && /* @__PURE__ */ jsxs("div", { className: "text-xs text-blue-700 dark:text-blue-300 mt-1 flex items-center gap-1", children: [
+              /* @__PURE__ */ jsx(Clock, { className: "h-3 w-3" }),
+              fmtDate2(sub.trial_end)
+            ] })
+          ] }),
+          /* @__PURE__ */ jsx("td", { className: "px-4 py-3 align-top", children: /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap justify-end gap-2", children: [
+            !hasSub ? /* @__PURE__ */ jsxs(Fragment, { children: [
+              /* @__PURE__ */ jsxs(Button, { size: "sm", disabled: !canManage || mAdd.isPending, onClick: () => mAdd.mutate({ app_code: app.code }), className: "gap-1.5", children: [
+                /* @__PURE__ */ jsx(Plus, { className: "h-3.5 w-3.5" }),
+                t("billing.add_app", "Add")
+              ] }),
+              /* @__PURE__ */ jsxs(Button, { size: "sm", variant: "outline", disabled: !canManage || mTrial.isPending, onClick: () => mTrial.mutate({ app_code: app.code }), className: "gap-1.5", children: [
+                /* @__PURE__ */ jsx(Zap, { className: "h-3.5 w-3.5" }),
+                t("billing.start_trial", "Trial")
+              ] })
+            ] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
+              /* @__PURE__ */ jsx(Button, { size: "sm", variant: "outline", disabled: !canManage, onClick: () => setChangeFor(app.code), children: t("billing.change_plan", "Change") }),
+              isCanceled ? /* @__PURE__ */ jsxs(Button, { size: "sm", disabled: !canManage || mReactivate.isPending, onClick: () => mReactivate.mutate({ app_code: app.code }), className: "gap-1.5", children: [
+                /* @__PURE__ */ jsx(RefreshCw, { className: "h-3.5 w-3.5" }),
+                t("billing.reactivate", "Reactivate")
+              ] }) : /* @__PURE__ */ jsxs(Button, { size: "sm", variant: "outline", disabled: !canManage || mCancel.isPending, onClick: () => mCancel.mutate({ app_code: app.code }), className: "gap-1.5", children: [
+                /* @__PURE__ */ jsx(XCircle, { className: "h-3.5 w-3.5" }),
+                t("billing.cancel_at_period_end", "Cancel")
+              ] }),
+              app.removable && /* @__PURE__ */ jsxs(Button, { size: "sm", variant: "ghost", disabled: !canManage || mRemove.isPending, onClick: () => mRemove.mutate({ app_code: app.code }), className: "gap-1.5 text-destructive hover:text-destructive", children: [
+                /* @__PURE__ */ jsx(Trash2, { className: "h-3.5 w-3.5" }),
+                t("billing.remove_app", "Remove")
+              ] })
+            ] }),
+            /* @__PURE__ */ jsxs(
+              Link,
+              {
+                to: "/app/account/billing/compare",
+                search: { app: app.code },
+                className: "inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border hover:bg-accent",
+                children: [
+                  /* @__PURE__ */ jsx(GitCompare, { className: "h-3.5 w-3.5" }),
+                  t("billing.compare_plans", "Compare")
+                ]
+              }
+            )
+          ] }) })
+        ] }, app.code);
+      }) })
+    ] }) }),
+    /* @__PURE__ */ jsx("div", { className: "md:hidden grid grid-cols-1 gap-3", children: APPS.map((app) => {
+      const sub = subByApp.get(app.code);
+      const plans = plansByApp.get(app.code) ?? [];
+      const status = sub?.status ?? "inactive";
+      const currentPlan = sub?.plan_code ?? "\u2014";
+      const currentInterval = sub?.interval ?? "month";
+      const monthly = plans.find((p) => p.plan_code === currentPlan && p.interval === "month");
+      const yearly = plans.find((p) => p.plan_code === currentPlan && p.interval === "year");
+      const isTrialing = status === "trialing";
+      const isCanceled = status === "canceled" || sub?.cancel_at_period_end;
+      const hasSub = !!sub && !sub.synthetic && status !== "inactive";
+      return /* @__PURE__ */ jsxs("div", { className: "border rounded-lg bg-card p-4 flex flex-col gap-3", children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex items-start justify-between gap-3", children: [
+          /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
+            /* @__PURE__ */ jsx("h3", { className: "font-semibold", children: app.name }),
+            /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground mt-0.5", children: app.description })
+          ] }),
+          !hasSub ? /* @__PURE__ */ jsx("span", { className: "text-[10px] uppercase font-semibold px-2 py-0.5 rounded border bg-muted text-muted-foreground border-border", children: t("billing.not_subscribed", "Not subscribed") }) : /* @__PURE__ */ jsxs(
+            "span",
+            {
+              className: "text-[10px] uppercase font-semibold px-2 py-0.5 rounded",
+              style: planBadgeStyle2(currentPlan) ?? { backgroundColor: "#454545", color: "#fff" },
+              children: [
+                currentPlan,
+                isTrialing ? ` \xB7 ${t("billing.trial", "Trial")}` : "",
+                isCanceled ? ` \xB7 ${t("billing.canceling", "Canceling")}` : ""
+              ]
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-3 gap-3 text-xs border-t pt-3", children: [
+          /* @__PURE__ */ jsxs("div", { children: [
+            /* @__PURE__ */ jsx("div", { className: "text-muted-foreground", children: t("billing.current_plan", "Current plan") }),
+            /* @__PURE__ */ jsxs("div", { className: "font-medium capitalize mt-0.5", children: [
+              currentPlan,
+              hasSub && /* @__PURE__ */ jsxs("span", { className: "text-muted-foreground", children: [
+                " / ",
+                currentInterval
+              ] })
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { children: [
+            /* @__PURE__ */ jsx("div", { className: "text-muted-foreground", children: t("billing.monthly", "Monthly") }),
+            /* @__PURE__ */ jsx("div", { className: "font-medium mt-0.5", children: monthly ? fmtMoney2(monthly.price_cents) : "\u2014" })
+          ] }),
+          /* @__PURE__ */ jsxs("div", { children: [
+            /* @__PURE__ */ jsx("div", { className: "text-muted-foreground", children: t("billing.yearly", "Yearly") }),
+            /* @__PURE__ */ jsx("div", { className: "font-medium mt-0.5", children: yearly ? fmtMoney2(yearly.price_cents) : "\u2014" })
+          ] })
+        ] }),
+        isTrialing && sub?.trial_end && /* @__PURE__ */ jsxs("div", { className: "text-xs flex items-center gap-1.5 text-blue-700 dark:text-blue-300", children: [
+          /* @__PURE__ */ jsx(Clock, { className: "h-3.5 w-3.5" }),
+          t("billing.trial_ends_on", "Trial ends on"),
+          " ",
+          fmtDate2(sub.trial_end)
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap gap-2 pt-1 border-t", children: [
+          !hasSub ? /* @__PURE__ */ jsxs(Fragment, { children: [
+            /* @__PURE__ */ jsxs(Button, { size: "sm", disabled: !canManage || mAdd.isPending, onClick: () => mAdd.mutate({ app_code: app.code }), className: "gap-1.5", children: [
+              /* @__PURE__ */ jsx(Plus, { className: "h-3.5 w-3.5" }),
+              t("billing.add_app", "Add App")
+            ] }),
+            /* @__PURE__ */ jsxs(Button, { size: "sm", variant: "outline", disabled: !canManage || mTrial.isPending, onClick: () => mTrial.mutate({ app_code: app.code }), className: "gap-1.5", children: [
+              /* @__PURE__ */ jsx(Zap, { className: "h-3.5 w-3.5" }),
+              t("billing.start_trial", "Start Trial")
+            ] })
+          ] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
+            /* @__PURE__ */ jsx(Button, { size: "sm", variant: "outline", disabled: !canManage, onClick: () => setChangeFor(app.code), className: "gap-1.5", children: t("billing.change_plan", "Change Plan") }),
+            isCanceled ? /* @__PURE__ */ jsxs(Button, { size: "sm", disabled: !canManage || mReactivate.isPending, onClick: () => mReactivate.mutate({ app_code: app.code }), className: "gap-1.5", children: [
+              /* @__PURE__ */ jsx(RefreshCw, { className: "h-3.5 w-3.5" }),
+              t("billing.reactivate", "Reactivate")
+            ] }) : /* @__PURE__ */ jsxs(Button, { size: "sm", variant: "outline", disabled: !canManage || mCancel.isPending, onClick: () => mCancel.mutate({ app_code: app.code }), className: "gap-1.5", children: [
+              /* @__PURE__ */ jsx(XCircle, { className: "h-3.5 w-3.5" }),
+              t("billing.cancel_at_period_end", "Cancel at Period End")
+            ] }),
+            app.removable && /* @__PURE__ */ jsxs(Button, { size: "sm", variant: "ghost", disabled: !canManage || mRemove.isPending, onClick: () => mRemove.mutate({ app_code: app.code }), className: "gap-1.5 text-destructive hover:text-destructive", children: [
+              /* @__PURE__ */ jsx(Trash2, { className: "h-3.5 w-3.5" }),
+              t("billing.remove_app", "Remove App")
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxs(
+            Link,
+            {
+              to: "/app/account/billing/compare",
+              search: { app: app.code },
+              className: "inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border hover:bg-accent ml-auto",
+              children: [
+                /* @__PURE__ */ jsx(GitCompare, { className: "h-3.5 w-3.5" }),
+                t("billing.compare_plans", "Compare plans")
+              ]
+            }
+          )
+        ] })
+      ] }, app.code);
+    }) }),
+    /* @__PURE__ */ jsx(Dialog, { open: !!changeFor, onOpenChange: (o) => !o && setChangeFor(null), children: /* @__PURE__ */ jsxs(DialogContent, { className: "max-w-2xl", children: [
+      /* @__PURE__ */ jsxs(DialogHeader, { children: [
+        /* @__PURE__ */ jsxs(DialogTitle, { children: [
+          t("billing.change_plan_for", "Change plan for"),
+          " ",
+          changeFor
+        ] }),
+        /* @__PURE__ */ jsx(DialogDescription, { children: t("billing.stripe_future_short", "Updates local data only \u2014 Stripe coming later.") })
+      ] }),
+      changeFor && /* @__PURE__ */ jsx(
+        ChangePlanGrid,
+        {
+          plans: plansByApp.get(changeFor) ?? [],
+          currentPlan: subByApp.get(changeFor)?.plan_code ?? void 0,
+          currentInterval: subByApp.get(changeFor)?.interval ?? "month",
+          disabled: !canManage || mChange.isPending,
+          onPick: (plan_code, interval) => {
+            mChange.mutate(
+              { app_code: changeFor, plan_code, interval },
+              { onSettled: () => setChangeFor(null) }
+            );
+          }
+        }
+      ),
+      /* @__PURE__ */ jsx(DialogFooter, { children: /* @__PURE__ */ jsx(Button, { variant: "outline", onClick: () => setChangeFor(null), children: t("common.cancel", "Cancel") }) })
+    ] }) })
+  ] });
+}
+function ChangePlanGrid({
+  plans,
+  currentPlan,
+  currentInterval,
+  disabled,
+  onPick
+}) {
+  const { t } = useTranslation();
+  const [interval, setInterval] = useState(currentInterval);
+  const filtered = plans.filter((p) => p.interval === interval);
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-3", children: [
+    /* @__PURE__ */ jsx("div", { className: "flex justify-end", children: /* @__PURE__ */ jsx("div", { className: "inline-flex border rounded-md overflow-hidden text-xs", children: ["month", "year"].map((iv) => /* @__PURE__ */ jsx(
+      "button",
+      {
+        onClick: () => setInterval(iv),
+        className: `px-3 py-1.5 ${interval === iv ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent"}`,
+        children: iv === "month" ? t("billing.monthly", "Monthly") : t("billing.yearly", "Yearly")
+      },
+      iv
+    )) }) }),
+    /* @__PURE__ */ jsx("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-2", children: filtered.map((p) => {
+      const isCurrent = currentPlan === p.plan_code && currentInterval === p.interval;
+      const features = Array.isArray(p.features) ? p.features : [];
+      return /* @__PURE__ */ jsxs(
+        "button",
+        {
+          disabled: disabled || isCurrent,
+          onClick: () => onPick(p.plan_code, p.interval),
+          className: `text-left border rounded-lg p-3 hover:bg-accent disabled:opacity-60 disabled:cursor-not-allowed ${isCurrent ? "ring-2 ring-primary" : ""}`,
+          children: [
+            /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between", children: [
+              /* @__PURE__ */ jsx("div", { className: "font-medium", children: p.name }),
+              /* @__PURE__ */ jsx("div", { className: "text-sm font-semibold", children: fmtMoney2(p.price_cents) })
+            ] }),
+            p.description && /* @__PURE__ */ jsx("div", { className: "text-xs text-muted-foreground mt-1", children: p.description }),
+            features.length > 0 && /* @__PURE__ */ jsx("ul", { className: "text-xs space-y-0.5 mt-2", children: features.slice(0, 4).map((f) => /* @__PURE__ */ jsxs("li", { className: "flex items-start gap-1.5", children: [
+              /* @__PURE__ */ jsx(Check, { className: "h-3 w-3 mt-0.5 text-primary shrink-0" }),
+              /* @__PURE__ */ jsx("span", { children: f })
+            ] }, f)) }),
+            isCurrent && /* @__PURE__ */ jsx("div", { className: "text-[10px] uppercase font-semibold text-primary mt-2", children: t("billing.current_plan", "Current plan") })
+          ]
+        },
+        p.plan_code
+      );
+    }) })
+  ] });
+}
+function BillingOverviewPage() {
+  const { t } = useTranslation();
+  const { useAuth, router, fns } = useJoaSuite();
+  const { currentTenantId } = useAuth();
+  const { Link } = router;
+  const overviewQ = useQuery({
+    queryKey: ["billing-overview", currentTenantId],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.getBillingOverview({ tenant_id: currentTenantId })
+  });
+  const bundleRulesQ = useQuery({
+    queryKey: ["billing-bundle-rules"],
+    queryFn: () => fns.listActiveBundleRules()
+  });
+  const { multiAppDiscount, matchingRule, discountPct, discountCents, rules, paidCount } = useMemo(() => {
+    const subs2 = overviewQ.data?.subscriptions ?? [];
+    const paidApps = subs2.filter((s) => s.plan_code && s.plan_code !== "free");
+    const rules2 = bundleRulesQ.data ?? [];
+    const matchingRule2 = rules2.filter((r) => paidApps.length >= r.minimum_active_apps).sort((a, b) => Number(b.discount_percent) - Number(a.discount_percent))[0];
+    const discountPct2 = matchingRule2 ? Number(matchingRule2.discount_percent) : 0;
+    const subtotalCents = overviewQ.data?.next_invoice_estimate_cents ?? 0;
+    const discountCents2 = Math.round(subtotalCents * (discountPct2 / 100));
+    return { multiAppDiscount: discountCents2 > 0, matchingRule: matchingRule2, discountPct: discountPct2, discountCents: discountCents2, rules: rules2, paidCount: paidApps.length };
+  }, [overviewQ.data, bundleRulesQ.data]);
+  if (!currentTenantId) return null;
+  if (overviewQ.isLoading) return /* @__PURE__ */ jsx("div", { className: "text-muted-foreground", children: t("common.loading") });
+  if (!overviewQ.data) return null;
+  const data = overviewQ.data;
+  const subs = data.subscriptions ?? [];
+  const trialing = subs.filter((s) => s.status === "trialing" && s.trial_end);
+  const soonestTrialEnd = trialing.map((s) => s.trial_end).filter(Boolean).sort()[0];
+  const trialDaysLeft = soonestTrialEnd ? Math.ceil((new Date(soonestTrialEnd).getTime() - Date.now()) / 864e5) : null;
+  const alerts = [];
+  alerts.push({
+    id: "stripe",
+    tone: "info",
+    icon: Sparkles,
+    title: t("billing.alert.stripe_pending_title", "Stripe not connected yet"),
+    body: t(
+      "billing.alert.stripe_pending_body",
+      "Real payments are disabled. All charges and plan changes on this page are simulated for preview."
+    )
+  });
+  if (!data.default_payment_method) {
+    alerts.push({
+      id: "no_pm",
+      tone: "warning",
+      icon: CreditCard,
+      title: t("billing.alert.no_pm_title", "Payment method missing"),
+      body: t(
+        "billing.alert.no_pm_body",
+        "Add a payment method to avoid service interruption when Stripe goes live."
+      )
+    });
+  }
+  if (trialDaysLeft !== null && trialDaysLeft <= 7) {
+    alerts.push({
+      id: "trial",
+      tone: "warning",
+      icon: CalendarClock,
+      title: t("billing.alert.trial_ending_title", "Trial ending soon"),
+      body: t("billing.alert.trial_ending_body", "Your trial ends in {{days}} day(s). Choose a plan to keep access.", { days: Math.max(0, trialDaysLeft) })
+    });
+  }
+  if (subs.some((s) => s.status === "past_due")) {
+    alerts.push({
+      id: "past_due",
+      tone: "danger",
+      icon: ShieldAlert,
+      title: t("billing.alert.past_due_title", "Payment past due"),
+      body: t("billing.alert.past_due_body", "One or more subscriptions are past due. Update your payment method to restore service.")
+    });
+  }
+  if (subs.some((s) => s.status === "canceled" || s.cancel_at_period_end)) {
+    alerts.push({
+      id: "canceled",
+      tone: "warning",
+      icon: XCircle,
+      title: t("billing.alert.canceled_title", "Subscription canceled"),
+      body: t("billing.alert.canceled_body", "One or more subscriptions are scheduled to end. Re-subscribe to keep access.")
+    });
+  }
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-5", children: [
+    alerts.length > 0 && /* @__PURE__ */ jsx("section", { className: "grid grid-cols-1 md:grid-cols-2 gap-3", children: alerts.map((a) => {
+      const Icon = a.icon;
+      const tone = a.tone === "danger" ? "border-destructive/40 bg-destructive/10 text-destructive" : a.tone === "warning" ? "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200" : "border-blue-500/40 bg-blue-500/10 text-blue-900 dark:text-blue-200";
+      return /* @__PURE__ */ jsxs("div", { className: `rounded-md border px-3 py-2.5 text-xs flex items-start gap-2 ${tone}`, children: [
+        /* @__PURE__ */ jsx(Icon, { className: "h-4 w-4 mt-0.5 shrink-0" }),
+        /* @__PURE__ */ jsxs("div", { className: "space-y-0.5", children: [
+          /* @__PURE__ */ jsx("div", { className: "font-semibold", children: a.title }),
+          /* @__PURE__ */ jsx("div", { className: "opacity-90", children: a.body })
+        ] })
+      ] }, a.id);
+    }) }),
+    /* @__PURE__ */ jsxs("section", { children: [
+      /* @__PURE__ */ jsxs("header", { className: "mb-3 flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx(Package, { className: "h-4 w-4" }),
+        /* @__PURE__ */ jsx("h3", { className: "font-medium", children: t("billing.apps_and_plans", "Apps & Plans") })
+      ] }),
+      /* @__PURE__ */ jsx(PlansSection, {})
+    ] }),
+    /* @__PURE__ */ jsxs("section", { className: "border rounded-lg bg-card", children: [
+      /* @__PURE__ */ jsxs("header", { className: "p-4 border-b flex items-center justify-between", children: [
+        /* @__PURE__ */ jsxs("h3", { className: "font-medium flex items-center gap-2", children: [
+          /* @__PURE__ */ jsx(Gift, { className: "h-4 w-4" }),
+          t("billing.discounts_summary", "Discounts")
+        ] }),
+        /* @__PURE__ */ jsx(Link, { to: "/app/account/billing/discounts", className: "text-xs text-primary hover:underline", children: t("billing.manage", "Manage") })
+      ] }),
+      /* @__PURE__ */ jsxs("ul", { className: "divide-y text-sm", children: [
+        multiAppDiscount && matchingRule && /* @__PURE__ */ jsxs("li", { className: "p-4 flex items-center justify-between", children: [
+          /* @__PURE__ */ jsxs("span", { children: [
+            t("billing.multi_app_discount", "Multi-app bundle discount"),
+            /* @__PURE__ */ jsxs("span", { className: "text-xs text-muted-foreground ml-2", children: [
+              "(",
+              matchingRule.name,
+              ")"
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxs("span", { className: "font-medium text-emerald-600 dark:text-emerald-400", children: [
+            "\u2212",
+            discountPct,
+            "%"
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxs("li", { className: "p-4 flex items-center justify-between", children: [
+          /* @__PURE__ */ jsxs("span", { children: [
+            t("billing.promo_code", "Promo code"),
+            ":",
+            " ",
+            /* @__PURE__ */ jsx("span", { className: "font-mono text-xs px-1.5 py-0.5 rounded bg-muted", children: "WELCOME20" })
+          ] }),
+          /* @__PURE__ */ jsx("span", { className: "text-xs text-muted-foreground", children: t("billing.promo_simulated", "Simulated \u2014 Stripe coming later") })
+        ] }),
+        (() => {
+          const nextRule = rules.filter((r) => r.minimum_active_apps > paidCount).sort((a, b) => a.minimum_active_apps - b.minimum_active_apps)[0];
+          if (!nextRule) return null;
+          const need = nextRule.minimum_active_apps - paidCount;
+          return /* @__PURE__ */ jsx("li", { className: "p-4 text-xs text-muted-foreground", children: t("billing.multi_app_hint_dynamic", "Add {{n}} more paid app(s) to unlock {{pct}}% off ({{name}}).", {
+            n: need,
+            pct: Number(nextRule.discount_percent),
+            name: nextRule.name
+          }) });
+        })()
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs("section", { className: "border rounded-lg bg-card p-4 flex items-center justify-between text-sm", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx(Receipt, { className: "h-4 w-4" }),
+        /* @__PURE__ */ jsx("span", { children: t("billing.invoices_shortcut", "View invoices & receipts for this organization") })
+      ] }),
+      /* @__PURE__ */ jsx(Link, { to: "/app/account/billing/invoices", className: "text-xs text-primary hover:underline", children: t("billing.open", "Open") })
+    ] })
+  ] });
+}
+function isExpired(pm) {
+  const now = /* @__PURE__ */ new Date();
+  return pm.exp_year < now.getFullYear() || pm.exp_year === now.getFullYear() && pm.exp_month < now.getMonth() + 1;
+}
+function computeStatus(rows) {
+  if (!rows.length) return "not_connected";
+  const defaultPm = rows.find((r) => r.is_default) ?? rows[0];
+  if (defaultPm.status === "failed") return "failed";
+  if (isExpired(defaultPm)) return "expired";
+  if (defaultPm.brand?.toLowerCase() === "ach") return "ach_on_file";
+  return "card_on_file";
+}
+var STATUS_STYLES = {
+  not_connected: { label: "billing.pm_status.not_connected", variant: "outline" },
+  card_on_file: { label: "billing.pm_status.card_on_file", variant: "default" },
+  ach_on_file: { label: "billing.pm_status.ach_on_file", variant: "secondary" },
+  expired: { label: "billing.pm_status.expired", variant: "destructive" },
+  failed: { label: "billing.pm_status.failed", variant: "destructive" }
+};
+function BillingPaymentMethodsPage() {
+  const { t } = useTranslation();
+  const { useAuth, ui, fns } = useJoaSuite();
+  const { currentTenantId } = useAuth();
+  const { Button, Badge, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } = ui;
+  const qc = useQueryClient();
+  const listQ = useQuery({
+    queryKey: ["billing-payment-methods", currentTenantId],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.listBillingPaymentMethods({ tenant_id: currentTenantId })
+  });
+  const permQ = useQuery({
+    queryKey: ["billing-perm", currentTenantId],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.canManageBillingFn({ tenant_id: currentTenantId })
+  });
+  const canManage = !!permQ.data?.can_manage;
+  const rows = listQ.data ?? [];
+  const status = computeStatus(rows);
+  const style = STATUS_STYLES[status];
+  const add = useMutation({
+    mutationFn: async (opts) => fns.addMockPaymentMethod({
+      tenant_id: currentTenantId,
+      brand: opts.brand,
+      last4: opts.last4,
+      exp_month: opts.exp_month,
+      exp_year: opts.exp_year,
+      make_default: true
+    }),
+    onSuccess: () => {
+      toast.success(t("billing.pm_added", "Payment method added (simulated)"));
+      qc.invalidateQueries({ queryKey: ["billing-payment-methods"] });
+      qc.invalidateQueries({ queryKey: ["billing-overview"] });
+    },
+    onError: (e) => toast.error(e.message)
+  });
+  const setDef = useMutation({
+    mutationFn: async (id) => fns.setDefaultPaymentMethod({ tenant_id: currentTenantId, id }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["billing-payment-methods"] });
+      qc.invalidateQueries({ queryKey: ["billing-overview"] });
+    },
+    onError: (e) => toast.error(e.message)
+  });
+  const remove = useMutation({
+    mutationFn: async (id) => fns.removePaymentMethod({ tenant_id: currentTenantId, id }),
+    onSuccess: () => {
+      toast.success(t("billing.pm_removed", "Payment method removed"));
+      qc.invalidateQueries({ queryKey: ["billing-payment-methods"] });
+      qc.invalidateQueries({ queryKey: ["billing-overview"] });
+    },
+    onError: (e) => toast.error(e.message)
+  });
+  const now = /* @__PURE__ */ new Date();
+  const expiredYear = now.getFullYear() - 1;
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-6", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3", children: [
+      /* @__PURE__ */ jsxs("div", { children: [
+        /* @__PURE__ */ jsx("h3", { className: "text-lg font-semibold", children: t("billing.payment_method_title", "Payment Method") }),
+        /* @__PURE__ */ jsx("p", { className: "text-sm text-muted-foreground", children: t("billing.payment_method_subtitle", "Manage how your organization pays for JoaSuite subscriptions.") })
+      ] }),
+      /* @__PURE__ */ jsxs(Button, { disabled: true, variant: "outline", className: "gap-2", children: [
+        /* @__PURE__ */ jsx(ExternalLink, { className: "h-4 w-4" }),
+        t("billing.open_stripe_portal", "Open Stripe Billing Portal - Coming Soon")
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "rounded-lg border bg-card p-5 space-y-4", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between", children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-3", children: [
+          /* @__PURE__ */ jsx("div", { className: "rounded-full bg-primary/10 p-2.5 text-primary", children: status === "ach_on_file" ? /* @__PURE__ */ jsx(Landmark, { className: "h-5 w-5" }) : /* @__PURE__ */ jsx(CreditCard, { className: "h-5 w-5" }) }),
+          /* @__PURE__ */ jsxs("div", { children: [
+            /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("billing.current_status", "Current status") }),
+            /* @__PURE__ */ jsx(Badge, { variant: style.variant, children: t(style.label) })
+          ] })
+        ] }),
+        canManage && status === "not_connected" && /* @__PURE__ */ jsxs(DropdownMenu, { children: [
+          /* @__PURE__ */ jsx(DropdownMenuTrigger, { asChild: true, children: /* @__PURE__ */ jsx(Button, { size: "sm", variant: "outline", children: t("billing.simulate_add_mock", "Simulate add mock method") }) }),
+          /* @__PURE__ */ jsxs(DropdownMenuContent, { align: "end", children: [
+            /* @__PURE__ */ jsx(
+              DropdownMenuItem,
+              {
+                onClick: () => add.mutate({ brand: "Visa", last4: "4242", exp_month: now.getMonth() + 1, exp_year: now.getFullYear() + 3 }),
+                disabled: add.isPending,
+                children: t("billing.simulate.visa_4242", "Visa ending 4242")
+              }
+            ),
+            /* @__PURE__ */ jsx(
+              DropdownMenuItem,
+              {
+                onClick: () => add.mutate({ brand: "Mastercard", last4: "5555", exp_month: now.getMonth() + 1, exp_year: now.getFullYear() + 2 }),
+                disabled: add.isPending,
+                children: t("billing.simulate.mastercard_5555", "Mastercard ending 5555")
+              }
+            ),
+            /* @__PURE__ */ jsx(
+              DropdownMenuItem,
+              {
+                onClick: () => add.mutate({ brand: "ACH", last4: "6789", exp_month: 1, exp_year: 2099 }),
+                disabled: add.isPending,
+                children: t("billing.simulate.ach_6789", "ACH ending 6789")
+              }
+            ),
+            /* @__PURE__ */ jsx(
+              DropdownMenuItem,
+              {
+                onClick: () => add.mutate({ brand: "Visa", last4: "0001", exp_month: 1, exp_year: expiredYear }),
+                disabled: add.isPending,
+                children: t("billing.simulate.expired_card", "Expired Visa ending 0001")
+              }
+            )
+          ] })
+        ] })
+      ] }),
+      rows.length === 0 ? /* @__PURE__ */ jsxs("div", { className: "rounded-md border border-dashed p-6 text-center space-y-2", children: [
+        /* @__PURE__ */ jsx(CreditCard, { className: "h-8 w-8 mx-auto text-muted-foreground/60" }),
+        /* @__PURE__ */ jsx("p", { className: "text-sm font-medium", children: t("billing.pm_placeholder_title", "Payment method will be managed through Stripe in a future phase.") }),
+        /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground", children: t("billing.pm_placeholder_desc", "Until then, this page displays mock data only. No real card or bank details are collected.") })
+      ] }) : /* @__PURE__ */ jsx("div", { className: "rounded-md border divide-y", children: rows.map((pm) => {
+        const expired = isExpired(pm);
+        return /* @__PURE__ */ jsxs("div", { className: "p-4 flex items-center gap-3", children: [
+          /* @__PURE__ */ jsx("div", { className: "rounded-full bg-muted p-2 text-muted-foreground", children: pm.brand?.toLowerCase() === "ach" ? /* @__PURE__ */ jsx(Landmark, { className: "h-4 w-4" }) : /* @__PURE__ */ jsx(CreditCard, { className: "h-4 w-4" }) }),
+          /* @__PURE__ */ jsxs("div", { className: "flex-1 min-w-0", children: [
+            /* @__PURE__ */ jsx("div", { className: "font-medium", children: t("billing.pm_display", "{{brand}} ending {{last4}}", { brand: pm.brand, last4: pm.last4 }) }),
+            /* @__PURE__ */ jsxs("div", { className: "text-xs text-muted-foreground", children: [
+              pm.brand?.toLowerCase() === "ach" ? t("billing.ach_account", "Bank account") : t("billing.expires", "Expires") + " " + String(pm.exp_month).padStart(2, "0") + "/" + pm.exp_year,
+              expired && /* @__PURE__ */ jsxs("span", { className: "ml-2 inline-flex items-center gap-1 text-destructive", children: [
+                /* @__PURE__ */ jsx(AlertTriangle, { className: "h-3 w-3" }),
+                t("billing.expired", "Expired")
+              ] })
+            ] })
+          ] }),
+          pm.is_default && /* @__PURE__ */ jsx("span", { className: "text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded bg-primary/15 text-primary", children: t("billing.default", "Default") }),
+          canManage && !pm.is_default && /* @__PURE__ */ jsx(
+            Button,
+            {
+              size: "sm",
+              variant: "ghost",
+              onClick: () => setDef.mutate(pm.id),
+              title: t("billing.set_default", "Set as default"),
+              children: /* @__PURE__ */ jsx(Star, { className: "h-4 w-4" })
+            }
+          ),
+          canManage && /* @__PURE__ */ jsx(
+            Button,
+            {
+              size: "sm",
+              variant: "ghost",
+              className: "text-destructive hover:text-destructive",
+              onClick: () => remove.mutate(pm.id),
+              children: /* @__PURE__ */ jsx(Trash2, { className: "h-4 w-4" })
+            }
+          )
+        ] }, pm.id);
+      }) })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 px-3 py-2 text-xs flex items-start gap-2", children: [
+      /* @__PURE__ */ jsx(AlertTriangle, { className: "h-4 w-4 mt-0.5 shrink-0" }),
+      /* @__PURE__ */ jsx("span", { children: t(
+        "billing.pm_stripe_note",
+        "Stripe integration coming later. Actions on this page update local mock data only and never store real card or bank information."
+      ) })
+    ] })
+  ] });
+}
+function fmtMoney3(cents, currency = "usd") {
+  return new Intl.NumberFormat(void 0, {
+    style: "currency",
+    currency: (currency ?? "usd").toUpperCase()
+  }).format((cents ?? 0) / 100);
+}
+function fmtDate3(d) {
+  if (!d) return "\u2014";
+  return new Date(d).toLocaleDateString();
+}
+function statusClass(s) {
+  const m = {
+    paid: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+    open: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    failed: "bg-destructive/15 text-destructive",
+    void: "bg-muted text-muted-foreground",
+    refunded: "bg-blue-500/15 text-blue-700 dark:text-blue-300",
+    draft: "bg-muted text-muted-foreground"
+  };
+  return `text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded ${m[s] ?? "bg-muted text-muted-foreground"}`;
+}
+function BillingInvoicesPage() {
+  const { t } = useTranslation();
+  const { useAuth, ui, fns } = useJoaSuite();
+  const { currentTenantId } = useAuth();
+  const { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } = ui;
+  const qc = useQueryClient();
+  const { data: perm } = useQuery({
+    queryKey: ["billing-perm", currentTenantId],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.canManageBillingFn({ tenant_id: currentTenantId })
+  });
+  const { data, isLoading } = useQuery({
+    queryKey: ["billing-invoices", currentTenantId],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.listBillingInvoices({ tenant_id: currentTenantId, limit: 100 })
+  });
+  const seedM = useMutation({
+    mutationFn: () => fns.seedSampleBillingInvoices({ tenant_id: currentTenantId }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ["billing-invoices", currentTenantId] });
+      toast.success(
+        r?.skipped ? t("billing.seed_skipped", "Sample invoices already exist.") : t("billing.seed_done", "Sample invoices created.")
+      );
+    },
+    onError: (e) => toast.error(e.message)
+  });
+  const retryM = useMutation({
+    mutationFn: (id) => fns.retryInvoicePayment({ tenant_id: currentTenantId, id }),
+    onSuccess: () => toast.info(t("billing.stripe_coming_later", "Stripe integration coming later.")),
+    onError: (e) => toast.error(e.message)
+  });
+  const [openId, setOpenId] = useState(null);
+  if (isLoading) return /* @__PURE__ */ jsx("div", { className: "text-muted-foreground", children: t("common.loading") });
+  const rows = data ?? [];
+  const canManage = !!perm?.can_manage;
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-4", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between gap-2 flex-wrap", children: [
+      /* @__PURE__ */ jsxs("div", { children: [
+        /* @__PURE__ */ jsx("h3", { className: "text-lg font-semibold", children: t("billing.invoices_title", "Invoices & Receipts") }),
+        /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground", children: t(
+          "billing.invoices_desc",
+          "Once Stripe is connected, real invoices will appear here. For now the list shows local mock data."
+        ) })
+      ] }),
+      canManage && rows.length === 0 && /* @__PURE__ */ jsxs(Button, { size: "sm", variant: "outline", onClick: () => seedM.mutate(), disabled: seedM.isPending, children: [
+        /* @__PURE__ */ jsx(Sparkles, { className: "h-3.5 w-3.5" }),
+        t("billing.seed_invoices", "Create sample invoices")
+      ] })
+    ] }),
+    rows.length === 0 ? /* @__PURE__ */ jsx("div", { className: "border rounded-lg bg-card p-10 text-center text-sm text-muted-foreground", children: t(
+      "billing.no_invoices",
+      "No invoices yet. Invoices will appear here once Stripe is connected."
+    ) }) : /* @__PURE__ */ jsx("div", { className: "border rounded-lg bg-card overflow-hidden", children: /* @__PURE__ */ jsxs("table", { className: "w-full text-sm", children: [
+      /* @__PURE__ */ jsx("thead", { className: "bg-muted/40 text-left", children: /* @__PURE__ */ jsxs("tr", { children: [
+        /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.invoice_date", "Date") }),
+        /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.invoice_no", "Invoice #") }),
+        /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.app", "App") }),
+        /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.period", "Billing period") }),
+        /* @__PURE__ */ jsx("th", { className: "px-3 py-2 text-right", children: t("billing.amount_due", "Amount due") }),
+        /* @__PURE__ */ jsx("th", { className: "px-3 py-2 text-right", children: t("billing.amount_paid", "Amount paid") }),
+        /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.status", "Status") }),
+        /* @__PURE__ */ jsx("th", { className: "px-3 py-2 text-right", children: t("billing.actions", "Actions") })
+      ] }) }),
+      /* @__PURE__ */ jsx("tbody", { children: rows.map((r) => {
+        const due = Math.max(0, (r.amount_cents ?? 0) - (r.amount_paid_cents ?? 0));
+        return /* @__PURE__ */ jsxs("tr", { className: "border-t", children: [
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: fmtDate3(r.issued_at) }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 font-mono", children: r.number }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 capitalize text-muted-foreground", children: r.app_code ?? "\u2014" }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-muted-foreground text-xs", children: r.period_start && r.period_end ? `${fmtDate3(r.period_start)} \u2013 ${fmtDate3(r.period_end)}` : "\u2014" }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right", children: fmtMoney3(due, r.currency) }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right", children: fmtMoney3(r.amount_paid_cents, r.currency) }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: /* @__PURE__ */ jsx("span", { className: statusClass(r.status), children: r.status }) }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-end gap-1", children: [
+            /* @__PURE__ */ jsx(
+              "button",
+              {
+                onClick: () => setOpenId(r.id),
+                className: "inline-flex items-center gap-1 text-xs px-2 py-1 rounded hover:bg-muted",
+                title: t("billing.view_invoice", "View invoice"),
+                children: /* @__PURE__ */ jsx(Eye, { className: "h-3.5 w-3.5" })
+              }
+            ),
+            /* @__PURE__ */ jsx(
+              "button",
+              {
+                disabled: true,
+                className: "inline-flex items-center gap-1 text-xs px-2 py-1 rounded text-muted-foreground cursor-not-allowed",
+                title: t("billing.download_disabled", "Available after Stripe is connected"),
+                children: /* @__PURE__ */ jsx(Download, { className: "h-3.5 w-3.5" })
+              }
+            ),
+            (r.status === "open" || r.status === "failed") && /* @__PURE__ */ jsx(
+              "button",
+              {
+                disabled: !canManage || retryM.isPending,
+                onClick: () => {
+                  if (!canManage) return;
+                  retryM.mutate(r.id);
+                },
+                className: "inline-flex items-center gap-1 text-xs px-2 py-1 rounded text-muted-foreground cursor-not-allowed",
+                title: t("billing.stripe_coming_later", "Stripe integration coming later."),
+                children: /* @__PURE__ */ jsx(RefreshCcw, { className: "h-3.5 w-3.5" })
+              }
+            )
+          ] }) })
+        ] }, r.id);
+      }) })
+    ] }) }),
+    /* @__PURE__ */ jsx(
+      InvoiceDetailDialog,
+      {
+        invoiceId: openId,
+        onClose: () => setOpenId(null)
+      }
+    )
+  ] });
+}
+function InvoiceDetailDialog({ invoiceId, onClose }) {
+  const { t } = useTranslation();
+  const { useAuth, ui, fns } = useJoaSuite();
+  const { currentTenantId } = useAuth();
+  const { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } = ui;
+  const { data, isLoading } = useQuery({
+    queryKey: ["billing-invoice", invoiceId],
+    enabled: !!invoiceId && !!currentTenantId,
+    queryFn: () => fns.getBillingInvoice({ tenant_id: currentTenantId, id: invoiceId })
+  });
+  return /* @__PURE__ */ jsx(Dialog, { open: !!invoiceId, onOpenChange: (o) => !o && onClose(), children: /* @__PURE__ */ jsxs(DialogContent, { className: "max-w-lg", children: [
+    /* @__PURE__ */ jsxs(DialogHeader, { children: [
+      /* @__PURE__ */ jsxs(DialogTitle, { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx(FileText, { className: "h-4 w-4" }),
+        t("billing.invoice_detail", "Invoice detail")
+      ] }),
+      /* @__PURE__ */ jsx(DialogDescription, { children: t("billing.local_preview_note", "Local preview \u2014 hosted Stripe pages will appear here once connected.") })
+    ] }),
+    isLoading || !data ? /* @__PURE__ */ jsx("div", { className: "text-muted-foreground text-sm", children: t("common.loading") }) : /* @__PURE__ */ jsxs("div", { className: "space-y-3 text-sm", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex justify-between", children: [
+        /* @__PURE__ */ jsx("span", { className: "text-muted-foreground", children: t("billing.invoice_no", "Invoice #") }),
+        /* @__PURE__ */ jsx("span", { className: "font-mono", children: data.number })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex justify-between", children: [
+        /* @__PURE__ */ jsx("span", { className: "text-muted-foreground", children: t("billing.app", "App") }),
+        /* @__PURE__ */ jsx("span", { className: "capitalize", children: data.app_code ?? "\u2014" })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex justify-between", children: [
+        /* @__PURE__ */ jsx("span", { className: "text-muted-foreground", children: t("billing.issued", "Issued") }),
+        /* @__PURE__ */ jsx("span", { children: fmtDate3(data.issued_at) })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex justify-between", children: [
+        /* @__PURE__ */ jsx("span", { className: "text-muted-foreground", children: t("billing.due", "Due") }),
+        /* @__PURE__ */ jsx("span", { children: fmtDate3(data.due_at) })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex justify-between", children: [
+        /* @__PURE__ */ jsx("span", { className: "text-muted-foreground", children: t("billing.period", "Billing period") }),
+        /* @__PURE__ */ jsx("span", { children: data.period_start && data.period_end ? `${fmtDate3(data.period_start)} \u2013 ${fmtDate3(data.period_end)}` : "\u2014" })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex justify-between", children: [
+        /* @__PURE__ */ jsx("span", { className: "text-muted-foreground", children: t("billing.status", "Status") }),
+        /* @__PURE__ */ jsx("span", { className: statusClass(data.status), children: data.status })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "border-t pt-3 space-y-1", children: [
+        data.description && /* @__PURE__ */ jsx("div", { className: "text-muted-foreground text-xs", children: data.description }),
+        /* @__PURE__ */ jsxs("div", { className: "flex justify-between", children: [
+          /* @__PURE__ */ jsx("span", { className: "text-muted-foreground", children: t("billing.amount_total", "Total") }),
+          /* @__PURE__ */ jsx("span", { children: fmtMoney3(data.amount_cents, data.currency) })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "flex justify-between", children: [
+          /* @__PURE__ */ jsx("span", { className: "text-muted-foreground", children: t("billing.amount_paid", "Amount paid") }),
+          /* @__PURE__ */ jsx("span", { children: fmtMoney3(data.amount_paid_cents ?? 0, data.currency) })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "flex justify-between font-medium", children: [
+          /* @__PURE__ */ jsx("span", { children: t("billing.amount_due", "Amount due") }),
+          /* @__PURE__ */ jsx("span", { children: fmtMoney3(Math.max(0, (data.amount_cents ?? 0) - (data.amount_paid_cents ?? 0)), data.currency) })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "border-t pt-3 space-y-2", children: [
+        /* @__PURE__ */ jsxs(Button, { variant: "outline", size: "sm", disabled: true, className: "w-full justify-start cursor-not-allowed", children: [
+          /* @__PURE__ */ jsx(ExternalLink, { className: "h-3.5 w-3.5" }),
+          t("billing.hosted_invoice_placeholder", "Open hosted invoice \u2014 Coming Soon")
+        ] }),
+        /* @__PURE__ */ jsxs(Button, { variant: "outline", size: "sm", disabled: true, className: "w-full justify-start cursor-not-allowed", children: [
+          /* @__PURE__ */ jsx(Download, { className: "h-3.5 w-3.5" }),
+          t("billing.download_pdf_placeholder", "Download PDF \u2014 Coming Soon")
+        ] })
+      ] })
+    ] })
+  ] }) });
+}
+function statusBadge(s) {
+  const m = {
+    active: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+    upcoming: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+    expired: "bg-muted text-muted-foreground",
+    canceled: "bg-muted text-muted-foreground line-through"
+  };
+  return `text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded ${m[s] ?? m.expired}`;
+}
+function formatDiscount(p, t) {
+  switch (p.discount_type) {
+    case "percent":
+      return `${p.discount_value}% off`;
+    case "fixed_amount":
+      return `${p.currency ?? "USD"} ${p.discount_value} off`;
+    case "trial_extension":
+      return `+${p.discount_value} ${t("billing.discounts.trial_days", "trial days")}`;
+    case "billing_credit":
+      return `${p.discount_value} ${t("billing.discounts.months_credit", "months credit")}`;
+  }
+}
+function formatScope(p, t) {
+  if (p.scope === "all_apps") return t("billing.discounts.scope.all", "All apps");
+  if (p.scope === "specific_app") return `${t("billing.discounts.scope.app", "App")}: ${p.app_code ?? "\u2014"}`;
+  return `${t("billing.discounts.scope.plan", "Plan")}: ${p.app_code ?? "\u2014"}/${p.plan_code ?? "\u2014"}`;
+}
+function fmtDate4(d) {
+  if (!d) return "\u2014";
+  return new Date(d).toLocaleDateString();
+}
+function BillingDiscountsPage() {
+  const { t } = useTranslation();
+  const { useAuth, fns } = useJoaSuite();
+  const { currentTenantId } = useAuth();
+  const qc = useQueryClient();
+  const [code, setCode] = useState("");
+  const { data: perm } = useQuery({
+    queryKey: ["billing-perm", currentTenantId],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.canManageBillingFn({ tenant_id: currentTenantId })
+  });
+  const { data: promos = [], isLoading: promosLoading } = useQuery({
+    queryKey: ["promo-codes", currentTenantId],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.listAvailablePromotions({ tenant_id: currentTenantId })
+  });
+  const { data: discounts = [], isLoading: discountsLoading } = useQuery({
+    queryKey: ["tenant-discounts", currentTenantId],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.listTenantDiscounts({ tenant_id: currentTenantId })
+  });
+  const redeem = useMutation({
+    mutationFn: (c) => fns.redeemPromoCode({ tenant_id: currentTenantId, code: c }),
+    onSuccess: (res) => {
+      if (res.ok) {
+        toast.success(t("billing.discounts.applied", "Promo code applied"));
+        setCode("");
+        qc.invalidateQueries({ queryKey: ["tenant-discounts", currentTenantId] });
+        qc.invalidateQueries({ queryKey: ["promo-codes", currentTenantId] });
+      } else {
+        const map = {
+          not_found: t("billing.discounts.err.not_found", "Promo code not found"),
+          expired: t("billing.discounts.err.expired", "This promo code has expired"),
+          upcoming: t("billing.discounts.err.upcoming", "This promo code is not yet active"),
+          exhausted: t("billing.discounts.err.exhausted", "This promo code has reached its limit"),
+          already_applied: t("billing.discounts.err.already_applied", "This promo code is already applied")
+        };
+        toast.error(map[res.reason] ?? "Unable to apply code");
+      }
+    },
+    onError: (e) => toast.error(e?.message ?? "Failed")
+  });
+  const remove = useMutation({
+    mutationFn: (id) => fns.removeTenantDiscount({ tenant_id: currentTenantId, discount_id: id }),
+    onSuccess: () => {
+      toast.success(t("billing.discounts.removed", "Discount removed"));
+      qc.invalidateQueries({ queryKey: ["tenant-discounts", currentTenantId] });
+    },
+    onError: (e) => toast.error(e?.message ?? "Failed")
+  });
+  const canManage = !!perm?.can_manage;
+  const grouped = {
+    active: promos.filter((p) => p.computed_status === "active"),
+    upcoming: promos.filter((p) => p.computed_status === "upcoming"),
+    expired: promos.filter((p) => p.computed_status === "expired")
+  };
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-5", children: [
+    /* @__PURE__ */ jsxs("div", { className: "rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 px-3 py-2 text-xs flex items-start gap-2", children: [
+      /* @__PURE__ */ jsx(AlertTriangle, { className: "h-4 w-4 mt-0.5 shrink-0" }),
+      /* @__PURE__ */ jsx("span", { children: t("billing.discounts.stripe_note", "Promo codes are validated against local data only. Stripe coupon/promotion-code sync will be connected in a future phase.") })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "border rounded-lg bg-card p-5", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 mb-1", children: [
+        /* @__PURE__ */ jsx(Ticket, { className: "h-4 w-4 text-primary" }),
+        /* @__PURE__ */ jsx("h3", { className: "font-semibold", children: t("billing.discounts.redeem_title", "Redeem a code") })
+      ] }),
+      /* @__PURE__ */ jsx("p", { className: "text-sm text-muted-foreground mb-3", children: t("billing.discounts.redeem_desc", "Enter a promo code to apply a discount to this organization.") }),
+      /* @__PURE__ */ jsxs(
+        "form",
+        {
+          onSubmit: (e) => {
+            e.preventDefault();
+            if (code.trim()) redeem.mutate(code.trim().toUpperCase());
+          },
+          className: "flex gap-2 max-w-md",
+          children: [
+            /* @__PURE__ */ jsx(
+              "input",
+              {
+                value: code,
+                onChange: (e) => setCode(e.target.value.toUpperCase()),
+                placeholder: "PROMOCODE",
+                className: "flex-1 border rounded-md px-3 py-2 text-sm font-mono bg-background",
+                disabled: !canManage || redeem.isPending
+              }
+            ),
+            /* @__PURE__ */ jsx(
+              "button",
+              {
+                type: "submit",
+                disabled: !canManage || redeem.isPending || !code.trim(),
+                className: "inline-flex items-center gap-1 px-3 py-2 text-sm rounded-md bg-primary text-primary-foreground disabled:opacity-50",
+                children: redeem.isPending ? "\u2026" : t("billing.discounts.apply", "Apply")
+              }
+            )
+          ]
+        }
+      ),
+      !canManage && /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground mt-2", children: t("billing.discounts.manage_only", "Only billing admins can redeem promo codes.") })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "border rounded-lg bg-card overflow-hidden", children: [
+      /* @__PURE__ */ jsxs("div", { className: "px-4 py-3 border-b flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx(Sparkles, { className: "h-4 w-4 text-primary" }),
+        /* @__PURE__ */ jsx("h3", { className: "font-semibold", children: t("billing.discounts.your_discounts", "Active discounts for this organization") })
+      ] }),
+      discountsLoading ? /* @__PURE__ */ jsx("div", { className: "p-4 text-sm text-muted-foreground", children: t("common.loading") }) : discounts.length === 0 ? /* @__PURE__ */ jsx("div", { className: "p-6 text-sm text-muted-foreground text-center", children: t("billing.discounts.none_applied", "No discounts applied yet.") }) : /* @__PURE__ */ jsxs("table", { className: "w-full text-sm", children: [
+        /* @__PURE__ */ jsx("thead", { className: "bg-muted/40 text-left", children: /* @__PURE__ */ jsxs("tr", { children: [
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.discounts.name", "Name") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.discounts.type", "Type") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.discounts.amount", "Amount") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.discounts.applies_to", "Applies to") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.discounts.start", "Start") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.discounts.end", "End") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.status", "Status") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2" })
+        ] }) }),
+        /* @__PURE__ */ jsx("tbody", { children: discounts.map((d) => /* @__PURE__ */ jsxs("tr", { className: "border-t", children: [
+          /* @__PURE__ */ jsxs("td", { className: "px-3 py-2 font-medium", children: [
+            d.name,
+            d.code && /* @__PURE__ */ jsx("span", { className: "ml-2 font-mono text-xs text-muted-foreground", children: d.code })
+          ] }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-muted-foreground", children: d.discount_type }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: formatDiscount(d, t) }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-muted-foreground", children: formatScope(d, t) }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-muted-foreground", children: fmtDate4(d.starts_at) }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-muted-foreground", children: fmtDate4(d.ends_at) }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: /* @__PURE__ */ jsx("span", { className: statusBadge(d.status), children: d.status }) }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right", children: canManage && d.status === "active" && /* @__PURE__ */ jsxs(
+            "button",
+            {
+              onClick: () => remove.mutate(d.id),
+              disabled: remove.isPending,
+              className: "inline-flex items-center gap-1 text-xs text-destructive hover:underline",
+              children: [
+                /* @__PURE__ */ jsx(Trash2, { className: "h-3.5 w-3.5" }),
+                t("common.remove", "Remove")
+              ]
+            }
+          ) })
+        ] }, d.id)) })
+      ] })
+    ] }),
+    ["active", "upcoming", "expired"].map((bucket) => /* @__PURE__ */ jsxs("div", { className: "border rounded-lg bg-card overflow-hidden", children: [
+      /* @__PURE__ */ jsxs("div", { className: "px-4 py-3 border-b flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx(Tag, { className: "h-4 w-4 text-muted-foreground" }),
+        /* @__PURE__ */ jsxs("h3", { className: "font-semibold", children: [
+          bucket === "active" && t("billing.discounts.active_promos", "Active promotions"),
+          bucket === "upcoming" && t("billing.discounts.upcoming_promos", "Upcoming promotions"),
+          bucket === "expired" && t("billing.discounts.expired_promos", "Expired promotions")
+        ] }),
+        /* @__PURE__ */ jsx("span", { className: "ml-auto text-xs text-muted-foreground", children: grouped[bucket].length })
+      ] }),
+      promosLoading ? /* @__PURE__ */ jsx("div", { className: "p-4 text-sm text-muted-foreground", children: t("common.loading") }) : grouped[bucket].length === 0 ? /* @__PURE__ */ jsx("div", { className: "p-4 text-sm text-muted-foreground", children: "\u2014" }) : /* @__PURE__ */ jsxs("table", { className: "w-full text-sm", children: [
+        /* @__PURE__ */ jsx("thead", { className: "bg-muted/40 text-left", children: /* @__PURE__ */ jsxs("tr", { children: [
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.discounts.code", "Code") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.discounts.name", "Name") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.discounts.type", "Type") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.discounts.amount", "Amount") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.discounts.applies_to", "Applies to") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.discounts.start", "Start") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.discounts.end", "End") })
+        ] }) }),
+        /* @__PURE__ */ jsx("tbody", { children: grouped[bucket].map((p) => /* @__PURE__ */ jsxs("tr", { className: "border-t", children: [
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 font-mono", children: p.code }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: p.name }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-muted-foreground", children: p.discount_type }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: formatDiscount(p, t) }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-muted-foreground", children: formatScope(p, t) }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-muted-foreground", children: fmtDate4(p.starts_at) }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-muted-foreground", children: fmtDate4(p.ends_at) })
+        ] }, p.id)) })
+      ] })
+    ] }, bucket))
+  ] });
+}
+function fmt(cents, currency = "USD") {
+  return new Intl.NumberFormat(void 0, { style: "currency", currency }).format(cents / 100);
+}
+function statusBadge2(s) {
+  const m = {
+    pending: "bg-amber-500/15 text-amber-700 dark:text-amber-300",
+    signed_up: "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+    subscribed: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300",
+    canceled: "bg-muted text-muted-foreground"
+  };
+  return `text-[10px] uppercase font-semibold px-1.5 py-0.5 rounded ${m[s]}`;
+}
+function BillingReferralsPage() {
+  const { t } = useTranslation();
+  const { useAuth, fns } = useJoaSuite();
+  const { currentTenantId } = useAuth();
+  const qc = useQueryClient();
+  const [email, setEmail] = useState("");
+  const [orgName, setOrgName] = useState("");
+  const { data: perm } = useQuery({
+    queryKey: ["billing-perm", currentTenantId],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.canManageBillingFn({ tenant_id: currentTenantId })
+  });
+  const { data, isLoading } = useQuery({
+    queryKey: ["referral-program", currentTenantId],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.getReferralProgram({ tenant_id: currentTenantId })
+  });
+  const program = data?.program;
+  const referrals = data?.referrals ?? [];
+  const link = useMemo(() => program ? `https://joasuite.com/r/${program.code}` : "", [program]);
+  const pending = referrals.filter((r) => r.status === "pending").length;
+  const confirmed = referrals.filter((r) => r.status === "subscribed").length;
+  const addMut = useMutation({
+    mutationFn: () => fns.addMockReferral({
+      tenant_id: currentTenantId,
+      referee_email: email.trim(),
+      referee_org_name: orgName.trim() || void 0,
+      status: "pending"
+    }),
+    onSuccess: () => {
+      toast.success(t("billing.referrals.added", "Referral recorded"));
+      setEmail("");
+      setOrgName("");
+      qc.invalidateQueries({ queryKey: ["referral-program", currentTenantId] });
+    },
+    onError: (e) => toast.error(e?.message ?? "Failed")
+  });
+  const advanceMut = useMutation({
+    mutationFn: (vars) => fns.updateReferralStatus({ tenant_id: currentTenantId, referral_id: vars.id, status: vars.status }),
+    onSuccess: () => {
+      toast.success(t("billing.referrals.updated", "Status updated"));
+      qc.invalidateQueries({ queryKey: ["referral-program", currentTenantId] });
+    },
+    onError: (e) => toast.error(e?.message ?? "Failed")
+  });
+  const canManage = !!perm?.can_manage;
+  if (isLoading || !program) {
+    return /* @__PURE__ */ jsx("div", { className: "text-muted-foreground", children: t("common.loading") });
+  }
+  const rewardLine = t(
+    "billing.referrals.reward_line",
+    "You receive {{amount}} billing credit when a referred organization becomes a paid customer.",
+    { amount: fmt(program.reward_amount_cents, program.reward_currency) }
+  );
+  const refereeLine = t(
+    "billing.referrals.referee_line",
+    "The referred organization receives {{pct}}% off for the first {{months}} months.",
+    { pct: program.referee_discount_percent, months: program.referee_discount_months }
+  );
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-5", children: [
+    /* @__PURE__ */ jsxs("div", { className: "rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 px-3 py-2 text-xs flex items-start gap-2", children: [
+      /* @__PURE__ */ jsx(AlertTriangle, { className: "h-4 w-4 mt-0.5 shrink-0" }),
+      /* @__PURE__ */ jsx("span", { children: t("billing.referrals.stripe_note", "Referrals and billing credit are tracked locally for MVP. Real payouts and Stripe credit/coupon issuance will be connected in a future phase.") })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "grid sm:grid-cols-4 gap-3", children: [
+      /* @__PURE__ */ jsx(Stat, { icon: /* @__PURE__ */ jsx(Users, { className: "h-4 w-4" }), label: t("billing.referrals.pending", "Pending"), value: pending.toString() }),
+      /* @__PURE__ */ jsx(Stat, { icon: /* @__PURE__ */ jsx(Gift, { className: "h-4 w-4" }), label: t("billing.referrals.confirmed", "Confirmed"), value: confirmed.toString() }),
+      /* @__PURE__ */ jsx(Stat, { icon: /* @__PURE__ */ jsx(DollarSign, { className: "h-4 w-4" }), label: t("billing.referrals.credit_available", "Credit available"), value: fmt(program.credit_available_cents, program.reward_currency) }),
+      /* @__PURE__ */ jsx(Stat, { icon: /* @__PURE__ */ jsx(DollarSign, { className: "h-4 w-4" }), label: t("billing.referrals.credit_used", "Credit used"), value: fmt(program.credit_used_cents, program.reward_currency) })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "border rounded-lg bg-card p-5", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 mb-1", children: [
+        /* @__PURE__ */ jsx(Gift, { className: "h-4 w-4 text-primary" }),
+        /* @__PURE__ */ jsx("h3", { className: "font-semibold", children: t("billing.referrals.share_title", "Share your referral link") })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "text-sm text-muted-foreground space-y-1 mb-3", children: [
+        /* @__PURE__ */ jsx("div", { children: rewardLine }),
+        /* @__PURE__ */ jsx("div", { children: refereeLine })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "grid sm:grid-cols-2 gap-3 max-w-3xl", children: [
+        /* @__PURE__ */ jsxs("div", { children: [
+          /* @__PURE__ */ jsx("label", { className: "text-xs uppercase tracking-wide text-muted-foreground", children: t("billing.referrals.your_code", "Your referral code") }),
+          /* @__PURE__ */ jsxs("div", { className: "flex gap-2 mt-1", children: [
+            /* @__PURE__ */ jsx("input", { readOnly: true, value: program.code, className: "flex-1 border rounded-md px-3 py-2 text-sm font-mono bg-muted/30" }),
+            /* @__PURE__ */ jsx(
+              "button",
+              {
+                onClick: () => {
+                  navigator.clipboard.writeText(program.code);
+                  toast.success(t("billing.referrals.copied", "Copied"));
+                },
+                className: "inline-flex items-center gap-1 px-3 py-2 text-sm rounded-md border hover:bg-muted",
+                children: /* @__PURE__ */ jsx(Copy, { className: "h-3.5 w-3.5" })
+              }
+            )
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { children: [
+          /* @__PURE__ */ jsx("label", { className: "text-xs uppercase tracking-wide text-muted-foreground", children: t("billing.referrals.your_link", "Your referral link") }),
+          /* @__PURE__ */ jsxs("div", { className: "flex gap-2 mt-1", children: [
+            /* @__PURE__ */ jsx("input", { readOnly: true, value: link, className: "flex-1 border rounded-md px-3 py-2 text-sm font-mono bg-muted/30" }),
+            /* @__PURE__ */ jsx(
+              "button",
+              {
+                onClick: () => {
+                  navigator.clipboard.writeText(link);
+                  toast.success(t("billing.referrals.copied", "Copied"));
+                },
+                className: "inline-flex items-center gap-1 px-3 py-2 text-sm rounded-md border hover:bg-muted",
+                children: /* @__PURE__ */ jsx(Copy, { className: "h-3.5 w-3.5" })
+              }
+            )
+          ] })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsx("div", { className: "mt-4", children: /* @__PURE__ */ jsxs(
+        "button",
+        {
+          disabled: true,
+          title: t("billing.stripe_pending", "Stripe integration coming later"),
+          className: "inline-flex items-center gap-1 px-3 py-2 text-sm rounded-md bg-primary/40 text-primary-foreground cursor-not-allowed",
+          children: [
+            /* @__PURE__ */ jsx(Lock, { className: "h-3.5 w-3.5" }),
+            t("billing.referrals.withdraw", "Withdraw credit \u2014 Coming Soon")
+          ]
+        }
+      ) })
+    ] }),
+    canManage && /* @__PURE__ */ jsxs("div", { className: "border rounded-lg bg-card p-5", children: [
+      /* @__PURE__ */ jsx("h3", { className: "font-semibold mb-2", children: t("billing.referrals.add_mock", "Add a mock referral") }),
+      /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground mb-3", children: t("billing.referrals.add_mock_desc", "For testing only \u2014 records a local referral entry. No real invite is sent.") }),
+      /* @__PURE__ */ jsxs(
+        "form",
+        {
+          onSubmit: (e) => {
+            e.preventDefault();
+            if (email.trim()) addMut.mutate();
+          },
+          className: "flex flex-wrap gap-2 max-w-3xl",
+          children: [
+            /* @__PURE__ */ jsx(
+              "input",
+              {
+                type: "email",
+                value: email,
+                onChange: (e) => setEmail(e.target.value),
+                placeholder: "referee@example.com",
+                className: "flex-1 min-w-[200px] border rounded-md px-3 py-2 text-sm bg-background",
+                required: true
+              }
+            ),
+            /* @__PURE__ */ jsx(
+              "input",
+              {
+                value: orgName,
+                onChange: (e) => setOrgName(e.target.value),
+                placeholder: t("billing.referrals.org_name_ph", "Organization name (optional)"),
+                className: "flex-1 min-w-[200px] border rounded-md px-3 py-2 text-sm bg-background"
+              }
+            ),
+            /* @__PURE__ */ jsxs(
+              "button",
+              {
+                type: "submit",
+                disabled: addMut.isPending,
+                className: "inline-flex items-center gap-1 px-3 py-2 text-sm rounded-md bg-primary text-primary-foreground disabled:opacity-50",
+                children: [
+                  /* @__PURE__ */ jsx(Plus, { className: "h-3.5 w-3.5" }),
+                  t("billing.referrals.add", "Add")
+                ]
+              }
+            )
+          ]
+        }
+      )
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "border rounded-lg bg-card overflow-hidden", children: [
+      /* @__PURE__ */ jsx("div", { className: "px-4 py-3 border-b", children: /* @__PURE__ */ jsx("h3", { className: "font-semibold", children: t("billing.referrals.history", "Referral history") }) }),
+      referrals.length === 0 ? /* @__PURE__ */ jsx("div", { className: "p-6 text-sm text-muted-foreground text-center", children: t("billing.referrals.none", "No referrals yet.") }) : /* @__PURE__ */ jsxs("table", { className: "w-full text-sm", children: [
+        /* @__PURE__ */ jsx("thead", { className: "bg-muted/40 text-left", children: /* @__PURE__ */ jsxs("tr", { children: [
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.referrals.email", "Email") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.referrals.org", "Organization") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.status", "Status") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.referrals.signed_up", "Signed up") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2", children: t("billing.referrals.subscribed_at", "Subscribed") }),
+          /* @__PURE__ */ jsx("th", { className: "px-3 py-2 text-right", children: t("billing.referrals.reward", "Reward") }),
+          canManage && /* @__PURE__ */ jsx("th", { className: "px-3 py-2" })
+        ] }) }),
+        /* @__PURE__ */ jsx("tbody", { children: referrals.map((r) => /* @__PURE__ */ jsxs("tr", { className: "border-t", children: [
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: r.referee_email ?? "\u2014" }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-muted-foreground", children: r.referee_org_name ?? "\u2014" }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: /* @__PURE__ */ jsx("span", { className: statusBadge2(r.status), children: r.status.replace("_", " ") }) }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-muted-foreground", children: r.signed_up_at ? new Date(r.signed_up_at).toLocaleDateString() : "\u2014" }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-muted-foreground", children: r.subscribed_at ? new Date(r.subscribed_at).toLocaleDateString() : "\u2014" }),
+          /* @__PURE__ */ jsx("td", { className: "px-3 py-2 text-right", children: fmt(r.reward_amount_cents, r.reward_currency) }),
+          canManage && /* @__PURE__ */ jsxs("td", { className: "px-3 py-2 text-right", children: [
+            r.status === "pending" && /* @__PURE__ */ jsx("button", { onClick: () => advanceMut.mutate({ id: r.id, status: "signed_up" }), className: "text-xs text-primary hover:underline", children: t("billing.referrals.mark_signed_up", "Mark signed up") }),
+            r.status === "signed_up" && /* @__PURE__ */ jsx("button", { onClick: () => advanceMut.mutate({ id: r.id, status: "subscribed" }), className: "text-xs text-primary hover:underline", children: t("billing.referrals.mark_subscribed", "Mark subscribed") })
+          ] })
+        ] }, r.id)) })
+      ] })
+    ] })
+  ] });
+}
+function Stat({ icon, label, value }) {
+  return /* @__PURE__ */ jsxs("div", { className: "border rounded-lg bg-card p-4", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground", children: [
+      icon,
+      label
+    ] }),
+    /* @__PURE__ */ jsx("div", { className: "text-2xl font-semibold mt-1", children: value })
+  ] });
+}
+function pct(used, limit) {
+  if (limit == null || limit <= 0) return 0;
+  return Math.min(100, Math.round(used / limit * 100));
+}
+function barColor(p, unlimited) {
+  if (unlimited) return "bg-emerald-500";
+  if (p >= 90) return "bg-destructive";
+  if (p >= 75) return "bg-amber-500";
+  return "bg-primary";
+}
+var NEXT_PLAN = { free: "Basic", basic: "Pro", pro: "Business", business: "Business" };
+function BillingUsagePage() {
+  const { t } = useTranslation();
+  const { currentApp, useAuth, router, fns } = useJoaSuite();
+  const { currentTenantId } = useAuth();
+  const { Link } = router;
+  const appName = APP_DISPLAY.find((a) => a.code === currentApp)?.name ?? currentApp;
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["billing-usage", currentTenantId, currentApp],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.getTenantUsage({ tenant_id: currentTenantId, app_code: currentApp })
+  });
+  if (isLoading) {
+    return /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("common.loading", "Loading...") });
+  }
+  if (error || !data) {
+    return /* @__PURE__ */ jsx("div", { className: "rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-3 py-2 text-sm", children: error?.message ?? t("billing.usage.load_failed", "Failed to load usage") });
+  }
+  const { plan_code, limits, usage } = data;
+  const planLabel2 = plan_code.charAt(0).toUpperCase() + plan_code.slice(1);
+  const upgradeTo = NEXT_PLAN[plan_code] ?? "Business";
+  const metrics = [
+    { key: "users", label: t("billing.usage.users", "Users (seats)"), used: usage.users, limit: limits.users },
+    { key: "customers", label: t("billing.usage.customers", "Customers"), used: usage.customers, limit: limits.customers },
+    { key: "invoices", label: t("billing.usage.invoices_month", "Invoices this month"), used: usage.invoices_this_month, limit: limits.invoices_per_month },
+    {
+      key: "storage",
+      label: t("billing.usage.storage", "Document storage"),
+      used: usage.storage_gb,
+      limit: limits.storage_gb,
+      unit: "GB",
+      format: (n) => n.toFixed(2)
+    },
+    { key: "projects", label: t("billing.usage.projects", "Projects"), used: usage.projects, limit: limits.projects },
+    { key: "attachments", label: t("billing.usage.attachments", "Attachments"), used: usage.attachments, limit: limits.attachments },
+    { key: "active_apps", label: t("billing.usage.active_apps", "Active JoaSuite apps"), used: usage.active_apps, limit: null }
+  ];
+  const nearLimit = metrics.filter((m) => m.limit != null && pct(m.used, m.limit) >= 90);
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-5", children: [
+    /* @__PURE__ */ jsxs("div", { className: "border rounded-lg bg-card px-4 py-3 flex items-center justify-between flex-wrap gap-2", children: [
+      /* @__PURE__ */ jsxs("div", { children: [
+        /* @__PURE__ */ jsx("div", { className: "text-xs text-muted-foreground uppercase tracking-wide", children: t("billing.usage.current_plan", "Current plan") }),
+        /* @__PURE__ */ jsxs("div", { className: "font-semibold text-lg", children: [
+          appName,
+          " \xB7 ",
+          planLabel2
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs(
+        Link,
+        {
+          to: "/app/account/billing",
+          className: "inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline",
+          children: [
+            t("billing.usage.change_plan", "Change plan"),
+            /* @__PURE__ */ jsx(ArrowUpRight, { className: "h-3.5 w-3.5" })
+          ]
+        }
+      )
+    ] }),
+    nearLimit.length > 0 && plan_code !== "business" && /* @__PURE__ */ jsxs("div", { className: "rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200 px-3 py-2 text-sm flex items-start gap-2", children: [
+      /* @__PURE__ */ jsx(AlertTriangle, { className: "h-4 w-4 mt-0.5 shrink-0" }),
+      /* @__PURE__ */ jsx("div", { className: "space-y-0.5", children: nearLimit.map((m) => /* @__PURE__ */ jsx("div", { children: t("billing.usage.near_limit_msg", "You are using {{used}} of {{limit}} {{label}}. Upgrade to {{plan}} for more.", {
+        used: m.format ? m.format(m.used) : m.used,
+        limit: m.limit,
+        label: m.label.toLowerCase(),
+        plan: upgradeTo
+      }) }, m.key)) })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "border rounded-lg bg-card overflow-hidden", children: [
+      /* @__PURE__ */ jsxs("div", { className: "px-4 py-3 border-b flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx(Activity, { className: "h-4 w-4 text-muted-foreground" }),
+        /* @__PURE__ */ jsx("h3", { className: "font-semibold", children: t("billing.usage.title", "Usage & limits") })
+      ] }),
+      /* @__PURE__ */ jsx("div", { className: "divide-y", children: metrics.map((m) => {
+        const unlimited = m.limit == null;
+        const p = pct(m.used, m.limit);
+        const usedStr = m.format ? m.format(m.used) : String(m.used);
+        const limitStr = unlimited ? t("billing.usage.unlimited", "Unlimited") : `${m.limit}${m.unit ? " " + m.unit : ""}`;
+        return /* @__PURE__ */ jsxs("div", { className: "px-4 py-3", children: [
+          /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between text-sm", children: [
+            /* @__PURE__ */ jsx("span", { children: m.label }),
+            /* @__PURE__ */ jsxs("span", { className: "text-muted-foreground tabular-nums", children: [
+              usedStr,
+              m.unit ? " " + m.unit : "",
+              " / ",
+              limitStr
+            ] })
+          ] }),
+          /* @__PURE__ */ jsx("div", { className: "mt-2 h-2 rounded bg-muted overflow-hidden", children: /* @__PURE__ */ jsx(
+            "div",
+            {
+              className: `h-full ${barColor(p, unlimited)} transition-all`,
+              style: { width: unlimited ? "100%" : `${p}%` }
+            }
+          ) })
+        ] }, m.key);
+      }) })
+    ] }),
+    /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground", children: t(
+      "billing.usage.note",
+      "Limits are based on your current plan. Live metering is read from your JoaSuite database; some counters use safe fallbacks until full instrumentation lands."
+    ) })
+  ] });
+}
+var SECTIONS = [
+  {
+    title: "Business",
+    fields: [
+      { key: "company_legal_name", label: "Legal business name", placeholder: "Acme Inc.", wide: true, maxLength: 200 },
+      { key: "tax_id", label: "Tax ID / EIN", placeholder: "12-3456789", maxLength: 64 },
+      { key: "billing_email", label: "Billing email", placeholder: "billing@example.com", type: "email" },
+      { key: "billing_phone", label: "Billing phone", placeholder: "+1 555 555 5555", maxLength: 40 }
+    ]
+  },
+  {
+    title: "Billing address",
+    fields: [
+      { key: "address_line1", label: "Address line 1", wide: true, maxLength: 200 },
+      { key: "address_line2", label: "Address line 2", wide: true, maxLength: 200 },
+      { key: "city", label: "City", maxLength: 100 },
+      { key: "state", label: "State / Region", maxLength: 100 },
+      { key: "postal_code", label: "ZIP / Postal code", maxLength: 20 },
+      { key: "country", label: "Country (ISO 2)", placeholder: "US", maxLength: 2 }
+    ]
+  },
+  {
+    title: "Billing contact",
+    fields: [
+      { key: "billing_contact_name", label: "Billing contact name", maxLength: 120 },
+      { key: "billing_contact_email", label: "Billing contact email", type: "email" }
+    ]
+  },
+  {
+    title: "Invoice memo",
+    fields: [
+      { key: "invoice_memo", label: "Invoice memo", placeholder: "Appears on every invoice (PO #, references, notes)", wide: true, type: "textarea", maxLength: 1e3 }
+    ]
+  }
+];
+var ALL_KEYS = SECTIONS.flatMap((s) => s.fields.map((f) => f.key));
+function BillingDetailsPage() {
+  const { t } = useTranslation();
+  const { useAuth, ui, fns } = useJoaSuite();
+  const { currentTenantId } = useAuth();
+  const { Button, Input, Label, Textarea } = ui;
+  const qc = useQueryClient();
+  const overviewQ = useQuery({
+    queryKey: ["billing-overview", currentTenantId],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.getBillingOverview({ tenant_id: currentTenantId })
+  });
+  const permQ = useQuery({
+    queryKey: ["billing-perm", currentTenantId],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.canManageBillingFn({ tenant_id: currentTenantId })
+  });
+  const canManage = !!permQ.data?.can_manage;
+  const [form, setForm] = useState({});
+  useEffect(() => {
+    const c = overviewQ.data?.customer ?? {};
+    const next = {};
+    ALL_KEYS.forEach((k) => next[k] = c[k] ?? "");
+    setForm(next);
+  }, [overviewQ.data]);
+  const save = useMutation({
+    mutationFn: async () => {
+      const payload = { tenant_id: currentTenantId };
+      ALL_KEYS.forEach((k) => {
+        const v = (form[k] ?? "").trim();
+        payload[k] = v ? v : null;
+      });
+      if (payload.country) payload.country = payload.country.toUpperCase();
+      return fns.updateBillingCustomer(payload);
+    },
+    onSuccess: () => {
+      toast.success(t("billing.details_saved", "Billing information saved"));
+      qc.invalidateQueries({ queryKey: ["billing-overview"] });
+    },
+    onError: (e) => toast.error(e.message)
+  });
+  if (overviewQ.isLoading) return /* @__PURE__ */ jsx("div", { className: "text-muted-foreground", children: t("common.loading", "Loading...") });
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-5 max-w-3xl", children: [
+    /* @__PURE__ */ jsxs("div", { className: "rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground flex items-start gap-2", children: [
+      /* @__PURE__ */ jsx(Info, { className: "h-4 w-4 mt-0.5 shrink-0" }),
+      /* @__PURE__ */ jsx("span", { children: t(
+        "billing.details.stripe_note",
+        "Stored in your JoaSuite organization. These fields will be synced to your Stripe customer record once Stripe integration is enabled."
+      ) })
+    ] }),
+    SECTIONS.map((section) => /* @__PURE__ */ jsxs("div", { className: "border rounded-lg bg-card p-5", children: [
+      /* @__PURE__ */ jsx("h3", { className: "font-semibold mb-3", children: t(`billing.details.section.${section.title.toLowerCase().replace(/\s+/g, "_")}`, section.title) }),
+      /* @__PURE__ */ jsx("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-3", children: section.fields.map((f) => /* @__PURE__ */ jsxs("div", { className: f.wide ? "md:col-span-2" : "", children: [
+        /* @__PURE__ */ jsx(Label, { htmlFor: f.key, children: t(`billing.field.${f.key}`, f.label) }),
+        f.type === "textarea" ? /* @__PURE__ */ jsx(
+          Textarea,
+          {
+            id: f.key,
+            value: form[f.key] ?? "",
+            onChange: (e) => setForm((p) => ({ ...p, [f.key]: e.target.value })),
+            placeholder: f.placeholder,
+            maxLength: f.maxLength,
+            rows: 3,
+            disabled: !canManage
+          }
+        ) : /* @__PURE__ */ jsx(
+          Input,
+          {
+            id: f.key,
+            type: f.type ?? "text",
+            value: form[f.key] ?? "",
+            onChange: (e) => setForm((p) => ({ ...p, [f.key]: e.target.value })),
+            placeholder: f.placeholder,
+            maxLength: f.maxLength,
+            disabled: !canManage
+          }
+        )
+      ] }, f.key)) })
+    ] }, section.title)),
+    canManage && /* @__PURE__ */ jsx("div", { className: "flex justify-end", children: /* @__PURE__ */ jsx(Button, { onClick: () => save.mutate(), disabled: save.isPending, children: save.isPending ? t("common.saving", "Saving...") : t("common.save", "Save") }) })
+  ] });
+}
+var PLAN_ORDER = ["free", "basic", "pro", "business"];
+function fmtMoney4(cents) {
+  return new Intl.NumberFormat(void 0, { style: "currency", currency: "USD" }).format((cents ?? 0) / 100);
+}
+function planRank(code) {
+  const idx = PLAN_ORDER.indexOf(code);
+  return idx === -1 ? 99 : idx;
+}
+function BillingComparePage({ appCode }) {
+  const { t } = useTranslation();
+  const { useAuth, ui, router, fns } = useJoaSuite();
+  const { currentTenantId } = useAuth();
+  const { Link } = router;
+  const { Button } = ui;
+  const qc = useQueryClient();
+  const [interval, setInterval] = useState("month");
+  const plansQ = useQuery({
+    queryKey: ["billing-plans", appCode],
+    queryFn: () => fns.listBillingPlans({ app_code: appCode })
+  });
+  const overviewQ = useQuery({
+    queryKey: ["billing-overview", currentTenantId],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.getBillingOverview({ tenant_id: currentTenantId })
+  });
+  const permQ = useQuery({
+    queryKey: ["billing-perm", currentTenantId],
+    enabled: !!currentTenantId,
+    queryFn: () => fns.canManageBillingFn({ tenant_id: currentTenantId })
+  });
+  const canManage = !!permQ.data?.can_manage;
+  const sub = (overviewQ.data?.subscriptions ?? []).find((s) => s.app_code === appCode);
+  const currentPlan = sub?.plan_code;
+  const grouped = useMemo(() => {
+    const byPlan = /* @__PURE__ */ new Map();
+    (plansQ.data ?? []).forEach((p) => {
+      const slot = byPlan.get(p.plan_code) ?? {};
+      slot[p.interval] = p;
+      byPlan.set(p.plan_code, slot);
+    });
+    return Array.from(byPlan.entries()).filter(([code]) => code !== "free").sort((a, b) => planRank(a[0]) - planRank(b[0]));
+  }, [plansQ.data]);
+  const change = useMutation({
+    mutationFn: (input) => fns.changeSubscriptionPlan({
+      tenant_id: currentTenantId,
+      app_code: appCode,
+      plan_code: input.plan_code,
+      interval,
+      seats: 1
+    }),
+    onSuccess: () => {
+      toast.success(t("billing.plan_change_success", "Plan updated (simulated)"));
+      qc.invalidateQueries({ queryKey: ["billing-overview"] });
+    },
+    onError: (e) => toast.error(e.message)
+  });
+  const meta = APP_DISPLAY.find((a) => a.code === appCode);
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-4", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between gap-3 flex-wrap", children: [
+      /* @__PURE__ */ jsx("div", { className: "flex items-center gap-3", children: /* @__PURE__ */ jsxs(
+        Link,
+        {
+          to: "/app/account/billing",
+          className: "inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground",
+          children: [
+            /* @__PURE__ */ jsx(ArrowLeft, { className: "h-3.5 w-3.5" }),
+            t("billing.back_to_plans", "Back to Apps & Plans")
+          ]
+        }
+      ) }),
+      /* @__PURE__ */ jsx("div", { className: "inline-flex border rounded-md overflow-hidden text-xs", children: ["month", "year"].map((iv) => /* @__PURE__ */ jsx(
+        "button",
+        {
+          onClick: () => setInterval(iv),
+          className: `px-3 py-1.5 ${interval === iv ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent"}`,
+          children: iv === "month" ? t("billing.monthly", "Monthly") : t("billing.yearly", "Yearly")
+        },
+        iv
+      )) })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { children: [
+      /* @__PURE__ */ jsxs("h2", { className: "text-lg font-semibold", children: [
+        t("billing.compare_plans_for", "Compare plans for"),
+        " ",
+        meta?.name ?? appCode
+      ] }),
+      /* @__PURE__ */ jsx("p", { className: "text-sm text-muted-foreground mt-0.5", children: t("billing.compare_desc", "Pick the plan that fits your team. Yearly billing saves ~15%.") })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "rounded-md border border-blue-500/40 bg-blue-500/10 text-blue-900 dark:text-blue-200 px-3 py-2 text-xs flex items-start gap-2", children: [
+      /* @__PURE__ */ jsx(Sparkles, { className: "h-4 w-4 mt-0.5 shrink-0" }),
+      /* @__PURE__ */ jsx("span", { children: t("billing.stripe_future_short", "Updates local data only \u2014 Stripe coming later.") })
+    ] }),
+    plansQ.isLoading ? /* @__PURE__ */ jsx("div", { className: "text-muted-foreground", children: t("common.loading") }) : grouped.length === 0 ? /* @__PURE__ */ jsx("div", { className: "border rounded-lg p-6 text-center text-sm text-muted-foreground", children: t("billing.no_plans", "No plans available for this app yet.") }) : /* @__PURE__ */ jsx("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-3", children: grouped.map(([planCode, plans]) => {
+      const p = plans[interval] ?? plans.month ?? plans.year;
+      if (!p) return null;
+      const isCurrent = currentPlan === planCode;
+      const isUpgrade = currentPlan ? planRank(planCode) > planRank(currentPlan) : true;
+      const isDowngrade = currentPlan ? planRank(planCode) < planRank(currentPlan) : false;
+      const features = Array.isArray(p.features) ? p.features : [];
+      const yearly = plans.year;
+      const monthly = plans.month;
+      return /* @__PURE__ */ jsxs(
+        "div",
+        {
+          className: `border rounded-lg p-5 flex flex-col bg-card relative ${isCurrent ? "ring-2 ring-primary" : ""} ${planCode === "pro" ? "shadow-md" : ""}`,
+          children: [
+            isCurrent && /* @__PURE__ */ jsx("span", { className: "absolute -top-2 left-4 text-[10px] uppercase font-semibold bg-primary text-primary-foreground px-2 py-0.5 rounded", children: t("billing.current_plan", "Current plan") }),
+            planCode === "pro" && !isCurrent && /* @__PURE__ */ jsx("span", { className: "absolute -top-2 right-4 text-[10px] uppercase font-semibold bg-amber-500 text-white px-2 py-0.5 rounded", children: t("billing.popular", "Popular") }),
+            /* @__PURE__ */ jsx("div", { className: "font-semibold text-lg capitalize", children: p.name }),
+            p.description && /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground mt-1", children: p.description }),
+            /* @__PURE__ */ jsxs("div", { className: "mt-4", children: [
+              /* @__PURE__ */ jsx("div", { className: "text-3xl font-semibold", children: fmtMoney4(p.price_cents) }),
+              /* @__PURE__ */ jsxs("div", { className: "text-xs text-muted-foreground", children: [
+                "/ ",
+                p.interval
+              ] }),
+              interval === "month" && yearly && /* @__PURE__ */ jsxs("div", { className: "text-[11px] text-emerald-600 dark:text-emerald-400 mt-1", children: [
+                t("billing.or_yearly", "or"),
+                " ",
+                fmtMoney4(yearly.price_cents),
+                " / ",
+                t("billing.year_short", "yr")
+              ] }),
+              interval === "year" && monthly && /* @__PURE__ */ jsxs("div", { className: "text-[11px] text-muted-foreground mt-1", children: [
+                t("billing.equiv_monthly", "\u2248"),
+                " ",
+                fmtMoney4(Math.round(yearly.price_cents / 12)),
+                " /",
+                " ",
+                t("billing.month_short", "mo")
+              ] })
+            ] }),
+            /* @__PURE__ */ jsxs("ul", { className: "text-sm space-y-1.5 mt-4 flex-1", children: [
+              features.map((f) => /* @__PURE__ */ jsxs("li", { className: "flex items-start gap-2", children: [
+                /* @__PURE__ */ jsx(Check, { className: "h-4 w-4 mt-0.5 text-primary shrink-0" }),
+                /* @__PURE__ */ jsx("span", { children: f })
+              ] }, f)),
+              features.length === 0 && /* @__PURE__ */ jsx("li", { className: "text-xs text-muted-foreground", children: t("billing.no_features", "No feature list yet.") })
+            ] }),
+            /* @__PURE__ */ jsx("div", { className: "mt-5", children: isCurrent ? /* @__PURE__ */ jsx(Button, { size: "sm", variant: "outline", disabled: true, className: "w-full", children: t("billing.current_plan", "Current plan") }) : /* @__PURE__ */ jsxs(
+              Button,
+              {
+                size: "sm",
+                variant: isUpgrade ? "default" : "outline",
+                disabled: !canManage || change.isPending,
+                onClick: () => change.mutate({ plan_code: planCode }),
+                className: "w-full gap-1.5",
+                children: [
+                  isUpgrade ? /* @__PURE__ */ jsx(ArrowUp, { className: "h-3.5 w-3.5" }) : isDowngrade ? /* @__PURE__ */ jsx(ArrowDown, { className: "h-3.5 w-3.5" }) : null,
+                  isUpgrade ? t("billing.upgrade", "Upgrade") : isDowngrade ? t("billing.downgrade", "Downgrade") : t("billing.select_plan", "Select")
+                ]
+              }
+            ) })
+          ]
+        },
+        planCode
+      );
+    }) })
+  ] });
+}
 
-export { APP_CODES, APP_DISPLAY, AppOverviewSection, AppSubscriptionsSummary, DEFAULT_APP_URLS, EmployeeDirectoryListPage, EmployeeProfileForm, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
+export { APP_CODES, APP_DISPLAY, AppOverviewSection, AppSubscriptionsSummary, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, EmployeeDirectoryListPage, EmployeeProfileForm, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map
