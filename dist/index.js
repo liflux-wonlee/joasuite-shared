@@ -240,7 +240,9 @@ var en_default = {
     },
     tile: {
       users: "Users",
-      users_desc: "Invite users across all organizations and assign per-app roles."
+      users_desc: "Invite users across all organizations and assign per-app roles.",
+      team: "Team",
+      team_desc: "Team will provide shared access to basic employee and contractor info across JoaSuite apps."
     }
   },
   users: {
@@ -302,15 +304,15 @@ var en_default = {
     send_invite: "Send invitation",
     added_to_org: "Added to organization"
   },
-  directory: {
-    title: "Employee Directory",
+  team: {
+    title: "Team",
     desc: "Basic employee and contractor info shared across JoaSuite apps.",
     add: "Add person",
-    edit: "Edit directory entry",
+    edit: "Edit team member",
     search_placeholder: "Search name or email",
     col_name: "Name",
-    empty: "No directory entries yet.",
-    saved: "Directory entry saved",
+    empty: "No team members yet.",
+    saved: "Team member saved",
     name: "Name",
     contact_email: "Email",
     contact_phone: "Phone",
@@ -326,7 +328,7 @@ var en_default = {
     status_terminated: "Terminated",
     hire_date: "Hire date",
     org_structure_title: "Departments & Positions",
-    org_structure_desc: "Shared across JoaSuite apps. Used by the Employee Directory and requirements matching.",
+    org_structure_desc: "Shared across JoaSuite apps. Used by Team and requirements matching.",
     new_department: "New department",
     edit_department: "Edit department",
     department_name: "Name",
@@ -522,7 +524,9 @@ var ko_default = {
     },
     tile: {
       users: "\uC0AC\uC6A9\uC790",
-      users_desc: "\uBAA8\uB4E0 \uC870\uC9C1\uC5D0 \uAC78\uCCD0 \uC0AC\uC6A9\uC790\uB97C \uCD08\uB300\uD558\uACE0 \uC571\uBCC4 \uC5ED\uD560\uC744 \uBD80\uC5EC\uD569\uB2C8\uB2E4."
+      users_desc: "\uBAA8\uB4E0 \uC870\uC9C1\uC5D0 \uAC78\uCCD0 \uC0AC\uC6A9\uC790\uB97C \uCD08\uB300\uD558\uACE0 \uC571\uBCC4 \uC5ED\uD560\uC744 \uBD80\uC5EC\uD569\uB2C8\uB2E4.",
+      team: "\uD300",
+      team_desc: "Team\uC740 JoaSuite \uC804 \uC571\uC5D0\uC11C \uAE30\uBCF8 \uC9C1\uC6D0/\uACC4\uC57D\uC790 \uC815\uBCF4\uB97C \uACF5\uC720\uD558\uB294 \uAE30\uB2A5\uC744 \uC81C\uACF5\uD560 \uC608\uC815\uC785\uB2C8\uB2E4."
     }
   },
   users: {
@@ -584,15 +588,15 @@ var ko_default = {
     send_invite: "\uCD08\uB300 \uBCF4\uB0B4\uAE30",
     added_to_org: "\uC870\uC9C1\uC5D0 \uCD94\uAC00\uB418\uC5C8\uC2B5\uB2C8\uB2E4"
   },
-  directory: {
-    title: "\uC9C1\uC6D0 \uB514\uB809\uD1A0\uB9AC",
+  team: {
+    title: "\uD300",
     desc: "JoaSuite \uC804 \uC571\uC5D0\uC11C \uACF5\uC720\uB418\uB294 \uC9C1\uC6D0/\uACC4\uC57D\uC790 \uAE30\uBCF8 \uC815\uBCF4\uC785\uB2C8\uB2E4.",
     add: "\uAD6C\uC131\uC6D0 \uCD94\uAC00",
-    edit: "\uB514\uB809\uD1A0\uB9AC \uD56D\uBAA9 \uD3B8\uC9D1",
+    edit: "\uD300\uC6D0 \uD3B8\uC9D1",
     search_placeholder: "\uC774\uB984 \uB610\uB294 \uC774\uBA54\uC77C \uAC80\uC0C9",
     col_name: "\uC774\uB984",
-    empty: "\uC544\uC9C1 \uB514\uB809\uD1A0\uB9AC \uD56D\uBAA9\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
-    saved: "\uB514\uB809\uD1A0\uB9AC \uD56D\uBAA9\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4",
+    empty: "\uC544\uC9C1 \uD300\uC6D0\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    saved: "\uD300\uC6D0 \uC815\uBCF4\uAC00 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4",
     name: "\uC774\uB984",
     contact_email: "\uC774\uBA54\uC77C",
     contact_phone: "\uC804\uD654\uBC88\uD638",
@@ -608,7 +612,7 @@ var ko_default = {
     status_terminated: "\uD1F4\uC0AC",
     hire_date: "\uC785\uC0AC\uC77C",
     org_structure_title: "\uBD80\uC11C \uBC0F \uC9C1\uAE09",
-    org_structure_desc: "JoaSuite \uC804 \uC571\uC5D0\uC11C \uACF5\uC720\uB429\uB2C8\uB2E4. \uC9C1\uC6D0 \uB514\uB809\uD1A0\uB9AC\uC640 \uC694\uAD6C\uC0AC\uD56D \uB9E4\uCE6D\uC5D0 \uC0AC\uC6A9\uB429\uB2C8\uB2E4.",
+    org_structure_desc: "JoaSuite \uC804 \uC571\uC5D0\uC11C \uACF5\uC720\uB429\uB2C8\uB2E4. Team\uACFC \uC694\uAD6C\uC0AC\uD56D \uB9E4\uCE6D\uC5D0 \uC0AC\uC6A9\uB429\uB2C8\uB2E4.",
     new_department: "\uC0C8 \uBD80\uC11C",
     edit_department: "\uBD80\uC11C \uD3B8\uC9D1",
     department_name: "\uC774\uB984",
@@ -789,7 +793,9 @@ var zh_default = {
   suite: {
     tile: {
       users: "\u7528\u6237",
-      users_desc: "\u5728\u6240\u6709\u7EC4\u7EC7\u4E2D\u9080\u8BF7\u7528\u6237\u5E76\u5206\u914D\u5404\u5E94\u7528\u7684\u89D2\u8272\u3002"
+      users_desc: "\u5728\u6240\u6709\u7EC4\u7EC7\u4E2D\u9080\u8BF7\u7528\u6237\u5E76\u5206\u914D\u5404\u5E94\u7528\u7684\u89D2\u8272\u3002",
+      team: "\u56E2\u961F",
+      team_desc: "Team \u5C06\u5728 JoaSuite \u5404\u5E94\u7528\u95F4\u63D0\u4F9B\u5171\u4EAB\u7684\u5458\u5DE5/\u627F\u5305\u5546\u57FA\u672C\u4FE1\u606F\u8BBF\u95EE\u3002"
     }
   },
   users: {
@@ -851,15 +857,15 @@ var zh_default = {
     send_invite: "\u53D1\u9001\u9080\u8BF7",
     added_to_org: "\u5DF2\u6DFB\u52A0\u5230\u7EC4\u7EC7"
   },
-  directory: {
-    title: "\u5458\u5DE5\u901A\u8BAF\u5F55",
+  team: {
+    title: "\u56E2\u961F",
     desc: "JoaSuite \u5404\u5E94\u7528\u5171\u4EAB\u7684\u5458\u5DE5/\u627F\u5305\u5546\u57FA\u672C\u4FE1\u606F\u3002",
     add: "\u6DFB\u52A0\u4EBA\u5458",
-    edit: "\u7F16\u8F91\u901A\u8BAF\u5F55\u6761\u76EE",
+    edit: "\u7F16\u8F91\u56E2\u961F\u6210\u5458",
     search_placeholder: "\u641C\u7D22\u59D3\u540D\u6216\u90AE\u7BB1",
     col_name: "\u59D3\u540D",
-    empty: "\u6682\u65E0\u901A\u8BAF\u5F55\u6761\u76EE\u3002",
-    saved: "\u901A\u8BAF\u5F55\u6761\u76EE\u5DF2\u4FDD\u5B58",
+    empty: "\u6682\u65E0\u56E2\u961F\u6210\u5458\u3002",
+    saved: "\u56E2\u961F\u6210\u5458\u4FE1\u606F\u5DF2\u4FDD\u5B58",
     name: "\u59D3\u540D",
     contact_email: "\u90AE\u7BB1",
     contact_phone: "\u7535\u8BDD",
@@ -875,7 +881,7 @@ var zh_default = {
     status_terminated: "\u5DF2\u79BB\u804C",
     hire_date: "\u5165\u804C\u65E5\u671F",
     org_structure_title: "\u90E8\u95E8\u4E0E\u804C\u4F4D",
-    org_structure_desc: "JoaSuite \u5404\u5E94\u7528\u5171\u4EAB\u3002\u7528\u4E8E\u5458\u5DE5\u901A\u8BAF\u5F55\u548C\u9700\u6C42\u5339\u914D\u3002",
+    org_structure_desc: "JoaSuite \u5404\u5E94\u7528\u5171\u4EAB\u3002\u7528\u4E8E Team \u548C\u9700\u6C42\u5339\u914D\u3002",
     new_department: "\u65B0\u5EFA\u90E8\u95E8",
     edit_department: "\u7F16\u8F91\u90E8\u95E8",
     department_name: "\u540D\u79F0",
@@ -1059,7 +1065,9 @@ var es_default = {
   suite: {
     tile: {
       users: "Usuarios",
-      users_desc: "Invita usuarios en todas las organizaciones y asigna roles por aplicaci\xF3n."
+      users_desc: "Invita usuarios en todas las organizaciones y asigna roles por aplicaci\xF3n.",
+      team: "Equipo",
+      team_desc: "Team ofrecer\xE1 acceso compartido a la informaci\xF3n b\xE1sica de empleados y contratistas en las apps de JoaSuite."
     }
   },
   users: {
@@ -1121,15 +1129,15 @@ var es_default = {
     send_invite: "Enviar invitaci\xF3n",
     added_to_org: "A\xF1adido a la organizaci\xF3n"
   },
-  directory: {
-    title: "Directorio de empleados",
+  team: {
+    title: "Equipo",
     desc: "Informaci\xF3n b\xE1sica de empleados y contratistas compartida entre las apps de JoaSuite.",
     add: "A\xF1adir persona",
-    edit: "Editar entrada del directorio",
+    edit: "Editar miembro del equipo",
     search_placeholder: "Buscar por nombre o correo",
     col_name: "Nombre",
-    empty: "A\xFAn no hay entradas en el directorio.",
-    saved: "Entrada del directorio guardada",
+    empty: "A\xFAn no hay miembros del equipo.",
+    saved: "Miembro del equipo guardado",
     name: "Nombre",
     contact_email: "Correo",
     contact_phone: "Tel\xE9fono",
@@ -1145,7 +1153,7 @@ var es_default = {
     status_terminated: "Baja",
     hire_date: "Fecha de contrataci\xF3n",
     org_structure_title: "Departamentos y puestos",
-    org_structure_desc: "Compartido entre las apps de JoaSuite. Usado por el Directorio de empleados y la coincidencia de requisitos.",
+    org_structure_desc: "Compartido entre las apps de JoaSuite. Usado por Team y la coincidencia de requisitos.",
     new_department: "Nuevo departamento",
     edit_department: "Editar departamento",
     department_name: "Nombre",
@@ -1329,7 +1337,9 @@ var vi_default = {
   suite: {
     tile: {
       users: "Ng\u01B0\u1EDDi d\xF9ng",
-      users_desc: "M\u1EDDi ng\u01B0\u1EDDi d\xF9ng tr\xEAn t\u1EA5t c\u1EA3 t\u1ED5 ch\u1EE9c v\xE0 ph\xE2n quy\u1EC1n theo t\u1EEBng \u1EE9ng d\u1EE5ng."
+      users_desc: "M\u1EDDi ng\u01B0\u1EDDi d\xF9ng tr\xEAn t\u1EA5t c\u1EA3 t\u1ED5 ch\u1EE9c v\xE0 ph\xE2n quy\u1EC1n theo t\u1EEBng \u1EE9ng d\u1EE5ng.",
+      team: "Nh\xF3m",
+      team_desc: "Team s\u1EBD cung c\u1EA5p quy\u1EC1n truy c\u1EADp chung v\xE0o th\xF4ng tin c\u01A1 b\u1EA3n c\u1EE7a nh\xE2n vi\xEAn v\xE0 nh\xE0 th\u1EA7u tr\xEAn c\xE1c \u1EE9ng d\u1EE5ng JoaSuite."
     }
   },
   users: {
@@ -1391,15 +1401,15 @@ var vi_default = {
     send_invite: "G\u1EEDi l\u1EDDi m\u1EDDi",
     added_to_org: "\u0110\xE3 th\xEAm v\xE0o t\u1ED5 ch\u1EE9c"
   },
-  directory: {
-    title: "Danh b\u1EA1 nh\xE2n vi\xEAn",
+  team: {
+    title: "Nh\xF3m",
     desc: "Th\xF4ng tin c\u01A1 b\u1EA3n c\u1EE7a nh\xE2n vi\xEAn v\xE0 nh\xE0 th\u1EA7u, d\xF9ng chung gi\u1EEFa c\xE1c \u1EE9ng d\u1EE5ng JoaSuite.",
     add: "Th\xEAm ng\u01B0\u1EDDi",
-    edit: "S\u1EEDa m\u1EE5c danh b\u1EA1",
+    edit: "S\u1EEDa th\xE0nh vi\xEAn nh\xF3m",
     search_placeholder: "T\xECm theo t\xEAn ho\u1EB7c email",
     col_name: "T\xEAn",
-    empty: "Ch\u01B0a c\xF3 m\u1EE5c danh b\u1EA1 n\xE0o.",
-    saved: "\u0110\xE3 l\u01B0u m\u1EE5c danh b\u1EA1",
+    empty: "Ch\u01B0a c\xF3 th\xE0nh vi\xEAn nh\xF3m n\xE0o.",
+    saved: "\u0110\xE3 l\u01B0u th\xF4ng tin th\xE0nh vi\xEAn nh\xF3m",
     name: "T\xEAn",
     contact_email: "Email",
     contact_phone: "\u0110i\u1EC7n tho\u1EA1i",
@@ -1415,7 +1425,7 @@ var vi_default = {
     status_terminated: "\u0110\xE3 ngh\u1EC9 vi\u1EC7c",
     hire_date: "Ng\xE0y v\xE0o l\xE0m",
     org_structure_title: "Ph\xF2ng ban & Ch\u1EE9c v\u1EE5",
-    org_structure_desc: "D\xF9ng chung gi\u1EEFa c\xE1c \u1EE9ng d\u1EE5ng JoaSuite. \u0110\u01B0\u1EE3c s\u1EED d\u1EE5ng b\u1EDFi Danh b\u1EA1 nh\xE2n vi\xEAn v\xE0 vi\u1EC7c kh\u1EDBp y\xEAu c\u1EA7u.",
+    org_structure_desc: "D\xF9ng chung gi\u1EEFa c\xE1c \u1EE9ng d\u1EE5ng JoaSuite. \u0110\u01B0\u1EE3c s\u1EED d\u1EE5ng b\u1EDFi Team v\xE0 vi\u1EC7c kh\u1EDBp y\xEAu c\u1EA7u.",
     new_department: "Ph\xF2ng ban m\u1EDBi",
     edit_department: "S\u1EEDa ph\xF2ng ban",
     department_name: "T\xEAn",
@@ -2304,10 +2314,10 @@ function SuiteSettingsHub() {
     },
     {
       icon: Contact2,
-      label: t("suite.tile.directory", "Directory"),
+      label: t("suite.tile.team", "Team"),
       description: t(
-        "suite.tile.directory_desc",
-        "Directory will provide shared access to customers, vendors, employees, contractors, and contacts across JoaSuite apps."
+        "suite.tile.team_desc",
+        "Team will provide shared access to basic employee and contractor info across JoaSuite apps."
       ),
       disabled: true,
       badge: t("suite.state.coming_soon", "Coming Soon")
@@ -3417,7 +3427,7 @@ function UserDetailPage({ userId }) {
 var ANY = "__any__";
 var WORKER_TYPES = ["employee", "contractor"];
 var EMPLOYMENT_STATUSES = ["active", "on_leave", "terminated"];
-function EmployeeProfileForm({
+function TeamMemberForm({
   tenantId,
   partyId,
   linkedUserId,
@@ -3429,14 +3439,14 @@ function EmployeeProfileForm({
   const { Button, Input, Label, EmailInput, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } = ui;
   const qc = useQueryClient();
   const orgQ = useQuery({
-    queryKey: ["directory-org", tenantId],
+    queryKey: ["team-org", tenantId],
     enabled: !!tenantId,
     queryFn: () => fns.listDepartmentsAndPositions({ tenant_id: tenantId })
   });
   const entryQ = useQuery({
-    queryKey: ["directory-entry", tenantId, partyId],
+    queryKey: ["team-member", tenantId, partyId],
     enabled: !!tenantId && !!partyId,
-    queryFn: () => fns.getEmployeeDirectoryEntry({ tenant_id: tenantId, party_id: partyId })
+    queryFn: () => fns.getTeamMember({ tenant_id: tenantId, party_id: partyId })
   });
   const [nameEn, setNameEn] = useState("");
   const [contactEmail, setContactEmail] = useState("");
@@ -3459,7 +3469,7 @@ function EmployeeProfileForm({
     setWorkerType(e.worker_type ?? "employee");
   }, [entryQ.data]);
   const save = useMutation({
-    mutationFn: () => fns.upsertEmployeeDirectoryEntry({
+    mutationFn: () => fns.upsertTeamMember({
       tenant_id: tenantId,
       party_id: partyId,
       linked_user_id: partyId ? void 0 : linkedUserId,
@@ -3473,9 +3483,9 @@ function EmployeeProfileForm({
       worker_type: workerType
     }),
     onSuccess: (res) => {
-      toast.success(t("directory.saved", "Directory entry saved"));
-      qc.invalidateQueries({ queryKey: ["directory-entry", tenantId, partyId] });
-      qc.invalidateQueries({ queryKey: ["directory-list", tenantId] });
+      toast.success(t("team.saved", "Team member saved"));
+      qc.invalidateQueries({ queryKey: ["team-member", tenantId, partyId] });
+      qc.invalidateQueries({ queryKey: ["team-list", tenantId] });
       onSaved?.(res);
     },
     onError: (e) => toast.error(e.message)
@@ -3491,11 +3501,11 @@ function EmployeeProfileForm({
   return /* @__PURE__ */ jsxs("div", { className: "space-y-3", children: [
     (isNew || linkedUserId) && /* @__PURE__ */ jsxs(Fragment, { children: [
       /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsx(Label, { children: t("directory.name", "Name") }),
+        /* @__PURE__ */ jsx(Label, { children: t("team.name", "Name") }),
         /* @__PURE__ */ jsx(Input, { value: nameEn, onChange: (e) => setNameEn(e.target.value), disabled: readOnly })
       ] }),
       /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsx(Label, { children: t("directory.contact_email", "Email") }),
+        /* @__PURE__ */ jsx(Label, { children: t("team.contact_email", "Email") }),
         /* @__PURE__ */ jsx(
           EmailInput,
           {
@@ -3506,27 +3516,27 @@ function EmployeeProfileForm({
         )
       ] }),
       /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsx(Label, { children: t("directory.contact_phone", "Phone") }),
+        /* @__PURE__ */ jsx(Label, { children: t("team.contact_phone", "Phone") }),
         /* @__PURE__ */ jsx(Input, { value: contactPhone, onChange: (e) => setContactPhone(e.target.value), disabled: readOnly })
       ] })
     ] }),
     /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
       /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsx(Label, { children: t("directory.department", "Department") }),
+        /* @__PURE__ */ jsx(Label, { children: t("team.department", "Department") }),
         /* @__PURE__ */ jsxs(Select, { value: departmentId, onValueChange: setDepartmentId, disabled: readOnly, children: [
           /* @__PURE__ */ jsx(SelectTrigger, { children: /* @__PURE__ */ jsx(SelectValue, {}) }),
           /* @__PURE__ */ jsxs(SelectContent, { children: [
-            /* @__PURE__ */ jsx(SelectItem, { value: ANY, children: t("directory.none", "None") }),
+            /* @__PURE__ */ jsx(SelectItem, { value: ANY, children: t("team.none", "None") }),
             departments.map((d) => /* @__PURE__ */ jsx(SelectItem, { value: d.id, children: d.name }, d.id))
           ] })
         ] })
       ] }),
       /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsx(Label, { children: t("directory.position", "Position") }),
+        /* @__PURE__ */ jsx(Label, { children: t("team.position", "Position") }),
         /* @__PURE__ */ jsxs(Select, { value: positionId, onValueChange: setPositionId, disabled: readOnly, children: [
           /* @__PURE__ */ jsx(SelectTrigger, { children: /* @__PURE__ */ jsx(SelectValue, {}) }),
           /* @__PURE__ */ jsxs(SelectContent, { children: [
-            /* @__PURE__ */ jsx(SelectItem, { value: ANY, children: t("directory.none", "None") }),
+            /* @__PURE__ */ jsx(SelectItem, { value: ANY, children: t("team.none", "None") }),
             positions.map((p) => /* @__PURE__ */ jsx(SelectItem, { value: p.id, children: p.name }, p.id))
           ] })
         ] })
@@ -3534,28 +3544,28 @@ function EmployeeProfileForm({
     ] }),
     /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
       /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsx(Label, { children: t("directory.worker_type", "Worker type") }),
+        /* @__PURE__ */ jsx(Label, { children: t("team.worker_type", "Worker type") }),
         /* @__PURE__ */ jsxs(Select, { value: workerType, onValueChange: setWorkerType, disabled: readOnly, children: [
           /* @__PURE__ */ jsx(SelectTrigger, { children: /* @__PURE__ */ jsx(SelectValue, {}) }),
-          /* @__PURE__ */ jsx(SelectContent, { children: WORKER_TYPES.map((w) => /* @__PURE__ */ jsx(SelectItem, { value: w, children: t(`directory.worker_type_${w}`, w) }, w)) })
+          /* @__PURE__ */ jsx(SelectContent, { children: WORKER_TYPES.map((w) => /* @__PURE__ */ jsx(SelectItem, { value: w, children: t(`team.worker_type_${w}`, w) }, w)) })
         ] })
       ] }),
       /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsx(Label, { children: t("directory.employment_status", "Status") }),
+        /* @__PURE__ */ jsx(Label, { children: t("team.employment_status", "Status") }),
         /* @__PURE__ */ jsxs(Select, { value: employmentStatus, onValueChange: setEmploymentStatus, disabled: readOnly, children: [
           /* @__PURE__ */ jsx(SelectTrigger, { children: /* @__PURE__ */ jsx(SelectValue, {}) }),
-          /* @__PURE__ */ jsx(SelectContent, { children: EMPLOYMENT_STATUSES.map((s) => /* @__PURE__ */ jsx(SelectItem, { value: s, children: t(`directory.status_${s}`, s) }, s)) })
+          /* @__PURE__ */ jsx(SelectContent, { children: EMPLOYMENT_STATUSES.map((s) => /* @__PURE__ */ jsx(SelectItem, { value: s, children: t(`team.status_${s}`, s) }, s)) })
         ] })
       ] })
     ] }),
     /* @__PURE__ */ jsxs("div", { children: [
-      /* @__PURE__ */ jsx(Label, { children: t("directory.hire_date", "Hire date") }),
+      /* @__PURE__ */ jsx(Label, { children: t("team.hire_date", "Hire date") }),
       /* @__PURE__ */ jsx(Input, { type: "date", value: hireDate, onChange: (e) => setHireDate(e.target.value), disabled: readOnly })
     ] }),
     !readOnly && /* @__PURE__ */ jsx("div", { className: "flex justify-end", children: /* @__PURE__ */ jsx(Button, { onClick: () => save.mutate(), disabled: save.isPending || isNew && !nameEn.trim(), children: save.isPending ? t("set.sending", "Sending\u2026") : t("common.save") }) })
   ] });
 }
-function EmployeeDirectoryListPage({ tenantId }) {
+function TeamListPage({ tenantId, onEntrySaved }) {
   const { t } = useTranslation();
   const { ui, fns } = useJoaSuite();
   const {
@@ -3572,9 +3582,9 @@ function EmployeeDirectoryListPage({ tenantId }) {
   const [editingPartyId, setEditingPartyId] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const listQ = useQuery({
-    queryKey: ["directory-list", tenantId, search],
+    queryKey: ["team-list", tenantId, search],
     enabled: !!tenantId,
-    queryFn: () => fns.listEmployeeDirectory({ tenant_id: tenantId, search: search || void 0 })
+    queryFn: () => fns.listTeamMembers({ tenant_id: tenantId, search: search || void 0 })
   });
   const rows = listQ.data?.rows ?? [];
   return /* @__PURE__ */ jsxs("div", { className: "p-6 lg:p-8 max-w-5xl mx-auto space-y-4", children: [
@@ -3582,16 +3592,16 @@ function EmployeeDirectoryListPage({ tenantId }) {
       /* @__PURE__ */ jsxs("div", { children: [
         /* @__PURE__ */ jsxs("h1", { className: "text-2xl font-semibold flex items-center gap-2", children: [
           /* @__PURE__ */ jsx(Users, { className: "h-6 w-6" }),
-          t("directory.title", "Employee Directory")
+          t("team.title", "Team")
         ] }),
         /* @__PURE__ */ jsx("p", { className: "text-sm text-muted-foreground mt-1", children: t(
-          "directory.desc",
+          "team.desc",
           "Basic employee and contractor info shared across JoaSuite apps."
         ) })
       ] }),
       /* @__PURE__ */ jsxs(Button, { size: "sm", onClick: () => setAddOpen(true), children: [
         /* @__PURE__ */ jsx(Plus, { className: "h-4 w-4" }),
-        t("directory.add", "Add person")
+        t("team.add", "Add person")
       ] })
     ] }),
     /* @__PURE__ */ jsxs("div", { className: "relative max-w-sm", children: [
@@ -3599,7 +3609,7 @@ function EmployeeDirectoryListPage({ tenantId }) {
       /* @__PURE__ */ jsx(
         Input,
         {
-          placeholder: t("directory.search_placeholder", "Search name or email"),
+          placeholder: t("team.search_placeholder", "Search name or email"),
           value: search,
           onChange: (e) => setSearch(e.target.value),
           className: "pl-8"
@@ -3608,14 +3618,14 @@ function EmployeeDirectoryListPage({ tenantId }) {
     ] }),
     /* @__PURE__ */ jsx("div", { className: "border rounded-lg bg-card overflow-x-auto", children: /* @__PURE__ */ jsxs("table", { className: "w-full text-sm", children: [
       /* @__PURE__ */ jsx("thead", { className: "bg-muted/40 text-left", children: /* @__PURE__ */ jsxs("tr", { children: [
-        /* @__PURE__ */ jsx("th", { className: "px-3 py-2 min-w-[220px]", children: t("directory.col_name", "Name") }),
-        /* @__PURE__ */ jsx("th", { className: "px-3 py-2 min-w-[140px]", children: t("directory.department", "Department") }),
-        /* @__PURE__ */ jsx("th", { className: "px-3 py-2 min-w-[140px]", children: t("directory.position", "Position") }),
-        /* @__PURE__ */ jsx("th", { className: "px-3 py-2 min-w-[110px]", children: t("directory.worker_type", "Worker type") }),
-        /* @__PURE__ */ jsx("th", { className: "px-3 py-2 min-w-[100px]", children: t("directory.employment_status", "Status") })
+        /* @__PURE__ */ jsx("th", { className: "px-3 py-2 min-w-[220px]", children: t("team.col_name", "Name") }),
+        /* @__PURE__ */ jsx("th", { className: "px-3 py-2 min-w-[140px]", children: t("team.department", "Department") }),
+        /* @__PURE__ */ jsx("th", { className: "px-3 py-2 min-w-[140px]", children: t("team.position", "Position") }),
+        /* @__PURE__ */ jsx("th", { className: "px-3 py-2 min-w-[110px]", children: t("team.worker_type", "Worker type") }),
+        /* @__PURE__ */ jsx("th", { className: "px-3 py-2 min-w-[100px]", children: t("team.employment_status", "Status") })
       ] }) }),
       /* @__PURE__ */ jsxs("tbody", { children: [
-        !listQ.isLoading && rows.length === 0 && /* @__PURE__ */ jsx("tr", { children: /* @__PURE__ */ jsx("td", { colSpan: 5, className: "px-3 py-6 text-center text-muted-foreground", children: t("directory.empty", "No directory entries yet.") }) }),
+        !listQ.isLoading && rows.length === 0 && /* @__PURE__ */ jsx("tr", { children: /* @__PURE__ */ jsx("td", { colSpan: 5, className: "px-3 py-6 text-center text-muted-foreground", children: t("team.empty", "No team members yet.") }) }),
         rows.map((r) => /* @__PURE__ */ jsxs(
           "tr",
           {
@@ -3628,8 +3638,8 @@ function EmployeeDirectoryListPage({ tenantId }) {
               ] }),
               /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: r.department ?? "\u2014" }),
               /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: r.position ?? "\u2014" }),
-              /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: /* @__PURE__ */ jsx(Badge, { variant: "outline", className: "capitalize text-[10px]", children: t(`directory.worker_type_${r.worker_type ?? "employee"}`, r.worker_type ?? "employee") }) }),
-              /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: r.employment_status ? t(`directory.status_${r.employment_status}`, String(r.employment_status)) : "\u2014" })
+              /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: /* @__PURE__ */ jsx(Badge, { variant: "outline", className: "capitalize text-[10px]", children: t(`team.worker_type_${r.worker_type ?? "employee"}`, r.worker_type ?? "employee") }) }),
+              /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: r.employment_status ? t(`team.status_${r.employment_status}`, String(r.employment_status)) : "\u2014" })
             ]
           },
           r.party_id
@@ -3637,17 +3647,29 @@ function EmployeeDirectoryListPage({ tenantId }) {
       ] })
     ] }) }),
     /* @__PURE__ */ jsx(Dialog, { open: addOpen, onOpenChange: setAddOpen, children: /* @__PURE__ */ jsxs(DialogContent, { className: "max-w-md", children: [
-      /* @__PURE__ */ jsx(DialogHeader, { children: /* @__PURE__ */ jsx(DialogTitle, { children: t("directory.add", "Add person") }) }),
-      /* @__PURE__ */ jsx(EmployeeProfileForm, { tenantId, onSaved: () => setAddOpen(false) })
+      /* @__PURE__ */ jsx(DialogHeader, { children: /* @__PURE__ */ jsx(DialogTitle, { children: t("team.add", "Add person") }) }),
+      /* @__PURE__ */ jsx(
+        TeamMemberForm,
+        {
+          tenantId,
+          onSaved: (res) => {
+            setAddOpen(false);
+            onEntrySaved?.(res);
+          }
+        }
+      )
     ] }) }),
     /* @__PURE__ */ jsx(Dialog, { open: !!editingPartyId, onOpenChange: (open) => !open && setEditingPartyId(null), children: /* @__PURE__ */ jsxs(DialogContent, { className: "max-w-md", children: [
-      /* @__PURE__ */ jsx(DialogHeader, { children: /* @__PURE__ */ jsx(DialogTitle, { children: t("directory.edit", "Edit directory entry") }) }),
+      /* @__PURE__ */ jsx(DialogHeader, { children: /* @__PURE__ */ jsx(DialogTitle, { children: t("team.edit", "Edit team member") }) }),
       editingPartyId && /* @__PURE__ */ jsx(
-        EmployeeProfileForm,
+        TeamMemberForm,
         {
           tenantId,
           partyId: editingPartyId,
-          onSaved: () => setEditingPartyId(null)
+          onSaved: (res) => {
+            setEditingPartyId(null);
+            onEntrySaved?.(res);
+          }
         }
       )
     ] }) })
@@ -3912,6 +3934,6 @@ function OrgStructureSettingsPage({ tenantId }) {
   ] });
 }
 
-export { APP_CODES, APP_DISPLAY, AppOverviewSection, AppSubscriptionsSummary, DEFAULT_APP_URLS, EmployeeDirectoryListPage, EmployeeProfileForm, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
+export { APP_CODES, APP_DISPLAY, AppOverviewSection, AppSubscriptionsSummary, DEFAULT_APP_URLS, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

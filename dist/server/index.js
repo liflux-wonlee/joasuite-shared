@@ -800,11 +800,11 @@ async function loadDeptPosNames(supabaseAdmin, tenantId, deptIds, posIds) {
     posName: new Map((positions ?? []).map((p) => [p.id, p.name]))
   };
 }
-function createListEmployeeDirectory(deps) {
+function createListTeamMembers(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({ tenant_id: z.string().uuid(), search: z.string().max(200).optional() }).parse(i)
   ).handler(async ({ data, context }) => {
-    await deps.assertCanReadEmployeeDirectory(data.tenant_id, context.userId);
+    await deps.assertCanReadTeam(data.tenant_id, context.userId);
     let pq = deps.supabaseAdmin.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active").eq("tenant_id", data.tenant_id).eq("is_employee", true).order("name_en");
     if (data.search?.trim()) {
       const s = data.search.trim();
@@ -849,14 +849,14 @@ function createListEmployeeDirectory(deps) {
     };
   });
 }
-function createGetEmployeeDirectoryEntry(deps) {
+function createGetTeamMember(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({ tenant_id: z.string().uuid(), party_id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
-    await deps.assertCanReadEmployeeDirectory(data.tenant_id, context.userId);
+    await deps.assertCanReadTeam(data.tenant_id, context.userId);
     const { data: party, error: pErr } = await deps.supabaseAdmin.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active, is_employee").eq("tenant_id", data.tenant_id).eq("id", data.party_id).maybeSingle();
     if (pErr) throw new Error(pErr.message);
-    if (!party || !party.is_employee) throw new Error("Employee not found");
+    if (!party || !party.is_employee) throw new Error("Team member not found");
     const { data: profile, error: prErr } = await deps.supabaseAdmin.from("employee_profiles").select(
       "party_id, department_id, position_id, manager_id, employment_status, hire_date, termination_date, worker_type"
     ).eq("tenant_id", data.tenant_id).eq("party_id", data.party_id).maybeSingle();
@@ -886,7 +886,7 @@ function createGetEmployeeDirectoryEntry(deps) {
     };
   });
 }
-function createUpsertEmployeeDirectoryEntry(deps) {
+function createUpsertTeamMember(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({
       tenant_id: z.string().uuid(),
@@ -905,7 +905,7 @@ function createUpsertEmployeeDirectoryEntry(deps) {
     }).parse(i)
   ).handler(async ({ data, context }) => {
     const callerId = context.userId;
-    await deps.assertCanWriteEmployeeDirectory(data.tenant_id, callerId);
+    await deps.assertCanWriteTeam(data.tenant_id, callerId);
     let partyId;
     let created = false;
     if (data.party_id) {
@@ -942,7 +942,7 @@ function createUpsertEmployeeDirectoryEntry(deps) {
         created = true;
       }
     } else {
-      if (!data.name_en) throw new Error("name_en is required to create a new directory entry");
+      if (!data.name_en) throw new Error("name_en is required to create a new team member");
       const { data: newParty, error: insErr } = await deps.supabaseAdmin.from("parties").insert({
         tenant_id: data.tenant_id,
         name_en: data.name_en,
@@ -1975,6 +1975,6 @@ function createMergeParties(deps) {
   });
 }
 
-export { createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createArchiveParty, createCancelApp, createCleanupPartyContacts, createCreateDepartment, createCreatePosition, createDeleteDepartment, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDeletePosition, createGetEmployeeDirectoryEntry, createGetMyProfile, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListDepartmentsAndPositions, createListEmployeeDirectory, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSetUserAppRoles, createSubscribeApp, createUnarchiveParty, createUpdateDepartment, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdatePosition, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertEmployeeDirectoryEntry, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, resolveScopedTenantIds };
+export { createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createArchiveParty, createCancelApp, createCleanupPartyContacts, createCreateDepartment, createCreatePosition, createDeleteDepartment, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDeletePosition, createGetMyProfile, createGetParty, createGetSuiteHome, createGetTeamMember, createGetTenantSettings, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListDepartmentsAndPositions, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTeamMembers, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSetUserAppRoles, createSubscribeApp, createUnarchiveParty, createUpdateDepartment, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdatePosition, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, createUpsertTeamMember, resolveScopedTenantIds };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

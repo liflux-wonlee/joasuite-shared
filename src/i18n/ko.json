@@ -179,7 +179,9 @@
     },
     "tile": {
       "users": "사용자",
-      "users_desc": "모든 조직에 걸쳐 사용자를 초대하고 앱별 역할을 부여합니다."
+      "users_desc": "모든 조직에 걸쳐 사용자를 초대하고 앱별 역할을 부여합니다.",
+      "team": "팀",
+      "team_desc": "Team은 JoaSuite 전 앱에서 기본 직원/계약자 정보를 공유하는 기능을 제공할 예정입니다."
     }
   },
   "users": {
@@ -241,15 +243,15 @@
     "send_invite": "초대 보내기",
     "added_to_org": "조직에 추가되었습니다"
   },
-  "directory": {
-    "title": "직원 디렉토리",
+  "team": {
+    "title": "팀",
     "desc": "JoaSuite 전 앱에서 공유되는 직원/계약자 기본 정보입니다.",
     "add": "구성원 추가",
-    "edit": "디렉토리 항목 편집",
+    "edit": "팀원 편집",
     "search_placeholder": "이름 또는 이메일 검색",
     "col_name": "이름",
-    "empty": "아직 디렉토리 항목이 없습니다.",
-    "saved": "디렉토리 항목이 저장되었습니다",
+    "empty": "아직 팀원이 없습니다.",
+    "saved": "팀원 정보가 저장되었습니다",
     "name": "이름",
     "contact_email": "이메일",
     "contact_phone": "전화번호",
@@ -265,7 +267,7 @@
     "status_terminated": "퇴사",
     "hire_date": "입사일",
     "org_structure_title": "부서 및 직급",
-    "org_structure_desc": "JoaSuite 전 앱에서 공유됩니다. 직원 디렉토리와 요구사항 매칭에 사용됩니다.",
+    "org_structure_desc": "JoaSuite 전 앱에서 공유됩니다. Team과 요구사항 매칭에 사용됩니다.",
     "new_department": "새 부서",
     "edit_department": "부서 편집",
     "department_name": "이름",

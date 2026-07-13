@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
 /**
- * Shared Employee/Contractor Directory — basic identity + org-placement
+ * Shared Team (Employee/Contractor) module — basic identity + org-placement
  * fields ONLY (name, contact, department, position, manager, employment
  * status/dates, worker_type). Backed entirely by the shared core tables
  * `public.parties` (is_employee = true) and `public.employee_profiles`.
@@ -13,13 +13,13 @@ import { z } from "zod";
  * `office.employee_hr_records` / `office.employee_pto_balances`, gated by
  * their own role checks). This module must never import from, or grow a
  * dependency on, any app-specific HR schema — every JoaSuite app except
- * the future JoaHR app is expected to embed this same directory as-is.
+ * the future JoaHR app is expected to embed this same Team module as-is.
  */
-export type EmployeeDirectoryDeps = {
+export type TeamDeps = {
   requireSupabaseAuth: any;
   supabaseAdmin: any;
-  assertCanReadEmployeeDirectory: (tenantId: string, userId: string) => Promise<void>;
-  assertCanWriteEmployeeDirectory: (tenantId: string, userId: string) => Promise<void>;
+  assertCanReadTeam: (tenantId: string, userId: string) => Promise<void>;
+  assertCanWriteTeam: (tenantId: string, userId: string) => Promise<void>;
   /** Called after a successful write, e.g. to append an audit_logs row. Optional. */
   onWrite?: (input: {
     tenantId: string;
@@ -47,14 +47,14 @@ async function loadDeptPosNames(supabaseAdmin: any, tenantId: string, deptIds: s
   };
 }
 
-export function createListEmployeeDirectory(deps: EmployeeDirectoryDeps) {
+export function createListTeamMembers(deps: TeamDeps) {
   return createServerFn({ method: "POST" })
     .middleware([deps.requireSupabaseAuth])
     .inputValidator((i: unknown) =>
       z.object({ tenant_id: z.string().uuid(), search: z.string().max(200).optional() }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await deps.assertCanReadEmployeeDirectory(data.tenant_id, (context as any).userId);
+      await deps.assertCanReadTeam(data.tenant_id, (context as any).userId);
 
       let pq = deps.supabaseAdmin
         .from("parties")
@@ -113,14 +113,14 @@ export function createListEmployeeDirectory(deps: EmployeeDirectoryDeps) {
     });
 }
 
-export function createGetEmployeeDirectoryEntry(deps: EmployeeDirectoryDeps) {
+export function createGetTeamMember(deps: TeamDeps) {
   return createServerFn({ method: "POST" })
     .middleware([deps.requireSupabaseAuth])
     .inputValidator((i: unknown) =>
       z.object({ tenant_id: z.string().uuid(), party_id: z.string().uuid() }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await deps.assertCanReadEmployeeDirectory(data.tenant_id, (context as any).userId);
+      await deps.assertCanReadTeam(data.tenant_id, (context as any).userId);
 
       const { data: party, error: pErr } = await deps.supabaseAdmin
         .from("parties")
@@ -129,7 +129,7 @@ export function createGetEmployeeDirectoryEntry(deps: EmployeeDirectoryDeps) {
         .eq("id", data.party_id)
         .maybeSingle();
       if (pErr) throw new Error(pErr.message);
-      if (!party || !party.is_employee) throw new Error("Employee not found");
+      if (!party || !party.is_employee) throw new Error("Team member not found");
 
       const { data: profile, error: prErr } = await deps.supabaseAdmin
         .from("employee_profiles")
@@ -169,19 +169,19 @@ export function createGetEmployeeDirectoryEntry(deps: EmployeeDirectoryDeps) {
 }
 
 /**
- * Create-or-update a directory entry. Accepts EITHER an existing `party_id`
+ * Create-or-update a Team member. Accepts EITHER an existing `party_id`
  * (the common case for apps managing employees/contractors that have no
  * login — e.g. JoaOffice) OR a `linked_user_id` (the common case for
- * resolving/creating the employee record tied to an existing tenant login —
- * e.g. JoaSOP's Users detail page), OR neither for a brand-new directory
- * entry created from scratch (name/contact fields required in that case).
+ * resolving/creating the Team record tied to an existing tenant login —
+ * e.g. JoaSOP's Team page), OR neither for a brand-new Team member created
+ * from scratch (name/contact fields required in that case).
  *
  * Always leaves both a `parties` row (is_employee = true) and a matching
  * `employee_profiles` row in place — this is the fix for the historical gap
  * where creating a party alone (e.g. via a Parties/Vendors admin screen)
  * never created the accompanying employee_profiles row.
  */
-export function createUpsertEmployeeDirectoryEntry(deps: EmployeeDirectoryDeps) {
+export function createUpsertTeamMember(deps: TeamDeps) {
   return createServerFn({ method: "POST" })
     .middleware([deps.requireSupabaseAuth])
     .inputValidator((i: unknown) =>
@@ -205,7 +205,7 @@ export function createUpsertEmployeeDirectoryEntry(deps: EmployeeDirectoryDeps) 
     )
     .handler(async ({ data, context }) => {
       const callerId = (context as any).userId as string;
-      await deps.assertCanWriteEmployeeDirectory(data.tenant_id, callerId);
+      await deps.assertCanWriteTeam(data.tenant_id, callerId);
 
       let partyId: string;
       let created = false;
@@ -269,7 +269,7 @@ export function createUpsertEmployeeDirectoryEntry(deps: EmployeeDirectoryDeps) 
           created = true;
         }
       } else {
-        if (!data.name_en) throw new Error("name_en is required to create a new directory entry");
+        if (!data.name_en) throw new Error("name_en is required to create a new team member");
         const { data: newParty, error: insErr } = await deps.supabaseAdmin
           .from("parties")
           .insert({

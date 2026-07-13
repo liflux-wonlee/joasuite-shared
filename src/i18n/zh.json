@@ -164,7 +164,9 @@
   "suite": {
     "tile": {
       "users": "用户",
-      "users_desc": "在所有组织中邀请用户并分配各应用的角色。"
+      "users_desc": "在所有组织中邀请用户并分配各应用的角色。",
+      "team": "团队",
+      "team_desc": "Team 将在 JoaSuite 各应用间提供共享的员工/承包商基本信息访问。"
     }
   },
   "users": {
@@ -226,15 +228,15 @@
     "send_invite": "发送邀请",
     "added_to_org": "已添加到组织"
   },
-  "directory": {
-    "title": "员工通讯录",
+  "team": {
+    "title": "团队",
     "desc": "JoaSuite 各应用共享的员工/承包商基本信息。",
     "add": "添加人员",
-    "edit": "编辑通讯录条目",
+    "edit": "编辑团队成员",
     "search_placeholder": "搜索姓名或邮箱",
     "col_name": "姓名",
-    "empty": "暂无通讯录条目。",
-    "saved": "通讯录条目已保存",
+    "empty": "暂无团队成员。",
+    "saved": "团队成员信息已保存",
     "name": "姓名",
     "contact_email": "邮箱",
     "contact_phone": "电话",
@@ -250,7 +252,7 @@
     "status_terminated": "已离职",
     "hire_date": "入职日期",
     "org_structure_title": "部门与职位",
-    "org_structure_desc": "JoaSuite 各应用共享。用于员工通讯录和需求匹配。",
+    "org_structure_desc": "JoaSuite 各应用共享。用于 Team 和需求匹配。",
     "new_department": "新建部门",
     "edit_department": "编辑部门",
     "department_name": "名称",
