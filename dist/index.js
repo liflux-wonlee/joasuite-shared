@@ -1,25 +1,27 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
-import { Moon, Sun, Globe, User, Shield, Briefcase, CreditCard, LogOut, Bell, Check, Layers, Home, ChevronDown, FileText, Users, ClipboardCheck, BookOpen, Lock, Settings2, ScrollText, Building2, LayoutGrid, AlertCircle, Inbox, Send, ArrowRight, ExternalLink, Contact2, Link, AppWindow, Plus, Search, MoreHorizontal, Mail, KeyRound, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
+import { Moon, Sun, Globe, User, Shield, Briefcase, CreditCard, LogOut, Bell, Check, Layers, Home, ChevronDown, UserCog, FileText, Users, ClipboardCheck, BookOpen, Lock, Settings2, ScrollText, Building2, LayoutGrid, AlertCircle, Inbox, Send, ArrowRight, ExternalLink, Contact2, Link, AppWindow, Plus, Search, MoreHorizontal, Mail, KeyRound, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 // src/constants.ts
-var APP_CODES = ["joabooks", "joaapproval", "joacrm", "joaoffice", "joasop"];
+var APP_CODES = ["joabooks", "joaapproval", "joacrm", "joaoffice", "joasop", "joahr"];
 var APP_DISPLAY = [
   { code: "joabooks", name: "JoaBooks", description: "Finance \u2014 AP, AR, expenses, ledger" },
   { code: "joaapproval", name: "JoaApproval", description: "Cross-app approval inbox" },
   { code: "joacrm", name: "JoaCRM", description: "Customer relationships" },
   { code: "joaoffice", name: "JoaOffice", description: "Admin, assets, contracts" },
-  { code: "joasop", name: "JoaSOP", description: "Policies, SOPs, training" }
+  { code: "joasop", name: "JoaSOP", description: "Policies, SOPs, training" },
+  { code: "joahr", name: "JoaHR", description: "HR \u2014 people, time off, org chart" }
 ];
 var DEFAULT_APP_URLS = {
   joabooks: "https://books.joasuite.com",
   joaapproval: "https://approval.joasuite.com",
   joacrm: "https://crm.joasuite.com",
   joaoffice: "https://office.joasuite.com",
-  joasop: "https://sop.joasuite.com"
+  joasop: "https://sop.joasuite.com",
+  joahr: "https://hr.joasuite.com"
 };
 var ROLES_BY_APP = {
   joabooks: [
@@ -35,7 +37,8 @@ var ROLES_BY_APP = {
   joasop: ["sop_admin", "sop_author", "sop_reviewer", "sop_operator"],
   joaoffice: ["owner", "super_admin", "approver"],
   joaapproval: ["owner", "super_admin", "approver"],
-  joacrm: ["owner", "super_admin", "approver"]
+  joacrm: ["owner", "super_admin", "approver"],
+  joahr: ["owner", "super_admin", "approver"]
 };
 var SETTINGS_KV_APP_URL_KEYS = APP_CODES.map((c) => `app_url.${c}`);
 var JoaSuiteContext = createContext(null);
@@ -1714,7 +1717,8 @@ var APP_ICONS = {
   joaapproval: ClipboardCheck,
   joacrm: Users,
   joaoffice: Briefcase,
-  joasop: FileText
+  joasop: FileText,
+  joahr: UserCog
 };
 function SuiteSwitcher() {
   const { t } = useTranslation();
@@ -2151,7 +2155,8 @@ var APP_ICONS2 = {
   joaapproval: ClipboardCheck,
   joacrm: Users,
   joaoffice: Briefcase,
-  joasop: FileText
+  joasop: FileText,
+  joahr: UserCog
 };
 function planBadgeStyle(plan) {
   const p = (plan ?? "").toLowerCase();

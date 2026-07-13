@@ -15,6 +15,7 @@ import {
   ClipboardCheck,
   Briefcase,
   FileText,
+  UserCog,
 } from "lucide-react";
 import { useJoaSuite } from "../context";
 import { APP_DISPLAY, DEFAULT_APP_URLS, type AppCode } from "../constants";
@@ -25,6 +26,7 @@ const APP_ICONS: Record<AppCode, React.ComponentType<{ className?: string }>> = 
   joacrm: Users,
   joaoffice: Briefcase,
   joasop: FileText,
+  joahr: UserCog,
 };
 
 export function SuiteSwitcher() {

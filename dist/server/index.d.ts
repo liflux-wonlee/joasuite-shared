@@ -1,4 +1,4 @@
-export { A as AppCode } from '../constants-Bws7KgDt.js';
+export { A as AppCode } from '../constants-B39zophS.js';
 import * as _tanstack_start_client_core from '@tanstack/start-client-core';
 import { SupabaseClient } from '@supabase/supabase-js';
 
