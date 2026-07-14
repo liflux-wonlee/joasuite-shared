@@ -33,8 +33,8 @@ export { AppOverviewSection } from "./components/AppOverviewSection";
 export { UserListPage } from "./components/users/UserListPage";
 export { UserInvitePage } from "./components/users/UserInvitePage";
 export { UserDetailPage } from "./components/users/UserDetailPage";
-export { EmployeeDirectoryListPage } from "./components/employees/EmployeeDirectoryListPage";
-export { EmployeeProfileForm } from "./components/employees/EmployeeProfileForm";
+export { TeamListPage } from "./components/team/TeamListPage";
+export { TeamMemberForm } from "./components/team/TeamMemberForm";
 export { OrgStructureSettingsPage } from "./components/org-structure/OrgStructureSettingsPage";
 
 // Hooks

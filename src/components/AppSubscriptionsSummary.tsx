@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { ArrowRight, ExternalLink, BookOpen, ClipboardCheck, Users, Briefcase, FileText } from "lucide-react";
+import { ArrowRight, ExternalLink, BookOpen, ClipboardCheck, Users, Briefcase, FileText, UserCog } from "lucide-react";
 import { useJoaSuite } from "../context";
 import { APP_DISPLAY, DEFAULT_APP_URLS, type AppCode } from "../constants";
 import type { AppCatalogEntry, TenantAppRow } from "../server/suite.functions";
@@ -18,6 +18,7 @@ const APP_ICONS: Record<AppCode, React.ComponentType<{ className?: string }>> = 
   joacrm: Users,
   joaoffice: Briefcase,
   joasop: FileText,
+  joahr: UserCog,
 };
 
 function planBadgeStyle(plan: string | null | undefined): React.CSSProperties | undefined {

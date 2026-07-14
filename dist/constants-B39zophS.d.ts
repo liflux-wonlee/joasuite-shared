@@ -3,7 +3,7 @@
  * exact values used in `app_catalog`, `tenant_apps`, `user_roles.app_code`,
  * `settings_kv` (`app_url.<code>`), `approvals.source_app`, etc.
  */
-declare const APP_CODES: readonly ["joabooks", "joaapproval", "joacrm", "joaoffice", "joasop"];
+declare const APP_CODES: readonly ["joabooks", "joaapproval", "joacrm", "joaoffice", "joasop", "joahr"];
 type AppCode = (typeof APP_CODES)[number];
 /**
  * Display metadata for each app. User-facing names — DB identifiers are
@@ -25,6 +25,6 @@ declare const DEFAULT_APP_URLS: Record<AppCode, string>;
  * when stored with `user_roles.app_code IS NULL`.
  */
 declare const ROLES_BY_APP: Record<AppCode, string[]>;
-declare const SETTINGS_KV_APP_URL_KEYS: ("app_url.joabooks" | "app_url.joaapproval" | "app_url.joacrm" | "app_url.joaoffice" | "app_url.joasop")[];
+declare const SETTINGS_KV_APP_URL_KEYS: ("app_url.joabooks" | "app_url.joaapproval" | "app_url.joacrm" | "app_url.joaoffice" | "app_url.joasop" | "app_url.joahr")[];
 
 export { type AppCode as A, DEFAULT_APP_URLS as D, ROLES_BY_APP as R, SETTINGS_KV_APP_URL_KEYS as S, APP_CODES as a, APP_DISPLAY as b };

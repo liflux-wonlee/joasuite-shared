@@ -167,7 +167,9 @@
   "suite": {
     "tile": {
       "users": "Usuarios",
-      "users_desc": "Invita usuarios en todas las organizaciones y asigna roles por aplicación."
+      "users_desc": "Invita usuarios en todas las organizaciones y asigna roles por aplicación.",
+      "team": "Equipo",
+      "team_desc": "Team ofrecerá acceso compartido a la información básica de empleados y contratistas en las apps de JoaSuite."
     }
   },
   "users": {
@@ -229,15 +231,15 @@
     "send_invite": "Enviar invitación",
     "added_to_org": "Añadido a la organización"
   },
-  "directory": {
-    "title": "Directorio de empleados",
+  "team": {
+    "title": "Equipo",
     "desc": "Información básica de empleados y contratistas compartida entre las apps de JoaSuite.",
     "add": "Añadir persona",
-    "edit": "Editar entrada del directorio",
+    "edit": "Editar miembro del equipo",
     "search_placeholder": "Buscar por nombre o correo",
     "col_name": "Nombre",
-    "empty": "Aún no hay entradas en el directorio.",
-    "saved": "Entrada del directorio guardada",
+    "empty": "Aún no hay miembros del equipo.",
+    "saved": "Miembro del equipo guardado",
     "name": "Nombre",
     "contact_email": "Correo",
     "contact_phone": "Teléfono",
@@ -253,7 +255,7 @@
     "status_terminated": "Baja",
     "hire_date": "Fecha de contratación",
     "org_structure_title": "Departamentos y puestos",
-    "org_structure_desc": "Compartido entre las apps de JoaSuite. Usado por el Directorio de empleados y la coincidencia de requisitos.",
+    "org_structure_desc": "Compartido entre las apps de JoaSuite. Usado por Team y la coincidencia de requisitos.",
     "new_department": "Nuevo departamento",
     "edit_department": "Editar departamento",
     "department_name": "Nombre",
