@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
-import { Moon, Sun, Globe, User, Shield, Briefcase, CreditCard, LogOut, Bell, Check, Layers, Home, ChevronDown, UserCog, FileText, Users, ClipboardCheck, BookOpen, Lock, Settings2, ScrollText, Building2, LayoutGrid, AlertCircle, Inbox, Send, ArrowRight, ExternalLink, Contact2, Link, AppWindow, Plus, Search, MoreHorizontal, Mail, KeyRound, ArrowLeft, Pencil, Trash2, CalendarClock, Zap, AlertTriangle, Sparkles, Clock, RefreshCw, XCircle, GitCompare, ShieldAlert, Package, Gift, Receipt, Landmark, Star, Eye, Download, RefreshCcw, Ticket, Tag, DollarSign, Copy, ArrowUpRight, Activity, Info, ArrowUp, ArrowDown } from 'lucide-react';
+import { Moon, Sun, Globe, User, Shield, Briefcase, CreditCard, LogOut, Bell, Check, Layers, Home, ChevronDown, UserCog, FileText, Users, ClipboardCheck, BookOpen, Lock, Settings2, ScrollText, Building2, LayoutGrid, AlertCircle, Inbox, Send, ArrowRight, Contact2, Link, Plus, Search, MoreHorizontal, Mail, KeyRound, ArrowLeft, Pencil, Trash2, AppWindow, CalendarClock, Zap, AlertTriangle, Sparkles, Clock, RefreshCw, XCircle, GitCompare, ShieldAlert, Package, Gift, Receipt, ExternalLink, Landmark, Star, Eye, Download, RefreshCcw, Ticket, Tag, DollarSign, Copy, ArrowUpRight, Activity, Info, ArrowUp, ArrowDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -2265,130 +2265,6 @@ function SectionHeader({
 function EmptyState({ text }) {
   return /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground py-4 text-center", children: text });
 }
-var APP_ICONS2 = {
-  joabooks: BookOpen,
-  joaapproval: ClipboardCheck,
-  joacrm: Users,
-  joaoffice: Briefcase,
-  joasop: FileText,
-  joahr: UserCog
-};
-function planBadgeStyle(plan) {
-  const p = (plan ?? "").toLowerCase();
-  if (p === "basic") return { backgroundColor: "#DEE545", color: "#1a1a1a" };
-  if (p === "pro") return { backgroundColor: "#E56F3F", color: "#ffffff" };
-  if (p === "business" || p === "enterprise")
-    return { backgroundColor: "#454545", color: "#ffffff" };
-  return void 0;
-}
-function planLabel(plan) {
-  const p = (plan ?? "").toLowerCase();
-  if (!p) return "";
-  return p.charAt(0).toUpperCase() + p.slice(1);
-}
-function AppSubscriptionsSummary() {
-  const { t } = useTranslation();
-  const { useAuth, ui, router, fns, currentApp } = useJoaSuite();
-  const { Link } = router;
-  const { Card } = ui;
-  const { currentMembership } = useAuth();
-  const tenantId = currentMembership?.tenant_id ?? "";
-  const appsQ = useQuery({
-    queryKey: ["suite-apps", tenantId],
-    enabled: !!tenantId,
-    queryFn: () => fns.listSuiteApps({ tenantId })
-  });
-  const homeQ = useQuery({
-    queryKey: ["suite-home", tenantId],
-    enabled: !!tenantId,
-    queryFn: () => fns.getSuiteHome({ tenantId })
-  });
-  const subsByCode = useMemo(() => {
-    const m = /* @__PURE__ */ new Map();
-    (appsQ.data?.subscriptions ?? []).forEach((s) => m.set(s.app_code, s));
-    return m;
-  }, [appsQ.data]);
-  const catalogByCode = useMemo(() => {
-    const m = /* @__PURE__ */ new Map();
-    (appsQ.data?.catalog ?? []).forEach((c) => m.set(c.code, c));
-    return m;
-  }, [appsQ.data]);
-  const appUrls = homeQ.data?.appUrls ?? {};
-  const resolveUrl = (code) => appUrls[code] || DEFAULT_APP_URLS[code] || "";
-  if (!tenantId) return null;
-  return /* @__PURE__ */ jsxs(Card, { className: "overflow-hidden", children: [
-    /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/30", children: [
-      /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t(
-        "suite.subscriptions.summary_hint",
-        "Read-only summary. To change plans, start a trial, or cancel, go to Billing."
-      ) }),
-      /* @__PURE__ */ jsxs(
-        Link,
-        {
-          to: "/app/account/billing",
-          className: "inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline whitespace-nowrap",
-          children: [
-            t("suite.subscriptions.manage_cta", "Manage plans & billing"),
-            /* @__PURE__ */ jsx(ArrowRight, { className: "h-3 w-3" })
-          ]
-        }
-      )
-    ] }),
-    /* @__PURE__ */ jsx("ul", { className: "divide-y", children: APP_DISPLAY.map((meta) => {
-      const sub = subsByCode.get(meta.code);
-      const catalog = catalogByCode.get(meta.code);
-      const isHostApp = meta.code === currentApp;
-      const isActive = isHostApp || sub?.status === "active";
-      const isCanceled = sub?.status === "canceled";
-      const plan = sub?.plan ?? (isHostApp ? "basic" : null);
-      const url = resolveUrl(meta.code);
-      const Icon = APP_ICONS2[meta.code];
-      const badge = planBadgeStyle(plan);
-      const statusLabel = isActive ? t("suite.subscriptions.status.active", "Active") : isCanceled ? t("suite.subscriptions.status.canceled", "Canceled") : !catalog ? t("suite.state.coming_soon", "Coming Soon") : t("suite.subscriptions.status.not_subscribed", "Not subscribed");
-      return /* @__PURE__ */ jsxs("li", { className: "flex items-center gap-4 px-4 py-3", children: [
-        /* @__PURE__ */ jsx("div", { className: "rounded-md bg-muted p-2 shrink-0", children: /* @__PURE__ */ jsx(Icon, { className: "h-5 w-5 text-foreground" }) }),
-        /* @__PURE__ */ jsxs("div", { className: "min-w-0 flex-1", children: [
-          /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 flex-wrap", children: [
-            /* @__PURE__ */ jsx("span", { className: "font-medium text-sm", children: meta.name }),
-            isActive && badge && /* @__PURE__ */ jsx(
-              "span",
-              {
-                className: "text-[10px] leading-none px-1.5 py-0.5 rounded-sm font-medium uppercase tracking-wide",
-                style: badge,
-                children: planLabel(plan)
-              }
-            )
-          ] }),
-          /* @__PURE__ */ jsx("div", { className: "text-xs text-muted-foreground mt-0.5 truncate", children: meta.description })
-        ] }),
-        /* @__PURE__ */ jsx("div", { className: "text-xs text-muted-foreground whitespace-nowrap min-w-[6rem] text-right", children: statusLabel }),
-        /* @__PURE__ */ jsx("div", { className: "w-24 flex justify-end", children: isActive && (isHostApp ? /* @__PURE__ */ jsxs(
-          Link,
-          {
-            to: "/app",
-            className: "inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline",
-            children: [
-              t("suite.subscriptions.open_app", "Open"),
-              /* @__PURE__ */ jsx(ArrowRight, { className: "h-3 w-3" })
-            ]
-          }
-        ) : url ? /* @__PURE__ */ jsxs(
-          "a",
-          {
-            href: url,
-            target: "_blank",
-            rel: "noopener noreferrer",
-            className: "inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline",
-            children: [
-              t("suite.subscriptions.open_app", "Open"),
-              /* @__PURE__ */ jsx(ExternalLink, { className: "h-3 w-3" })
-            ]
-          }
-        ) : /* @__PURE__ */ jsx("span", { className: "text-[11px] text-muted-foreground", children: t("suite.state.no_url", "No URL") })) })
-      ] }, meta.code);
-    }) })
-  ] });
-}
 function SuiteSettingsHub() {
   const { t } = useTranslation();
   const { ui, router } = useJoaSuite();
@@ -2450,7 +2326,7 @@ function SuiteSettingsHub() {
       label: t("suite.tile.billing", "Plan & Billing"),
       description: t(
         "suite.tile.billing_desc",
-        "Workspace plan, invoices, and payment methods."
+        "App subscriptions, plans, invoices, and payment methods."
       )
     },
     {
@@ -2507,13 +2383,6 @@ function SuiteSettingsHub() {
           ]
         }
       )
-    ] }),
-    /* @__PURE__ */ jsxs("section", { className: "space-y-3", children: [
-      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
-        /* @__PURE__ */ jsx(AppWindow, { className: "h-4 w-4 text-muted-foreground" }),
-        /* @__PURE__ */ jsx("h2", { className: "text-sm font-semibold uppercase tracking-wider text-muted-foreground", children: t("suite.subscriptions.title", "App Subscriptions") })
-      ] }),
-      /* @__PURE__ */ jsx(AppSubscriptionsSummary, {})
     ] }),
     /* @__PURE__ */ jsx(Section, { title: t("suite.section.org", "Organization"), tiles: orgTiles, Link: Link$1, Card, Badge }),
     /* @__PURE__ */ jsx(Section, { title: t("suite.section.apps", "Apps"), tiles: appsTiles, Link: Link$1, Card, Badge }),
@@ -4413,7 +4282,7 @@ var PLAN_BADGE_STYLE = {
   business: { backgroundColor: "#454545", color: "#ffffff" },
   enterprise: { backgroundColor: "#454545", color: "#ffffff" }
 };
-function planBadgeStyle2(plan) {
+function planBadgeStyle(plan) {
   if (!plan) return void 0;
   return PLAN_BADGE_STYLE[plan.toLowerCase()];
 }
@@ -4537,7 +4406,7 @@ function PlansSection() {
               "span",
               {
                 className: "inline-flex text-[10px] uppercase font-semibold px-2 py-0.5 rounded",
-                style: planBadgeStyle2(currentPlan) ?? { backgroundColor: "#454545", color: "#fff" },
+                style: planBadgeStyle(currentPlan) ?? { backgroundColor: "#454545", color: "#fff" },
                 children: [
                   currentPlan,
                   isTrialing ? ` \xB7 ${t("billing.trial", "Trial")}` : "",
@@ -4611,7 +4480,7 @@ function PlansSection() {
             "span",
             {
               className: "text-[10px] uppercase font-semibold px-2 py-0.5 rounded",
-              style: planBadgeStyle2(currentPlan) ?? { backgroundColor: "#454545", color: "#fff" },
+              style: planBadgeStyle(currentPlan) ?? { backgroundColor: "#454545", color: "#fff" },
               children: [
                 currentPlan,
                 isTrialing ? ` \xB7 ${t("billing.trial", "Trial")}` : "",
@@ -5767,7 +5636,7 @@ function BillingUsagePage() {
     return /* @__PURE__ */ jsx("div", { className: "rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-3 py-2 text-sm", children: error?.message ?? t("billing.usage.load_failed", "Failed to load usage") });
   }
   const { plan_code, limits, usage } = data;
-  const planLabel2 = plan_code.charAt(0).toUpperCase() + plan_code.slice(1);
+  const planLabel = plan_code.charAt(0).toUpperCase() + plan_code.slice(1);
   const upgradeTo = NEXT_PLAN[plan_code] ?? "Business";
   const metrics = [
     { key: "users", label: t("billing.usage.users", "Users (seats)"), used: usage.users, limit: limits.users },
@@ -5793,7 +5662,7 @@ function BillingUsagePage() {
         /* @__PURE__ */ jsxs("div", { className: "font-semibold text-lg", children: [
           appName,
           " \xB7 ",
-          planLabel2
+          planLabel
         ] })
       ] }),
       /* @__PURE__ */ jsxs(
@@ -6131,6 +6000,6 @@ function BillingComparePage({ appCode }) {
   ] });
 }
 
-export { APP_CODES, APP_DISPLAY, AppOverviewSection, AppSubscriptionsSummary, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, EmployeeDirectoryListPage, EmployeeProfileForm, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
+export { APP_CODES, APP_DISPLAY, AppOverviewSection, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, EmployeeDirectoryListPage, EmployeeProfileForm, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

@@ -1980,7 +1980,12 @@ function createMergeParties(deps) {
     return { ok: true, target_party_id: data.target_party_id, reassigned: counts };
   });
 }
-var APP_CODES = ["joabooks", "joasop", "joaoffice", "joaapproval", "joacrm", "joahr"];
+
+// src/constants.ts
+var APP_CODES = ["joabooks", "joaapproval", "joacrm", "joaoffice", "joasop", "joahr"];
+APP_CODES.map((c) => `app_url.${c}`);
+
+// src/server/billing.functions.ts
 var PLAN_CODES = ["free", "basic", "pro", "business"];
 var INTERVALS = ["month", "year"];
 var SOURCE_APP = "joasuite-core";

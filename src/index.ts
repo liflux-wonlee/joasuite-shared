@@ -27,7 +27,6 @@ export { NotificationsBell } from "./components/NotificationsBell";
 export { SuiteSwitcher } from "./components/SuiteSwitcher";
 export { SuiteHomePage } from "./components/SuiteHomePage";
 export { SuiteSettingsHub } from "./components/SuiteSettingsHub";
-export { AppSubscriptionsSummary } from "./components/AppSubscriptionsSummary";
 export { PostLoginGate } from "./components/PostLoginGate";
 export { OrgScopeToggle } from "./components/OrgScopeToggle";
 export { AppOverviewSection } from "./components/AppOverviewSection";

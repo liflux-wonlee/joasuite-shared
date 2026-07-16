@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { APP_CODES, type AppCode } from "../constants";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // JoaSuite Core — Billing module
@@ -7,10 +8,9 @@ import { z } from "zod";
 // Reusable across all JoaSuite apps (joabooks / joasop / joaoffice / joaapproval / joacrm / joahr).
 // ──────────────────────────────────────────────────────────────────────────────
 
-export const APP_CODES = ["joabooks", "joasop", "joaoffice", "joaapproval", "joacrm", "joahr"] as const;
+export { APP_CODES, type AppCode };
 export const PLAN_CODES = ["free", "basic", "pro", "business"] as const;
 export const INTERVALS = ["month", "year"] as const;
-export type AppCode = (typeof APP_CODES)[number];
 export type PlanCode = (typeof PLAN_CODES)[number];
 export type BillingInterval = (typeof INTERVALS)[number];
 const SOURCE_APP = "joasuite-core";
