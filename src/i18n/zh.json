@@ -34,6 +34,29 @@
     "no_notifications": "无通知。",
     "aria": "通知"
   },
+  "signup_wizard": {
+    "email_label": "邮箱",
+    "continue": "继续",
+    "sending": "发送中…",
+    "existing_hint": "已经有 JoaSuite 账户了吗？在上方输入您的邮箱即可登录 —— 无需创建新账户。",
+    "have_password": "想用密码登录？",
+    "sign_in": "登录",
+    "check_email_title": "请查收邮件",
+    "check_email_desc": "我们已向 {{email}} 发送了一个安全链接。点击即可继续。",
+    "use_different_email": "使用其他邮箱"
+  },
+  "set_password": {
+    "title": "设置密码",
+    "desc": "可选 —— 设置后下次可直接登录，无需邮件链接。",
+    "label": "密码",
+    "submit": "设置密码并继续",
+    "submitting": "保存中…",
+    "success": "密码已设置",
+    "skip": "暂时跳过",
+    "min_length": "密码至少需要 8 个字符。",
+    "invalid_title": "此链接已过期",
+    "invalid_desc": "请重新申请登录链接。"
+  },
   "common": {
     "submit": "提交",
     "save": "保存",

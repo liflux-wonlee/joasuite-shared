@@ -557,6 +557,35 @@ declare function PostLoginGate({ children }: {
 }): react.JSX.Element;
 
 /**
+ * Passwordless, email-first signup. Calls signInWithOtp with
+ * shouldCreateUser:true, which is safe to use identically for both a
+ * brand-new email and an email that already has a JoaSuite account
+ * (Supabase never reveals which case it is, never touches an existing
+ * password, and never creates a duplicate account) - the two cases are
+ * disambiguated later, safely, by SetPasswordForm after the link is
+ * clicked, not here. No password field on this screen at all, so there's
+ * nothing for an existing user to "silently lose" by re-submitting this
+ * form with a new value.
+ */
+declare function SignUpForm(): react.JSX.Element;
+
+/**
+ * Landing page for SignUpForm's magic-link email. Supabase's client
+ * auto-detects the session from the callback URL, so this just waits for
+ * that, then decides what to show:
+ *   - Account created within the last few minutes (this signup flow just
+ *     created it) -> genuinely new user, offer to set a password.
+ *   - Otherwise -> an existing user who already has a password just
+ *     re-verified their email via magic link; nothing new to set up,
+ *     send them straight into the app.
+ * This is what safely resolves the new-vs-existing ambiguity that
+ * SignUpForm deliberately can't: it happens post-auth, after Supabase has
+ * already proven which case it is via account age, not by asking a
+ * pre-auth endpoint to reveal it.
+ */
+declare function SetPasswordForm(): react.JSX.Element;
+
+/**
  * Lets the user widen a screen (Dashboard, JoaSuite Home) from "this
  * organization" to any combination of the organizations they belong to.
  * Hidden entirely for users with only one eligible membership — there's
@@ -672,4 +701,4 @@ declare function BillingComparePage({ appCode }: {
  */
 declare function useOrgScope(): [string[], (tenantIds: string[]) => void];
 
-export { type AppCatalogEntry, AppCode, AppOverviewSection, type AppSummaryTile, type ApprovalSummary, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type Department, EmployeeDirectoryListPage, type EmployeeDirectoryRow, EmployeeProfileForm, type EmployeeProfileInput, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, type RouterAdapter, SUPPORTED_LANGUAGES, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
+export { type AppCatalogEntry, AppCode, AppOverviewSection, type AppSummaryTile, type ApprovalSummary, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type Department, EmployeeDirectoryListPage, type EmployeeDirectoryRow, EmployeeProfileForm, type EmployeeProfileInput, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, type RouterAdapter, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };

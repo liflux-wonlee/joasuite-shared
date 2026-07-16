@@ -34,6 +34,29 @@
     "no_notifications": "Sin notificaciones.",
     "aria": "Notificaciones"
   },
+  "signup_wizard": {
+    "email_label": "Correo",
+    "continue": "Continuar",
+    "sending": "Enviando…",
+    "existing_hint": "¿Ya tienes una cuenta de JoaSuite? Escribe tu correo arriba — te iniciaremos sesión, no hace falta crear una cuenta nueva.",
+    "have_password": "¿Prefieres iniciar sesión con contraseña?",
+    "sign_in": "Iniciar sesión",
+    "check_email_title": "Revisa tu correo",
+    "check_email_desc": "Enviamos un enlace seguro a {{email}}. Haz clic para continuar.",
+    "use_different_email": "Usar otro correo"
+  },
+  "set_password": {
+    "title": "Establecer una contraseña",
+    "desc": "Opcional — te permite iniciar sesión directamente la próxima vez sin un enlace por correo.",
+    "label": "Contraseña",
+    "submit": "Establecer contraseña y continuar",
+    "submitting": "Guardando…",
+    "success": "Contraseña establecida",
+    "skip": "Omitir por ahora",
+    "min_length": "La contraseña debe tener al menos 8 caracteres.",
+    "invalid_title": "Este enlace ha expirado",
+    "invalid_desc": "Solicita un nuevo enlace de inicio de sesión."
+  },
   "common": {
     "submit": "Enviar",
     "save": "Guardar",

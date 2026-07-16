@@ -34,6 +34,29 @@
     "no_notifications": "Không có thông báo.",
     "aria": "Thông báo"
   },
+  "signup_wizard": {
+    "email_label": "Email",
+    "continue": "Tiếp tục",
+    "sending": "Đang gửi…",
+    "existing_hint": "Bạn đã có tài khoản JoaSuite? Nhập email ở trên — chúng tôi sẽ đăng nhập cho bạn, không cần tạo tài khoản mới.",
+    "have_password": "Muốn đăng nhập bằng mật khẩu?",
+    "sign_in": "Đăng nhập",
+    "check_email_title": "Kiểm tra email của bạn",
+    "check_email_desc": "Chúng tôi đã gửi một liên kết an toàn đến {{email}}. Nhấp vào đó để tiếp tục.",
+    "use_different_email": "Dùng email khác"
+  },
+  "set_password": {
+    "title": "Đặt mật khẩu",
+    "desc": "Không bắt buộc — giúp bạn đăng nhập trực tiếp lần sau mà không cần liên kết email.",
+    "label": "Mật khẩu",
+    "submit": "Đặt mật khẩu và tiếp tục",
+    "submitting": "Đang lưu…",
+    "success": "Đã đặt mật khẩu",
+    "skip": "Bỏ qua lúc này",
+    "min_length": "Mật khẩu phải có ít nhất 8 ký tự.",
+    "invalid_title": "Liên kết này đã hết hạn",
+    "invalid_desc": "Vui lòng yêu cầu liên kết đăng nhập mới."
+  },
   "common": {
     "submit": "Gửi",
     "save": "Lưu",

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
-import { Moon, Sun, Globe, User, Shield, Briefcase, CreditCard, LogOut, Bell, Check, Layers, Home, ChevronDown, UserCog, FileText, Users, ClipboardCheck, BookOpen, Lock, Settings2, ScrollText, Building2, LayoutGrid, AlertCircle, Inbox, Send, ArrowRight, Contact2, Link, Plus, Search, MoreHorizontal, Mail, KeyRound, ArrowLeft, Pencil, Trash2, AppWindow, CalendarClock, Zap, AlertTriangle, Sparkles, Clock, RefreshCw, XCircle, GitCompare, ShieldAlert, Package, Gift, Receipt, ExternalLink, Landmark, Star, Eye, Download, RefreshCcw, Ticket, Tag, DollarSign, Copy, ArrowUpRight, Activity, Info, ArrowUp, ArrowDown } from 'lucide-react';
+import { Moon, Sun, Globe, User, Shield, Briefcase, CreditCard, LogOut, Bell, Check, Layers, Home, ChevronDown, UserCog, FileText, Users, ClipboardCheck, BookOpen, Lock, Settings2, ScrollText, Building2, LayoutGrid, AlertCircle, Inbox, Send, ArrowRight, Contact2, Link, Mail, EyeOff, Eye, Plus, Search, MoreHorizontal, KeyRound, ArrowLeft, Pencil, Trash2, AppWindow, CalendarClock, Zap, AlertTriangle, Sparkles, Clock, RefreshCw, XCircle, GitCompare, ShieldAlert, Package, Gift, Receipt, ExternalLink, Landmark, Star, Download, RefreshCcw, Ticket, Tag, DollarSign, Copy, ArrowUpRight, Activity, Info, ArrowUp, ArrowDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -94,6 +94,29 @@ var en_default = {
     mark_all_read: "Mark all read",
     no_notifications: "No notifications.",
     aria: "Notifications"
+  },
+  signup_wizard: {
+    email_label: "Email",
+    continue: "Continue",
+    sending: "Sending\u2026",
+    existing_hint: "Already have a JoaSuite account? Enter your email above \u2014 we'll sign you in, no new account needed.",
+    have_password: "Prefer to sign in with a password?",
+    sign_in: "Sign in",
+    check_email_title: "Check your email",
+    check_email_desc: "We sent a secure link to {{email}}. Click it to continue.",
+    use_different_email: "Use a different email"
+  },
+  set_password: {
+    title: "Set a password",
+    desc: "Optional \u2014 lets you sign in directly next time without an email link.",
+    label: "Password",
+    submit: "Set password & continue",
+    submitting: "Saving\u2026",
+    success: "Password set",
+    skip: "Skip for now",
+    min_length: "Password must be at least 8 characters.",
+    invalid_title: "This link has expired",
+    invalid_desc: "Please request a new sign-in link."
   },
   common: {
     submit: "Submit",
@@ -405,6 +428,29 @@ var ko_default = {
     no_notifications: "\uC54C\uB9BC\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
     aria: "\uC54C\uB9BC"
   },
+  signup_wizard: {
+    email_label: "\uC774\uBA54\uC77C",
+    continue: "\uACC4\uC18D",
+    sending: "\uC804\uC1A1 \uC911\u2026",
+    existing_hint: "\uC774\uBBF8 JoaSuite \uACC4\uC815\uC774 \uC788\uC73C\uC2E0\uAC00\uC694? \uC704\uC5D0 \uC774\uBA54\uC77C\uC744 \uC785\uB825\uD558\uC2DC\uBA74 \uB85C\uADF8\uC778\uC2DC\uCF1C \uB4DC\uB9BD\uB2C8\uB2E4 \u2014 \uC0C8 \uACC4\uC815\uC744 \uB9CC\uB4E4 \uD544\uC694 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    have_password: "\uBE44\uBC00\uBC88\uD638\uB85C \uB85C\uADF8\uC778\uD558\uC2DC\uACA0\uC5B4\uC694?",
+    sign_in: "\uB85C\uADF8\uC778",
+    check_email_title: "\uC774\uBA54\uC77C\uC744 \uD655\uC778\uD558\uC138\uC694",
+    check_email_desc: "{{email}}\uB85C \uC548\uC804\uD55C \uB9C1\uD06C\uB97C \uBCF4\uB0C8\uC2B5\uB2C8\uB2E4. \uD074\uB9AD\uD558\uBA74 \uACC4\uC18D \uC9C4\uD589\uB429\uB2C8\uB2E4.",
+    use_different_email: "\uB2E4\uB978 \uC774\uBA54\uC77C \uC0AC\uC6A9"
+  },
+  set_password: {
+    title: "\uBE44\uBC00\uBC88\uD638 \uC124\uC815",
+    desc: "\uC120\uD0DD \uC0AC\uD56D\uC785\uB2C8\uB2E4 \u2014 \uB2E4\uC74C\uBD80\uD130\uB294 \uC774\uBA54\uC77C \uB9C1\uD06C \uC5C6\uC774 \uBC14\uB85C \uB85C\uADF8\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+    label: "\uBE44\uBC00\uBC88\uD638",
+    submit: "\uBE44\uBC00\uBC88\uD638 \uC124\uC815\uD558\uACE0 \uACC4\uC18D\uD558\uAE30",
+    submitting: "\uC800\uC7A5 \uC911\u2026",
+    success: "\uBE44\uBC00\uBC88\uD638\uAC00 \uC124\uC815\uB418\uC5C8\uC2B5\uB2C8\uB2E4",
+    skip: "\uB098\uC911\uC5D0 \uD558\uAE30",
+    min_length: "\uBE44\uBC00\uBC88\uD638\uB294 \uCD5C\uC18C 8\uC790 \uC774\uC0C1\uC774\uC5B4\uC57C \uD569\uB2C8\uB2E4.",
+    invalid_title: "\uB9C1\uD06C\uAC00 \uB9CC\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4",
+    invalid_desc: "\uC0C8 \uB85C\uADF8\uC778 \uB9C1\uD06C\uB97C \uC694\uCCAD\uD574 \uC8FC\uC138\uC694."
+  },
   common: {
     submit: "\uC81C\uCD9C",
     save: "\uC800\uC7A5",
@@ -712,6 +758,29 @@ var zh_default = {
     no_notifications: "\u65E0\u901A\u77E5\u3002",
     aria: "\u901A\u77E5"
   },
+  signup_wizard: {
+    email_label: "\u90AE\u7BB1",
+    continue: "\u7EE7\u7EED",
+    sending: "\u53D1\u9001\u4E2D\u2026",
+    existing_hint: "\u5DF2\u7ECF\u6709 JoaSuite \u8D26\u6237\u4E86\u5417\uFF1F\u5728\u4E0A\u65B9\u8F93\u5165\u60A8\u7684\u90AE\u7BB1\u5373\u53EF\u767B\u5F55 \u2014\u2014 \u65E0\u9700\u521B\u5EFA\u65B0\u8D26\u6237\u3002",
+    have_password: "\u60F3\u7528\u5BC6\u7801\u767B\u5F55\uFF1F",
+    sign_in: "\u767B\u5F55",
+    check_email_title: "\u8BF7\u67E5\u6536\u90AE\u4EF6",
+    check_email_desc: "\u6211\u4EEC\u5DF2\u5411 {{email}} \u53D1\u9001\u4E86\u4E00\u4E2A\u5B89\u5168\u94FE\u63A5\u3002\u70B9\u51FB\u5373\u53EF\u7EE7\u7EED\u3002",
+    use_different_email: "\u4F7F\u7528\u5176\u4ED6\u90AE\u7BB1"
+  },
+  set_password: {
+    title: "\u8BBE\u7F6E\u5BC6\u7801",
+    desc: "\u53EF\u9009 \u2014\u2014 \u8BBE\u7F6E\u540E\u4E0B\u6B21\u53EF\u76F4\u63A5\u767B\u5F55\uFF0C\u65E0\u9700\u90AE\u4EF6\u94FE\u63A5\u3002",
+    label: "\u5BC6\u7801",
+    submit: "\u8BBE\u7F6E\u5BC6\u7801\u5E76\u7EE7\u7EED",
+    submitting: "\u4FDD\u5B58\u4E2D\u2026",
+    success: "\u5BC6\u7801\u5DF2\u8BBE\u7F6E",
+    skip: "\u6682\u65F6\u8DF3\u8FC7",
+    min_length: "\u5BC6\u7801\u81F3\u5C11\u9700\u8981 8 \u4E2A\u5B57\u7B26\u3002",
+    invalid_title: "\u6B64\u94FE\u63A5\u5DF2\u8FC7\u671F",
+    invalid_desc: "\u8BF7\u91CD\u65B0\u7533\u8BF7\u767B\u5F55\u94FE\u63A5\u3002"
+  },
   common: {
     submit: "\u63D0\u4EA4",
     save: "\u4FDD\u5B58",
@@ -1003,6 +1072,29 @@ var es_default = {
     mark_all_read: "Marcar todo como le\xEDdo",
     no_notifications: "Sin notificaciones.",
     aria: "Notificaciones"
+  },
+  signup_wizard: {
+    email_label: "Correo",
+    continue: "Continuar",
+    sending: "Enviando\u2026",
+    existing_hint: "\xBFYa tienes una cuenta de JoaSuite? Escribe tu correo arriba \u2014 te iniciaremos sesi\xF3n, no hace falta crear una cuenta nueva.",
+    have_password: "\xBFPrefieres iniciar sesi\xF3n con contrase\xF1a?",
+    sign_in: "Iniciar sesi\xF3n",
+    check_email_title: "Revisa tu correo",
+    check_email_desc: "Enviamos un enlace seguro a {{email}}. Haz clic para continuar.",
+    use_different_email: "Usar otro correo"
+  },
+  set_password: {
+    title: "Establecer una contrase\xF1a",
+    desc: "Opcional \u2014 te permite iniciar sesi\xF3n directamente la pr\xF3xima vez sin un enlace por correo.",
+    label: "Contrase\xF1a",
+    submit: "Establecer contrase\xF1a y continuar",
+    submitting: "Guardando\u2026",
+    success: "Contrase\xF1a establecida",
+    skip: "Omitir por ahora",
+    min_length: "La contrase\xF1a debe tener al menos 8 caracteres.",
+    invalid_title: "Este enlace ha expirado",
+    invalid_desc: "Solicita un nuevo enlace de inicio de sesi\xF3n."
   },
   common: {
     submit: "Enviar",
@@ -1298,6 +1390,29 @@ var vi_default = {
     mark_all_read: "\u0110\xE1nh d\u1EA5u t\u1EA5t c\u1EA3 \u0111\xE3 \u0111\u1ECDc",
     no_notifications: "Kh\xF4ng c\xF3 th\xF4ng b\xE1o.",
     aria: "Th\xF4ng b\xE1o"
+  },
+  signup_wizard: {
+    email_label: "Email",
+    continue: "Ti\u1EBFp t\u1EE5c",
+    sending: "\u0110ang g\u1EEDi\u2026",
+    existing_hint: "B\u1EA1n \u0111\xE3 c\xF3 t\xE0i kho\u1EA3n JoaSuite? Nh\u1EADp email \u1EDF tr\xEAn \u2014 ch\xFAng t\xF4i s\u1EBD \u0111\u0103ng nh\u1EADp cho b\u1EA1n, kh\xF4ng c\u1EA7n t\u1EA1o t\xE0i kho\u1EA3n m\u1EDBi.",
+    have_password: "Mu\u1ED1n \u0111\u0103ng nh\u1EADp b\u1EB1ng m\u1EADt kh\u1EA9u?",
+    sign_in: "\u0110\u0103ng nh\u1EADp",
+    check_email_title: "Ki\u1EC3m tra email c\u1EE7a b\u1EA1n",
+    check_email_desc: "Ch\xFAng t\xF4i \u0111\xE3 g\u1EEDi m\u1ED9t li\xEAn k\u1EBFt an to\xE0n \u0111\u1EBFn {{email}}. Nh\u1EA5p v\xE0o \u0111\xF3 \u0111\u1EC3 ti\u1EBFp t\u1EE5c.",
+    use_different_email: "D\xF9ng email kh\xE1c"
+  },
+  set_password: {
+    title: "\u0110\u1EB7t m\u1EADt kh\u1EA9u",
+    desc: "Kh\xF4ng b\u1EAFt bu\u1ED9c \u2014 gi\xFAp b\u1EA1n \u0111\u0103ng nh\u1EADp tr\u1EF1c ti\u1EBFp l\u1EA7n sau m\xE0 kh\xF4ng c\u1EA7n li\xEAn k\u1EBFt email.",
+    label: "M\u1EADt kh\u1EA9u",
+    submit: "\u0110\u1EB7t m\u1EADt kh\u1EA9u v\xE0 ti\u1EBFp t\u1EE5c",
+    submitting: "\u0110ang l\u01B0u\u2026",
+    success: "\u0110\xE3 \u0111\u1EB7t m\u1EADt kh\u1EA9u",
+    skip: "B\u1ECF qua l\xFAc n\xE0y",
+    min_length: "M\u1EADt kh\u1EA9u ph\u1EA3i c\xF3 \xEDt nh\u1EA5t 8 k\xFD t\u1EF1.",
+    invalid_title: "Li\xEAn k\u1EBFt n\xE0y \u0111\xE3 h\u1EBFt h\u1EA1n",
+    invalid_desc: "Vui l\xF2ng y\xEAu c\u1EA7u li\xEAn k\u1EBFt \u0111\u0103ng nh\u1EADp m\u1EDBi."
   },
   common: {
     submit: "G\u1EEDi",
@@ -2568,6 +2683,188 @@ function PostLoginGate({ children }) {
       ] })
     ] })
   ] }) });
+}
+function SignUpForm() {
+  const { t } = useTranslation();
+  const { supabase, ui, router } = useJoaSuite();
+  const { Button, Label, EmailInput } = ui;
+  const { Link } = router;
+  const [step, setStep] = useState("email");
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: true,
+        emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/onboarding/set-password` : void 0
+      }
+    });
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setStep("sent");
+  };
+  if (step === "sent") {
+    return /* @__PURE__ */ jsxs("div", { className: "space-y-4 text-center", children: [
+      /* @__PURE__ */ jsx("div", { className: "mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted", children: /* @__PURE__ */ jsx(Mail, { className: "h-5 w-5 text-muted-foreground" }) }),
+      /* @__PURE__ */ jsxs("div", { children: [
+        /* @__PURE__ */ jsx("h2", { className: "font-semibold", children: t("signup_wizard.check_email_title", "Check your email") }),
+        /* @__PURE__ */ jsx("p", { className: "mt-1.5 text-sm text-muted-foreground", children: t(
+          "signup_wizard.check_email_desc",
+          "We sent a secure link to {{email}}. Click it to continue.",
+          { email }
+        ) })
+      ] }),
+      /* @__PURE__ */ jsx(Button, { variant: "outline", className: "w-full", onClick: () => setStep("email"), children: t("signup_wizard.use_different_email", "Use a different email") })
+    ] });
+  }
+  return /* @__PURE__ */ jsxs("form", { onSubmit: submit, className: "space-y-4", children: [
+    /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+      /* @__PURE__ */ jsx(Label, { htmlFor: "signup-wizard-email", children: t("signup_wizard.email_label", "Email") }),
+      /* @__PURE__ */ jsx(
+        EmailInput,
+        {
+          id: "signup-wizard-email",
+          value: email,
+          onChange: (e) => setEmail(e.target.value),
+          required: true,
+          autoFocus: true
+        }
+      )
+    ] }),
+    /* @__PURE__ */ jsx(Button, { type: "submit", disabled: busy || !email, className: "w-full", children: busy ? t("signup_wizard.sending", "Sending\u2026") : t("signup_wizard.continue", "Continue") }),
+    /* @__PURE__ */ jsx("p", { className: "text-xs text-center text-muted-foreground", children: t(
+      "signup_wizard.existing_hint",
+      "Already have a JoaSuite account? Enter your email above \u2014 we'll sign you in, no new account needed."
+    ) }),
+    /* @__PURE__ */ jsxs("p", { className: "text-sm text-center text-muted-foreground", children: [
+      t("signup_wizard.have_password", "Prefer to sign in with a password?"),
+      " ",
+      /* @__PURE__ */ jsx(Link, { to: "/signin", className: "text-primary underline", children: t("signup_wizard.sign_in", "Sign in") })
+    ] })
+  ] });
+}
+var FRESH_ACCOUNT_WINDOW_MS = 5 * 60 * 1e3;
+function SetPasswordForm() {
+  const { t } = useTranslation();
+  const { supabase, ui, router } = useJoaSuite();
+  const { Button, Input, Label } = ui;
+  const { useNavigate } = router;
+  const nav = useNavigate();
+  const [phase, setPhase] = useState("checking");
+  const [pw, setPw] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    const decide = async () => {
+      const { data } = await supabase.auth.getUser();
+      if (cancelled) return;
+      const createdAt = data.user?.created_at ? new Date(data.user.created_at).getTime() : 0;
+      const isFresh = !!createdAt && Date.now() - createdAt < FRESH_ACCOUNT_WINDOW_MS;
+      setPhase(isFresh ? "new" : "existing");
+    };
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_IN") decide();
+    });
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) {
+        decide();
+        return;
+      }
+      setTimeout(async () => {
+        const { data: d2 } = await supabase.auth.getSession();
+        if (!cancelled) {
+          if (d2.session) decide();
+          else setPhase("invalid");
+        }
+      }, 800);
+    });
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+  useEffect(() => {
+    if (phase === "existing") nav({ to: "/app" });
+  }, [phase, nav]);
+  if (phase === "checking" || phase === "existing") {
+    return /* @__PURE__ */ jsx("div", { className: "p-8 text-center text-sm text-muted-foreground", children: t("common.loading", "Loading\u2026") });
+  }
+  if (phase === "invalid") {
+    return /* @__PURE__ */ jsxs("div", { className: "space-y-2 text-center", children: [
+      /* @__PURE__ */ jsx("h2", { className: "font-semibold", children: t("set_password.invalid_title", "This link has expired") }),
+      /* @__PURE__ */ jsx("p", { className: "text-sm text-muted-foreground", children: t("set_password.invalid_desc", "Please request a new sign-in link.") })
+    ] });
+  }
+  const submit = async (e) => {
+    e.preventDefault();
+    if (pw.length < 8) {
+      toast.error(t("set_password.min_length", "Password must be at least 8 characters."));
+      return;
+    }
+    setBusy(true);
+    const { error } = await supabase.auth.updateUser({ password: pw });
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success(t("set_password.success", "Password set"));
+    nav({ to: "/app" });
+  };
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-4", children: [
+    /* @__PURE__ */ jsxs("div", { children: [
+      /* @__PURE__ */ jsx("h1", { className: "text-xl font-semibold", children: t("set_password.title", "Set a password") }),
+      /* @__PURE__ */ jsx("p", { className: "text-sm text-muted-foreground mt-1", children: t("set_password.desc", "Optional \u2014 lets you sign in directly next time without an email link.") })
+    ] }),
+    /* @__PURE__ */ jsxs("form", { onSubmit: submit, className: "space-y-4", children: [
+      /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+        /* @__PURE__ */ jsx(Label, { htmlFor: "set-password-pw", children: t("set_password.label", "Password") }),
+        /* @__PURE__ */ jsxs("div", { className: "relative", children: [
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              id: "set-password-pw",
+              type: showPw ? "text" : "password",
+              value: pw,
+              onChange: (e) => setPw(e.target.value),
+              minLength: 8,
+              autoComplete: "new-password",
+              className: "pr-10",
+              autoFocus: true
+            }
+          ),
+          /* @__PURE__ */ jsx(
+            "button",
+            {
+              type: "button",
+              onClick: () => setShowPw((v) => !v),
+              className: "absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground",
+              tabIndex: -1,
+              "aria-label": showPw ? t("common.hide_password", "Hide") : t("common.show_password", "Show"),
+              children: showPw ? /* @__PURE__ */ jsx(EyeOff, { size: 18 }) : /* @__PURE__ */ jsx(Eye, { size: 18 })
+            }
+          )
+        ] })
+      ] }),
+      /* @__PURE__ */ jsx(Button, { type: "submit", disabled: busy, className: "w-full", children: busy ? t("set_password.submitting", "Saving\u2026") : t("set_password.submit", "Set password & continue") })
+    ] }),
+    /* @__PURE__ */ jsx(
+      "button",
+      {
+        type: "button",
+        onClick: () => nav({ to: "/app" }),
+        className: "w-full text-center text-xs text-muted-foreground hover:text-foreground underline",
+        children: t("set_password.skip", "Skip for now")
+      }
+    )
+  ] });
 }
 function deriveStatus(u) {
   const vals = Object.values(u.assignments);
@@ -6000,6 +6297,6 @@ function BillingComparePage({ appCode }) {
   ] });
 }
 
-export { APP_CODES, APP_DISPLAY, AppOverviewSection, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, EmployeeDirectoryListPage, EmployeeProfileForm, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
+export { APP_CODES, APP_DISPLAY, AppOverviewSection, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, EmployeeDirectoryListPage, EmployeeProfileForm, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

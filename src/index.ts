@@ -28,6 +28,8 @@ export { SuiteSwitcher } from "./components/SuiteSwitcher";
 export { SuiteHomePage } from "./components/SuiteHomePage";
 export { SuiteSettingsHub } from "./components/SuiteSettingsHub";
 export { PostLoginGate } from "./components/PostLoginGate";
+export { SignUpForm } from "./components/SignUpForm";
+export { SetPasswordForm } from "./components/SetPasswordForm";
 export { OrgScopeToggle } from "./components/OrgScopeToggle";
 export { AppOverviewSection } from "./components/AppOverviewSection";
 export { UserListPage } from "./components/users/UserListPage";

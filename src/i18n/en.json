@@ -34,6 +34,29 @@
     "no_notifications": "No notifications.",
     "aria": "Notifications"
   },
+  "signup_wizard": {
+    "email_label": "Email",
+    "continue": "Continue",
+    "sending": "Sending…",
+    "existing_hint": "Already have a JoaSuite account? Enter your email above — we'll sign you in, no new account needed.",
+    "have_password": "Prefer to sign in with a password?",
+    "sign_in": "Sign in",
+    "check_email_title": "Check your email",
+    "check_email_desc": "We sent a secure link to {{email}}. Click it to continue.",
+    "use_different_email": "Use a different email"
+  },
+  "set_password": {
+    "title": "Set a password",
+    "desc": "Optional — lets you sign in directly next time without an email link.",
+    "label": "Password",
+    "submit": "Set password & continue",
+    "submitting": "Saving…",
+    "success": "Password set",
+    "skip": "Skip for now",
+    "min_length": "Password must be at least 8 characters.",
+    "invalid_title": "This link has expired",
+    "invalid_desc": "Please request a new sign-in link."
+  },
   "common": {
     "submit": "Submit",
     "save": "Save",
