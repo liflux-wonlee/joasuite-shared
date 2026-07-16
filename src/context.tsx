@@ -21,6 +21,8 @@ export type AuthState = {
   currentTenantId: string | null;
   currentMembership: Membership | null;
   memberships: Membership[];
+  setCurrentTenantId: (id: string) => void;
+  refresh: () => Promise<void>;
   signOut: () => Promise<void> | void;
 };
 
@@ -93,6 +95,7 @@ export type BoundServerFns = {
   }>;
   subscribeApp: (input: { tenantId: string; appCode: string; plan: string }) => Promise<{ ok: true }>;
   cancelApp: (input: { tenantId: string; appCode: string }) => Promise<{ ok: true }>;
+  createTenant: (input: { name: string; display_name?: string }) => Promise<{ tenant: { id: string; [k: string]: any } }>;
   getSuiteHome: (input: { tenantId: string }) => Promise<any>;
   setAppUrl: (input: { tenantId: string; appCode: AppCode; url: string }) => Promise<{ ok: true }>;
   getAppSummaries: (input: { tenantIds: string[] }) => Promise<AppSummaryTile[]>;

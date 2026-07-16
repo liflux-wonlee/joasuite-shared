@@ -244,6 +244,24 @@ var en_default = {
     tile: {
       users: "Users",
       users_desc: "Invite users across all organizations and assign per-app roles."
+    },
+    gate: {
+      no_org_title: "Create your organization",
+      no_org_desc: "Your account isn't part of any organization yet. Create one to get started.",
+      org_name_label: "Organization name",
+      create_org: "Create organization",
+      creating: "Creating\u2026",
+      org_created: "Organization created",
+      create_failed: "Failed to create organization",
+      owner_title: "{{tenant}} hasn't enabled {{app}} yet",
+      owner_desc: "Subscribe your organization to {{app}} to continue.",
+      subscribe_cta: "Subscribe {{app}}",
+      subscribing: "Subscribing\u2026",
+      subscribed: "{{app}} is now enabled",
+      subscribe_failed: "Failed to subscribe",
+      member_title: "{{tenant}} doesn't use {{app}} yet",
+      member_desc: "You're registered at {{tenant}} as {{role}}. Ask the organization owner to subscribe to {{app}} to get access.",
+      separate_org_cta: "Need this for something unrelated? Create a separate organization"
     }
   },
   users: {
@@ -533,6 +551,24 @@ var ko_default = {
     tile: {
       users: "\uC0AC\uC6A9\uC790",
       users_desc: "\uBAA8\uB4E0 \uC870\uC9C1\uC5D0 \uAC78\uCCD0 \uC0AC\uC6A9\uC790\uB97C \uCD08\uB300\uD558\uACE0 \uC571\uBCC4 \uC5ED\uD560\uC744 \uBD80\uC5EC\uD569\uB2C8\uB2E4."
+    },
+    gate: {
+      no_org_title: "\uC870\uC9C1 \uB9CC\uB4E4\uAE30",
+      no_org_desc: "\uC544\uC9C1 \uC5B4\uB290 \uC870\uC9C1\uC5D0\uB3C4 \uC18D\uD574 \uC788\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4. \uC2DC\uC791\uD558\uB824\uBA74 \uC870\uC9C1\uC744 \uB9CC\uB4DC\uC138\uC694.",
+      org_name_label: "\uC870\uC9C1 \uC774\uB984",
+      create_org: "\uC870\uC9C1 \uB9CC\uB4E4\uAE30",
+      creating: "\uC0DD\uC131 \uC911\u2026",
+      org_created: "\uC870\uC9C1\uC774 \uC0DD\uC131\uB418\uC5C8\uC2B5\uB2C8\uB2E4",
+      create_failed: "\uC870\uC9C1 \uC0DD\uC131\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4",
+      owner_title: "\u300C{{tenant}}\u300D\uC5D0\uC11C \uC544\uC9C1 {{app}}\uC744(\uB97C) \uC0AC\uC6A9\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4",
+      owner_desc: "\uACC4\uC18D\uD558\uB824\uBA74 \uC870\uC9C1\uC744 {{app}}\uC5D0 \uAD6C\uB3C5\uD558\uC138\uC694.",
+      subscribe_cta: "{{app}} \uAD6C\uB3C5\uD558\uAE30",
+      subscribing: "\uAD6C\uB3C5 \uCC98\uB9AC \uC911\u2026",
+      subscribed: "{{app}}\uC774(\uAC00) \uD65C\uC131\uD654\uB418\uC5C8\uC2B5\uB2C8\uB2E4",
+      subscribe_failed: "\uAD6C\uB3C5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4",
+      member_title: "\u300C{{tenant}}\u300D\uC5D0\uC11C \uC544\uC9C1 {{app}}\uC744(\uB97C) \uC0AC\uC6A9\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4",
+      member_desc: "\u300C{{tenant}}\u300D\uC5D0 {{role}}(\uC73C)\uB85C \uB4F1\uB85D\uB418\uC5B4 \uC788\uC2B5\uB2C8\uB2E4. {{app}}\uC744(\uB97C) \uC0AC\uC6A9\uD558\uB824\uBA74 \uC870\uC9C1 owner\uC5D0\uAC8C \uAD6C\uB3C5\uC744 \uC694\uCCAD\uD558\uC138\uC694.",
+      separate_org_cta: "\uBB34\uAD00\uD55C \uBAA9\uC801\uC774\uC2E0\uAC00\uC694? \uBCC4\uB3C4 \uC870\uC9C1 \uB9CC\uB4E4\uAE30"
     }
   },
   users: {
@@ -807,6 +843,24 @@ var zh_default = {
     tile: {
       users: "\u7528\u6237",
       users_desc: "\u5728\u6240\u6709\u7EC4\u7EC7\u4E2D\u9080\u8BF7\u7528\u6237\u5E76\u5206\u914D\u5404\u5E94\u7528\u7684\u89D2\u8272\u3002"
+    },
+    gate: {
+      no_org_title: "\u521B\u5EFA\u60A8\u7684\u7EC4\u7EC7",
+      no_org_desc: "\u60A8\u7684\u8D26\u6237\u5C1A\u672A\u52A0\u5165\u4EFB\u4F55\u7EC4\u7EC7\u3002\u521B\u5EFA\u4E00\u4E2A\u5373\u53EF\u5F00\u59CB\u4F7F\u7528\u3002",
+      org_name_label: "\u7EC4\u7EC7\u540D\u79F0",
+      create_org: "\u521B\u5EFA\u7EC4\u7EC7",
+      creating: "\u521B\u5EFA\u4E2D\u2026",
+      org_created: "\u7EC4\u7EC7\u5DF2\u521B\u5EFA",
+      create_failed: "\u521B\u5EFA\u7EC4\u7EC7\u5931\u8D25",
+      owner_title: "\u300C{{tenant}}\u300D\u5C1A\u672A\u542F\u7528 {{app}}",
+      owner_desc: "\u8BA2\u9605 {{app}} \u540E\u5373\u53EF\u7EE7\u7EED\u4F7F\u7528\u3002",
+      subscribe_cta: "\u8BA2\u9605 {{app}}",
+      subscribing: "\u8BA2\u9605\u4E2D\u2026",
+      subscribed: "{{app}} \u5DF2\u542F\u7528",
+      subscribe_failed: "\u8BA2\u9605\u5931\u8D25",
+      member_title: "\u300C{{tenant}}\u300D\u5C1A\u672A\u4F7F\u7528 {{app}}",
+      member_desc: "\u60A8\u5DF2\u5728\u300C{{tenant}}\u300D\u4EE5 {{role}} \u8EAB\u4EFD\u6CE8\u518C\u3002\u8BF7\u8BA9\u7EC4\u7EC7\u6240\u6709\u8005\u8BA2\u9605 {{app}} \u4EE5\u83B7\u53D6\u8BBF\u95EE\u6743\u9650\u3002",
+      separate_org_cta: "\u7528\u4E8E\u65E0\u5173\u76EE\u7684\uFF1F\u521B\u5EFA\u4E00\u4E2A\u72EC\u7ACB\u7684\u65B0\u7EC4\u7EC7"
     }
   },
   users: {
@@ -1084,6 +1138,24 @@ var es_default = {
     tile: {
       users: "Usuarios",
       users_desc: "Invita usuarios en todas las organizaciones y asigna roles por aplicaci\xF3n."
+    },
+    gate: {
+      no_org_title: "Crea tu organizaci\xF3n",
+      no_org_desc: "Tu cuenta a\xFAn no pertenece a ninguna organizaci\xF3n. Crea una para comenzar.",
+      org_name_label: "Nombre de la organizaci\xF3n",
+      create_org: "Crear organizaci\xF3n",
+      creating: "Creando\u2026",
+      org_created: "Organizaci\xF3n creada",
+      create_failed: "No se pudo crear la organizaci\xF3n",
+      owner_title: "{{tenant}} a\xFAn no ha habilitado {{app}}",
+      owner_desc: "Suscribe tu organizaci\xF3n a {{app}} para continuar.",
+      subscribe_cta: "Suscribir {{app}}",
+      subscribing: "Suscribiendo\u2026",
+      subscribed: "{{app}} est\xE1 ahora habilitada",
+      subscribe_failed: "No se pudo completar la suscripci\xF3n",
+      member_title: "{{tenant}} todav\xEDa no usa {{app}}",
+      member_desc: "Est\xE1s registrado en {{tenant}} como {{role}}. Pide al propietario de la organizaci\xF3n que suscriba {{app}} para obtener acceso.",
+      separate_org_cta: "\xBFEs para algo no relacionado? Crea una organizaci\xF3n aparte"
     }
   },
   users: {
@@ -1361,6 +1433,24 @@ var vi_default = {
     tile: {
       users: "Ng\u01B0\u1EDDi d\xF9ng",
       users_desc: "M\u1EDDi ng\u01B0\u1EDDi d\xF9ng tr\xEAn t\u1EA5t c\u1EA3 t\u1ED5 ch\u1EE9c v\xE0 ph\xE2n quy\u1EC1n theo t\u1EEBng \u1EE9ng d\u1EE5ng."
+    },
+    gate: {
+      no_org_title: "T\u1EA1o t\u1ED5 ch\u1EE9c c\u1EE7a b\u1EA1n",
+      no_org_desc: "T\xE0i kho\u1EA3n c\u1EE7a b\u1EA1n ch\u01B0a thu\u1ED9c t\u1ED5 ch\u1EE9c n\xE0o. H\xE3y t\u1EA1o m\u1ED9t t\u1ED5 ch\u1EE9c \u0111\u1EC3 b\u1EAFt \u0111\u1EA7u.",
+      org_name_label: "T\xEAn t\u1ED5 ch\u1EE9c",
+      create_org: "T\u1EA1o t\u1ED5 ch\u1EE9c",
+      creating: "\u0110ang t\u1EA1o\u2026",
+      org_created: "\u0110\xE3 t\u1EA1o t\u1ED5 ch\u1EE9c",
+      create_failed: "T\u1EA1o t\u1ED5 ch\u1EE9c th\u1EA5t b\u1EA1i",
+      owner_title: "{{tenant}} ch\u01B0a b\u1EADt {{app}}",
+      owner_desc: "\u0110\u0103ng k\xFD {{app}} cho t\u1ED5 ch\u1EE9c c\u1EE7a b\u1EA1n \u0111\u1EC3 ti\u1EBFp t\u1EE5c.",
+      subscribe_cta: "\u0110\u0103ng k\xFD {{app}}",
+      subscribing: "\u0110ang \u0111\u0103ng k\xFD\u2026",
+      subscribed: "{{app}} \u0111\xE3 \u0111\u01B0\u1EE3c b\u1EADt",
+      subscribe_failed: "\u0110\u0103ng k\xFD th\u1EA5t b\u1EA1i",
+      member_title: "{{tenant}} ch\u01B0a d\xF9ng {{app}}",
+      member_desc: "B\u1EA1n \u0111\xE3 \u0111\u0103ng k\xFD t\u1EA1i {{tenant}} v\u1EDBi vai tr\xF2 {{role}}. H\xE3y nh\u1EDD ch\u1EE7 t\u1ED5 ch\u1EE9c \u0111\u0103ng k\xFD {{app}} \u0111\u1EC3 c\xF3 quy\u1EC1n truy c\u1EADp.",
+      separate_org_cta: "D\xF9ng cho vi\u1EC7c kh\xF4ng li\xEAn quan? T\u1EA1o m\u1ED9t t\u1ED5 ch\u1EE9c ri\xEAng"
     }
   },
   users: {
@@ -2469,6 +2559,146 @@ function TileCard({ tile, Link, Card, Badge }) {
   );
   if (tile.disabled || !tile.to) return inner;
   return /* @__PURE__ */ jsx(Link, { to: tile.to, className: "block h-full", children: inner });
+}
+function PostLoginGate({ children }) {
+  const { t } = useTranslation();
+  const { useAuth, ui, router, fns, currentApp } = useJoaSuite();
+  const { Button, Card, Input, Label } = ui;
+  const { useNavigate } = router;
+  const nav = useNavigate();
+  const qc = useQueryClient();
+  const { currentMembership, setCurrentTenantId, refresh } = useAuth();
+  const [creatingOrg, setCreatingOrg] = useState(false);
+  const [orgName, setOrgName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [subscribing, setSubscribing] = useState(false);
+  const appName = APP_DISPLAY.find((a) => a.code === currentApp)?.name ?? currentApp;
+  if (currentMembership?.apps?.includes(currentApp)) {
+    return /* @__PURE__ */ jsx(Fragment, { children });
+  }
+  const isOwner = !!currentMembership && (currentMembership.roles.includes("owner") || currentMembership.roles.includes("super_admin"));
+  const goToApp = async (tenantId) => {
+    await refresh();
+    setCurrentTenantId(tenantId);
+    qc.invalidateQueries();
+    nav({ to: "/app" });
+  };
+  const handleCreateOrg = async (e) => {
+    e.preventDefault();
+    if (!orgName.trim()) return;
+    setCreating(true);
+    try {
+      const res = await fns.createTenant({ name: orgName.trim() });
+      if (!res?.tenant?.id) throw new Error("No tenant returned");
+      toast.success(t("suite.gate.org_created", "Organization created"));
+      await goToApp(res.tenant.id);
+    } catch (err) {
+      toast.error(err?.message ?? t("suite.gate.create_failed", "Failed to create organization"));
+    } finally {
+      setCreating(false);
+    }
+  };
+  const handleSubscribe = async () => {
+    if (!currentMembership) return;
+    setSubscribing(true);
+    try {
+      await fns.subscribeApp({ tenantId: currentMembership.tenant_id, appCode: currentApp, plan: "free" });
+      toast.success(t("suite.gate.subscribed", "{{app}} is now enabled", { app: appName }));
+      await goToApp(currentMembership.tenant_id);
+    } catch (err) {
+      toast.error(err?.message ?? t("suite.gate.subscribe_failed", "Failed to subscribe"));
+    } finally {
+      setSubscribing(false);
+    }
+  };
+  const newOrgForm = /* @__PURE__ */ jsxs("form", { onSubmit: handleCreateOrg, className: "space-y-3 text-left", children: [
+    /* @__PURE__ */ jsxs("div", { className: "space-y-1.5", children: [
+      /* @__PURE__ */ jsx(Label, { htmlFor: "gate-org-name", children: t("suite.gate.org_name_label", "Organization name") }),
+      /* @__PURE__ */ jsx(
+        Input,
+        {
+          id: "gate-org-name",
+          value: orgName,
+          onChange: (e) => setOrgName(e.target.value),
+          placeholder: "Acme Trading LLC",
+          autoFocus: true,
+          required: true
+        }
+      )
+    ] }),
+    /* @__PURE__ */ jsx(Button, { type: "submit", disabled: creating || !orgName.trim(), className: "w-full", children: creating ? t("suite.gate.creating", "Creating\u2026") : t("suite.gate.create_org", "Create organization") })
+  ] });
+  const separateOrgToggle = !creatingOrg && /* @__PURE__ */ jsxs(
+    "button",
+    {
+      type: "button",
+      onClick: () => setCreatingOrg(true),
+      className: "mx-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline",
+      children: [
+        t("suite.gate.separate_org_cta", "Need this for something unrelated? Create a separate organization"),
+        /* @__PURE__ */ jsx(ArrowRight, { className: "h-3 w-3" })
+      ]
+    }
+  );
+  const backToggle = creatingOrg && /* @__PURE__ */ jsx(
+    "button",
+    {
+      type: "button",
+      onClick: () => setCreatingOrg(false),
+      className: "text-xs text-muted-foreground hover:text-foreground hover:underline",
+      children: t("common.back", "Back")
+    }
+  );
+  return /* @__PURE__ */ jsx("div", { className: "flex min-h-screen items-center justify-center px-4", children: /* @__PURE__ */ jsxs(Card, { className: "w-full max-w-md space-y-4 p-6 text-center", children: [
+    /* @__PURE__ */ jsx("div", { className: "mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-muted", children: /* @__PURE__ */ jsx(Building2, { className: "h-5 w-5 text-muted-foreground" }) }),
+    !currentMembership ? /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsxs("div", { children: [
+        /* @__PURE__ */ jsx("h1", { className: "text-lg font-semibold", children: t("suite.gate.no_org_title", "Create your organization") }),
+        /* @__PURE__ */ jsx("p", { className: "mt-1.5 text-sm text-muted-foreground", children: t(
+          "suite.gate.no_org_desc",
+          "Your account isn't part of any organization yet. Create one to get started."
+        ) })
+      ] }),
+      newOrgForm
+    ] }) : isOwner ? /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsxs("div", { children: [
+        /* @__PURE__ */ jsx("h1", { className: "text-lg font-semibold", children: t("suite.gate.owner_title", "{{tenant}} hasn't enabled {{app}} yet", {
+          tenant: currentMembership.tenant_name,
+          app: appName
+        }) }),
+        /* @__PURE__ */ jsx("p", { className: "mt-1.5 text-sm text-muted-foreground", children: t("suite.gate.owner_desc", "Subscribe your organization to {{app}} to continue.", {
+          app: appName
+        }) })
+      ] }),
+      !creatingOrg ? /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+        /* @__PURE__ */ jsx(Button, { onClick: handleSubscribe, disabled: subscribing, className: "w-full", children: subscribing ? t("suite.gate.subscribing", "Subscribing\u2026") : t("suite.gate.subscribe_cta", "Subscribe {{app}}", { app: appName }) }),
+        separateOrgToggle
+      ] }) : /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+        newOrgForm,
+        backToggle
+      ] })
+    ] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsxs("div", { children: [
+        /* @__PURE__ */ jsx("h1", { className: "text-lg font-semibold", children: t("suite.gate.member_title", "{{tenant}} doesn't use {{app}} yet", {
+          tenant: currentMembership.tenant_name,
+          app: appName
+        }) }),
+        /* @__PURE__ */ jsx("p", { className: "mt-1.5 text-sm text-muted-foreground", children: t(
+          "suite.gate.member_desc",
+          "You're registered at {{tenant}} as {{role}}. Ask the organization owner to subscribe to {{app}} to get access.",
+          {
+            tenant: currentMembership.tenant_name,
+            role: currentMembership.roles[0] ?? "member",
+            app: appName
+          }
+        ) })
+      ] }),
+      !creatingOrg ? separateOrgToggle : /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+        newOrgForm,
+        backToggle
+      ] })
+    ] })
+  ] }) });
 }
 function deriveStatus(u) {
   const vals = Object.values(u.assignments);
@@ -5901,6 +6131,6 @@ function BillingComparePage({ appCode }) {
   ] });
 }
 
-export { APP_CODES, APP_DISPLAY, AppOverviewSection, AppSubscriptionsSummary, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, EmployeeDirectoryListPage, EmployeeProfileForm, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
+export { APP_CODES, APP_DISPLAY, AppOverviewSection, AppSubscriptionsSummary, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, EmployeeDirectoryListPage, EmployeeProfileForm, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

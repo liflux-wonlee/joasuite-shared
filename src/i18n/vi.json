@@ -168,6 +168,24 @@
     "tile": {
       "users": "Người dùng",
       "users_desc": "Mời người dùng trên tất cả tổ chức và phân quyền theo từng ứng dụng."
+    },
+    "gate": {
+      "no_org_title": "Tạo tổ chức của bạn",
+      "no_org_desc": "Tài khoản của bạn chưa thuộc tổ chức nào. Hãy tạo một tổ chức để bắt đầu.",
+      "org_name_label": "Tên tổ chức",
+      "create_org": "Tạo tổ chức",
+      "creating": "Đang tạo…",
+      "org_created": "Đã tạo tổ chức",
+      "create_failed": "Tạo tổ chức thất bại",
+      "owner_title": "{{tenant}} chưa bật {{app}}",
+      "owner_desc": "Đăng ký {{app}} cho tổ chức của bạn để tiếp tục.",
+      "subscribe_cta": "Đăng ký {{app}}",
+      "subscribing": "Đang đăng ký…",
+      "subscribed": "{{app}} đã được bật",
+      "subscribe_failed": "Đăng ký thất bại",
+      "member_title": "{{tenant}} chưa dùng {{app}}",
+      "member_desc": "Bạn đã đăng ký tại {{tenant}} với vai trò {{role}}. Hãy nhờ chủ tổ chức đăng ký {{app}} để có quyền truy cập.",
+      "separate_org_cta": "Dùng cho việc không liên quan? Tạo một tổ chức riêng"
     }
   },
   "users": {

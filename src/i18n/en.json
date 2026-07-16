@@ -183,6 +183,24 @@
     "tile": {
       "users": "Users",
       "users_desc": "Invite users across all organizations and assign per-app roles."
+    },
+    "gate": {
+      "no_org_title": "Create your organization",
+      "no_org_desc": "Your account isn't part of any organization yet. Create one to get started.",
+      "org_name_label": "Organization name",
+      "create_org": "Create organization",
+      "creating": "Creating…",
+      "org_created": "Organization created",
+      "create_failed": "Failed to create organization",
+      "owner_title": "{{tenant}} hasn't enabled {{app}} yet",
+      "owner_desc": "Subscribe your organization to {{app}} to continue.",
+      "subscribe_cta": "Subscribe {{app}}",
+      "subscribing": "Subscribing…",
+      "subscribed": "{{app}} is now enabled",
+      "subscribe_failed": "Failed to subscribe",
+      "member_title": "{{tenant}} doesn't use {{app}} yet",
+      "member_desc": "You're registered at {{tenant}} as {{role}}. Ask the organization owner to subscribe to {{app}} to get access.",
+      "separate_org_cta": "Need this for something unrelated? Create a separate organization"
     }
   },
   "users": {

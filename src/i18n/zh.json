@@ -165,6 +165,24 @@
     "tile": {
       "users": "用户",
       "users_desc": "在所有组织中邀请用户并分配各应用的角色。"
+    },
+    "gate": {
+      "no_org_title": "创建您的组织",
+      "no_org_desc": "您的账户尚未加入任何组织。创建一个即可开始使用。",
+      "org_name_label": "组织名称",
+      "create_org": "创建组织",
+      "creating": "创建中…",
+      "org_created": "组织已创建",
+      "create_failed": "创建组织失败",
+      "owner_title": "「{{tenant}}」尚未启用 {{app}}",
+      "owner_desc": "订阅 {{app}} 后即可继续使用。",
+      "subscribe_cta": "订阅 {{app}}",
+      "subscribing": "订阅中…",
+      "subscribed": "{{app}} 已启用",
+      "subscribe_failed": "订阅失败",
+      "member_title": "「{{tenant}}」尚未使用 {{app}}",
+      "member_desc": "您已在「{{tenant}}」以 {{role}} 身份注册。请让组织所有者订阅 {{app}} 以获取访问权限。",
+      "separate_org_cta": "用于无关目的？创建一个独立的新组织"
     }
   },
   "users": {

@@ -180,6 +180,24 @@
     "tile": {
       "users": "사용자",
       "users_desc": "모든 조직에 걸쳐 사용자를 초대하고 앱별 역할을 부여합니다."
+    },
+    "gate": {
+      "no_org_title": "조직 만들기",
+      "no_org_desc": "아직 어느 조직에도 속해 있지 않습니다. 시작하려면 조직을 만드세요.",
+      "org_name_label": "조직 이름",
+      "create_org": "조직 만들기",
+      "creating": "생성 중…",
+      "org_created": "조직이 생성되었습니다",
+      "create_failed": "조직 생성에 실패했습니다",
+      "owner_title": "「{{tenant}}」에서 아직 {{app}}을(를) 사용하지 않습니다",
+      "owner_desc": "계속하려면 조직을 {{app}}에 구독하세요.",
+      "subscribe_cta": "{{app}} 구독하기",
+      "subscribing": "구독 처리 중…",
+      "subscribed": "{{app}}이(가) 활성화되었습니다",
+      "subscribe_failed": "구독에 실패했습니다",
+      "member_title": "「{{tenant}}」에서 아직 {{app}}을(를) 사용하지 않습니다",
+      "member_desc": "「{{tenant}}」에 {{role}}(으)로 등록되어 있습니다. {{app}}을(를) 사용하려면 조직 owner에게 구독을 요청하세요.",
+      "separate_org_cta": "무관한 목적이신가요? 별도 조직 만들기"
     }
   },
   "users": {

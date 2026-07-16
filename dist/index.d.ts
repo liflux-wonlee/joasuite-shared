@@ -9,6 +9,8 @@ type Membership = {
     tenant_name: string | null;
     roles: string[];
     portal?: "internal" | "vendor" | "approver" | "customer";
+    /** Active `tenant_apps.app_code` values for this tenant. Drives PostLoginGate's app-subscription check. */
+    apps: string[];
 };
 /**
  * "Users" (suite login/tenant-membership management) types. Deliberately
@@ -172,6 +174,8 @@ type AuthState = {
     currentTenantId: string | null;
     currentMembership: Membership | null;
     memberships: Membership[];
+    setCurrentTenantId: (id: string) => void;
+    refresh: () => Promise<void>;
     signOut: () => Promise<void> | void;
 };
 /**
@@ -256,6 +260,15 @@ type BoundServerFns = {
         appCode: string;
     }) => Promise<{
         ok: true;
+    }>;
+    createTenant: (input: {
+        name: string;
+        display_name?: string;
+    }) => Promise<{
+        tenant: {
+            id: string;
+            [k: string]: any;
+        };
     }>;
     getSuiteHome: (input: {
         tenantId: string;
@@ -531,6 +544,21 @@ declare function SuiteSettingsHub(): react.JSX.Element;
 declare function AppSubscriptionsSummary(): react.JSX.Element | null;
 
 /**
+ * Renders `children` once the signed-in user has an active membership in a
+ * tenant that's subscribed to the current app. Otherwise renders the branch
+ * that applies:
+ *   - no membership anywhere -> create an organization
+ *   - owner/super_admin of a tenant that hasn't enabled this app -> one-click subscribe
+ *   - member (non-owner) of a tenant that hasn't enabled this app -> ask the owner
+ * All three reuse existing primitives (createTenant / subscribeApp) - no new
+ * server functions. Membership existence itself is never revealed pre-auth;
+ * this component only runs post-authentication.
+ */
+declare function PostLoginGate({ children }: {
+    children: ReactNode;
+}): react.JSX.Element;
+
+/**
  * Lets the user widen a screen (Dashboard, JoaSuite Home) from "this
  * organization" to any combination of the organizations they belong to.
  * Hidden entirely for users with only one eligible membership — there's
@@ -646,4 +674,4 @@ declare function BillingComparePage({ appCode }: {
  */
 declare function useOrgScope(): [string[], (tenantIds: string[]) => void];
 
-export { type AppCatalogEntry, AppCode, AppOverviewSection, AppSubscriptionsSummary, type AppSummaryTile, type ApprovalSummary, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type Department, EmployeeDirectoryListPage, type EmployeeDirectoryRow, EmployeeProfileForm, type EmployeeProfileInput, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, type RouterAdapter, SUPPORTED_LANGUAGES, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
+export { type AppCatalogEntry, AppCode, AppOverviewSection, AppSubscriptionsSummary, type AppSummaryTile, type ApprovalSummary, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type Department, EmployeeDirectoryListPage, type EmployeeDirectoryRow, EmployeeProfileForm, type EmployeeProfileInput, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, type RouterAdapter, SUPPORTED_LANGUAGES, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };

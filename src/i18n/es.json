@@ -168,6 +168,24 @@
     "tile": {
       "users": "Usuarios",
       "users_desc": "Invita usuarios en todas las organizaciones y asigna roles por aplicación."
+    },
+    "gate": {
+      "no_org_title": "Crea tu organización",
+      "no_org_desc": "Tu cuenta aún no pertenece a ninguna organización. Crea una para comenzar.",
+      "org_name_label": "Nombre de la organización",
+      "create_org": "Crear organización",
+      "creating": "Creando…",
+      "org_created": "Organización creada",
+      "create_failed": "No se pudo crear la organización",
+      "owner_title": "{{tenant}} aún no ha habilitado {{app}}",
+      "owner_desc": "Suscribe tu organización a {{app}} para continuar.",
+      "subscribe_cta": "Suscribir {{app}}",
+      "subscribing": "Suscribiendo…",
+      "subscribed": "{{app}} está ahora habilitada",
+      "subscribe_failed": "No se pudo completar la suscripción",
+      "member_title": "{{tenant}} todavía no usa {{app}}",
+      "member_desc": "Estás registrado en {{tenant}} como {{role}}. Pide al propietario de la organización que suscriba {{app}} para obtener acceso.",
+      "separate_org_cta": "¿Es para algo no relacionado? Crea una organización aparte"
     }
   },
   "users": {
