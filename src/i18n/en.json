@@ -34,6 +34,29 @@
     "no_notifications": "No notifications.",
     "aria": "Notifications"
   },
+  "signup_wizard": {
+    "email_label": "Email",
+    "continue": "Continue",
+    "sending": "Sending…",
+    "existing_hint": "Already have a JoaSuite account? Enter your email above — we'll sign you in, no new account needed.",
+    "have_password": "Prefer to sign in with a password?",
+    "sign_in": "Sign in",
+    "check_email_title": "Check your email",
+    "check_email_desc": "We sent a secure link to {{email}}. Click it to continue.",
+    "use_different_email": "Use a different email"
+  },
+  "set_password": {
+    "title": "Set a password",
+    "desc": "Optional — lets you sign in directly next time without an email link.",
+    "label": "Password",
+    "submit": "Set password & continue",
+    "submitting": "Saving…",
+    "success": "Password set",
+    "skip": "Skip for now",
+    "min_length": "Password must be at least 8 characters.",
+    "invalid_title": "This link has expired",
+    "invalid_desc": "Please request a new sign-in link."
+  },
   "common": {
     "submit": "Submit",
     "save": "Save",
@@ -185,6 +208,24 @@
       "users_desc": "Invite users across all organizations and assign per-app roles.",
       "team": "Team",
       "team_desc": "Team will provide shared access to basic employee and contractor info across JoaSuite apps."
+    },
+    "gate": {
+      "no_org_title": "Create your organization",
+      "no_org_desc": "Your account isn't part of any organization yet. Create one to get started.",
+      "org_name_label": "Organization name",
+      "create_org": "Create organization",
+      "creating": "Creating…",
+      "org_created": "Organization created",
+      "create_failed": "Failed to create organization",
+      "owner_title": "{{tenant}} hasn't enabled {{app}} yet",
+      "owner_desc": "Subscribe your organization to {{app}} to continue.",
+      "subscribe_cta": "Subscribe {{app}}",
+      "subscribing": "Subscribing…",
+      "subscribed": "{{app}} is now enabled",
+      "subscribe_failed": "Failed to subscribe",
+      "member_title": "{{tenant}} doesn't use {{app}} yet",
+      "member_desc": "You're registered at {{tenant}} as {{role}}. Ask the organization owner to subscribe to {{app}} to get access.",
+      "separate_org_cta": "Need this for something unrelated? Create a separate organization"
     }
   },
   "users": {
@@ -280,6 +321,13 @@
     "edit_position": "Edit position",
     "position_name": "Name",
     "no_positions": "No positions in this department yet.",
-    "confirm_delete": "Delete this?"
+    "confirm_delete": "Delete this?",
+    "title_employee": "Employees",
+    "title_contractor": "Contractors",
+    "desc_employee": "People on payroll, shared across JoaSuite apps.",
+    "desc_contractor": "External contractors and vendors, shared across JoaSuite apps.",
+    "add_employee": "Add employee",
+    "add_contractor": "Add contractor",
+    "team_group": "Team"
   }
 }

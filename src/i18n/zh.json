@@ -34,6 +34,29 @@
     "no_notifications": "无通知。",
     "aria": "通知"
   },
+  "signup_wizard": {
+    "email_label": "邮箱",
+    "continue": "继续",
+    "sending": "发送中…",
+    "existing_hint": "已经有 JoaSuite 账户了吗？在上方输入您的邮箱即可登录 —— 无需创建新账户。",
+    "have_password": "想用密码登录？",
+    "sign_in": "登录",
+    "check_email_title": "请查收邮件",
+    "check_email_desc": "我们已向 {{email}} 发送了一个安全链接。点击即可继续。",
+    "use_different_email": "使用其他邮箱"
+  },
+  "set_password": {
+    "title": "设置密码",
+    "desc": "可选 —— 设置后下次可直接登录，无需邮件链接。",
+    "label": "密码",
+    "submit": "设置密码并继续",
+    "submitting": "保存中…",
+    "success": "密码已设置",
+    "skip": "暂时跳过",
+    "min_length": "密码至少需要 8 个字符。",
+    "invalid_title": "此链接已过期",
+    "invalid_desc": "请重新申请登录链接。"
+  },
   "common": {
     "submit": "提交",
     "save": "保存",
@@ -167,6 +190,24 @@
       "users_desc": "在所有组织中邀请用户并分配各应用的角色。",
       "team": "团队",
       "team_desc": "Team 将在 JoaSuite 各应用间提供共享的员工/承包商基本信息访问。"
+    },
+    "gate": {
+      "no_org_title": "创建您的组织",
+      "no_org_desc": "您的账户尚未加入任何组织。创建一个即可开始使用。",
+      "org_name_label": "组织名称",
+      "create_org": "创建组织",
+      "creating": "创建中…",
+      "org_created": "组织已创建",
+      "create_failed": "创建组织失败",
+      "owner_title": "「{{tenant}}」尚未启用 {{app}}",
+      "owner_desc": "订阅 {{app}} 后即可继续使用。",
+      "subscribe_cta": "订阅 {{app}}",
+      "subscribing": "订阅中…",
+      "subscribed": "{{app}} 已启用",
+      "subscribe_failed": "订阅失败",
+      "member_title": "「{{tenant}}」尚未使用 {{app}}",
+      "member_desc": "您已在「{{tenant}}」以 {{role}} 身份注册。请让组织所有者订阅 {{app}} 以获取访问权限。",
+      "separate_org_cta": "用于无关目的？创建一个独立的新组织"
     }
   },
   "users": {
@@ -262,6 +303,13 @@
     "edit_position": "编辑职位",
     "position_name": "名称",
     "no_positions": "该部门暂无职位。",
-    "confirm_delete": "确定删除吗？"
+    "confirm_delete": "确定删除吗？",
+    "title_employee": "员工",
+    "title_contractor": "承包商",
+    "desc_employee": "在册员工列表，跨所有 JoaSuite 应用共享。",
+    "desc_contractor": "外部承包商和供应商列表，跨所有 JoaSuite 应用共享。",
+    "add_employee": "添加员工",
+    "add_contractor": "添加承包商",
+    "team_group": "团队"
   }
 }

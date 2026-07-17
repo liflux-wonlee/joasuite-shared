@@ -21,6 +21,8 @@ export type AuthState = {
   currentTenantId: string | null;
   currentMembership: Membership | null;
   memberships: Membership[];
+  setCurrentTenantId: (id: string) => void;
+  refresh: () => Promise<void>;
   signOut: () => Promise<void> | void;
 };
 
@@ -55,6 +57,7 @@ export type UiAdapter = {
   SelectValue: ComponentType<any>;
   Dialog: ComponentType<any>;
   DialogContent: ComponentType<any>;
+  DialogDescription: ComponentType<any>;
   DialogFooter: ComponentType<any>;
   DialogHeader: ComponentType<any>;
   DialogTitle: ComponentType<any>;
@@ -63,6 +66,7 @@ export type UiAdapter = {
   TabsList: ComponentType<any>;
   TabsTrigger: ComponentType<any>;
   TabsContent: ComponentType<any>;
+  Textarea: ComponentType<any>;
   EmailInput: ComponentType<any>;
 };
 
@@ -74,6 +78,8 @@ export type UiAdapter = {
 export type RouterAdapter = {
   Link: ComponentType<any>;
   useNavigate: () => (opts: { to: string; params?: Record<string, string> }) => void;
+  /** Current location pathname, for active-tab/nav highlighting in layout-style components. */
+  usePathname: () => string;
 };
 
 /**
@@ -89,6 +95,7 @@ export type BoundServerFns = {
   }>;
   subscribeApp: (input: { tenantId: string; appCode: string; plan: string }) => Promise<{ ok: true }>;
   cancelApp: (input: { tenantId: string; appCode: string }) => Promise<{ ok: true }>;
+  createTenant: (input: { name: string; display_name?: string }) => Promise<{ tenant: { id: string; [k: string]: any } }>;
   getSuiteHome: (input: { tenantId: string }) => Promise<any>;
   setAppUrl: (input: { tenantId: string; appCode: AppCode; url: string }) => Promise<{ ok: true }>;
   getAppSummaries: (input: { tenantIds: string[] }) => Promise<AppSummaryTile[]>;
@@ -109,7 +116,11 @@ export type BoundServerFns = {
   accountResendInvitation: (input: { user_id: string }) => Promise<any>;
   accountSendPasswordReset: (input: { user_id: string }) => Promise<any>;
   accountUpdateUserProfile: (input: any) => Promise<any>;
-  listTeamMembers: (input: { tenant_id: string; search?: string }) => Promise<{ rows: any[] }>;
+  listTeamMembers: (input: {
+    tenant_id: string;
+    search?: string;
+    worker_type?: "employee" | "contractor";
+  }) => Promise<{ rows: any[] }>;
   getTeamMember: (input: { tenant_id: string; party_id: string }) => Promise<any>;
   upsertTeamMember: (input: any) => Promise<{ party_id: string; created: boolean }>;
   listDepartmentsAndPositions: (input: {
@@ -130,6 +141,76 @@ export type BoundServerFns = {
   }) => Promise<any>;
   updatePosition: (input: { tenant_id: string; id: string; name: string }) => Promise<any>;
   deletePosition: (input: { tenant_id: string; id: string }) => Promise<any>;
+
+  // ── Billing (organization-scoped; identical across every JoaSuite app) ──
+  canManageBillingFn: (input: { tenant_id: string }) => Promise<{
+    can_manage: boolean;
+    can_view: boolean;
+    roles: string[];
+  }>;
+  getBillingOverview: (input: { tenant_id: string }) => Promise<any>;
+  updateBillingCustomer: (input: any) => Promise<any>;
+  listBillingPlans: (input?: { app_code?: string; interval?: "month" | "year" }) => Promise<any[]>;
+  changeSubscriptionPlan: (input: {
+    tenant_id: string;
+    app_code: string;
+    plan_code: string;
+    interval?: "month" | "year";
+    seats?: number;
+  }) => Promise<any>;
+  cancelSubscription: (input: {
+    tenant_id: string;
+    app_code: string;
+    at_period_end?: boolean;
+  }) => Promise<any>;
+  listBillingInvoices: (input: { tenant_id: string; limit?: number }) => Promise<any[]>;
+  getBillingInvoice: (input: { tenant_id: string; id: string }) => Promise<any>;
+  retryInvoicePayment: (input: { tenant_id: string; id: string }) => Promise<any>;
+  seedSampleBillingInvoices: (input: { tenant_id: string }) => Promise<any>;
+  listBillingPaymentMethods: (input: { tenant_id: string }) => Promise<any[]>;
+  addMockPaymentMethod: (input: {
+    tenant_id: string;
+    brand: string;
+    last4: string;
+    exp_month: number;
+    exp_year: number;
+    make_default?: boolean;
+  }) => Promise<any>;
+  setDefaultPaymentMethod: (input: { tenant_id: string; id: string }) => Promise<any>;
+  removePaymentMethod: (input: { tenant_id: string; id: string }) => Promise<any>;
+  startTrial: (input: {
+    tenant_id: string;
+    app_code: string;
+    plan_code?: string;
+    interval?: "month" | "year";
+    trial_days?: number;
+  }) => Promise<any>;
+  reactivateSubscription: (input: { tenant_id: string; app_code: string }) => Promise<any>;
+  addAppSubscription: (input: {
+    tenant_id: string;
+    app_code: string;
+    plan_code?: string;
+    interval?: "month" | "year";
+  }) => Promise<any>;
+  removeAppSubscription: (input: { tenant_id: string; app_code: string }) => Promise<any>;
+  listAvailablePromotions: (input: { tenant_id: string }) => Promise<any[]>;
+  listTenantDiscounts: (input: { tenant_id: string }) => Promise<any[]>;
+  redeemPromoCode: (input: { tenant_id: string; code: string }) => Promise<any>;
+  removeTenantDiscount: (input: { tenant_id: string; discount_id: string }) => Promise<any>;
+  getReferralProgram: (input: { tenant_id: string }) => Promise<any>;
+  addMockReferral: (input: {
+    tenant_id: string;
+    referee_email: string;
+    referee_org_name?: string;
+    status?: "pending" | "signed_up" | "subscribed";
+  }) => Promise<any>;
+  updateReferralStatus: (input: {
+    tenant_id: string;
+    referral_id: string;
+    status: "pending" | "signed_up" | "subscribed" | "canceled";
+  }) => Promise<any>;
+  getTenantUsage: (input: { tenant_id: string; app_code?: string }) => Promise<any>;
+  listActiveBundleRules: () => Promise<any[]>;
 };
 
 export type JoaSuiteContextValue = {

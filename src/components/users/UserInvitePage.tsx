@@ -78,6 +78,7 @@ export function UserInvitePage() {
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [position, setPosition] = useState("");
   const [orgIds, setOrgIds] = useState<string[]>([]);
   const [primaryTenantId, setPrimaryTenantId] = useState<string>("");
   const [preset, setPreset] = useState<InvitePresetKey>("custom");
@@ -150,6 +151,7 @@ export function UserInvitePage() {
       return fns.inviteUserToWorkspaces({
         email,
         display_name: displayName,
+        position: position.trim() || undefined,
         primary_tenant_id: primaryTenantId || undefined,
         assignments,
       });
@@ -233,6 +235,14 @@ export function UserInvitePage() {
             <div>
               <Label>{t("account.display_name", "Name")} *</Label>
               <Input value={displayName} onChange={(e: any) => setDisplayName(e.target.value)} />
+            </div>
+            <div>
+              <Label>{t("users.position", "Position / Title")}</Label>
+              <Input
+                value={position}
+                onChange={(e: any) => setPosition(e.target.value)}
+                placeholder={t("users.position_placeholder", "e.g. Accountant, Operations Manager")}
+              />
             </div>
           </div>
         )}

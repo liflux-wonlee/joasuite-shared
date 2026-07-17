@@ -3,7 +3,6 @@ import {
   Building2,
   Users,
   Shield,
-  AppWindow,
   Contact2,
   Briefcase,
   Bell,
@@ -13,7 +12,6 @@ import {
   Link as LinkIcon,
 } from "lucide-react";
 import { useJoaSuite } from "../context";
-import { AppSubscriptionsSummary } from "./AppSubscriptionsSummary";
 
 type Tile = {
   to?: string;
@@ -87,7 +85,7 @@ export function SuiteSettingsHub() {
       label: t("suite.tile.billing", "Plan & Billing"),
       description: t(
         "suite.tile.billing_desc",
-        "Workspace plan, invoices, and payment methods.",
+        "App subscriptions, plans, invoices, and payment methods.",
       ),
     },
     {
@@ -149,17 +147,6 @@ export function SuiteSettingsHub() {
           <ArrowRight className="h-3 w-3" />
         </Link>
       </div>
-
-      {/* App Subscriptions — read-only summary. Plan/billing changes live in /app/account/billing. */}
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <AppWindow className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            {t("suite.subscriptions.title", "App Subscriptions")}
-          </h2>
-        </div>
-        <AppSubscriptionsSummary />
-      </section>
 
       <Section title={t("suite.section.org", "Organization")} tiles={orgTiles} Link={Link} Card={Card} Badge={Badge} />
       <Section title={t("suite.section.apps", "Apps")} tiles={appsTiles} Link={Link} Card={Card} Badge={Badge} />

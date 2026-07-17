@@ -34,6 +34,29 @@
     "no_notifications": "Không có thông báo.",
     "aria": "Thông báo"
   },
+  "signup_wizard": {
+    "email_label": "Email",
+    "continue": "Tiếp tục",
+    "sending": "Đang gửi…",
+    "existing_hint": "Bạn đã có tài khoản JoaSuite? Nhập email ở trên — chúng tôi sẽ đăng nhập cho bạn, không cần tạo tài khoản mới.",
+    "have_password": "Muốn đăng nhập bằng mật khẩu?",
+    "sign_in": "Đăng nhập",
+    "check_email_title": "Kiểm tra email của bạn",
+    "check_email_desc": "Chúng tôi đã gửi một liên kết an toàn đến {{email}}. Nhấp vào đó để tiếp tục.",
+    "use_different_email": "Dùng email khác"
+  },
+  "set_password": {
+    "title": "Đặt mật khẩu",
+    "desc": "Không bắt buộc — giúp bạn đăng nhập trực tiếp lần sau mà không cần liên kết email.",
+    "label": "Mật khẩu",
+    "submit": "Đặt mật khẩu và tiếp tục",
+    "submitting": "Đang lưu…",
+    "success": "Đã đặt mật khẩu",
+    "skip": "Bỏ qua lúc này",
+    "min_length": "Mật khẩu phải có ít nhất 8 ký tự.",
+    "invalid_title": "Liên kết này đã hết hạn",
+    "invalid_desc": "Vui lòng yêu cầu liên kết đăng nhập mới."
+  },
   "common": {
     "submit": "Gửi",
     "save": "Lưu",
@@ -170,6 +193,24 @@
       "users_desc": "Mời người dùng trên tất cả tổ chức và phân quyền theo từng ứng dụng.",
       "team": "Nhóm",
       "team_desc": "Team sẽ cung cấp quyền truy cập chung vào thông tin cơ bản của nhân viên và nhà thầu trên các ứng dụng JoaSuite."
+    },
+    "gate": {
+      "no_org_title": "Tạo tổ chức của bạn",
+      "no_org_desc": "Tài khoản của bạn chưa thuộc tổ chức nào. Hãy tạo một tổ chức để bắt đầu.",
+      "org_name_label": "Tên tổ chức",
+      "create_org": "Tạo tổ chức",
+      "creating": "Đang tạo…",
+      "org_created": "Đã tạo tổ chức",
+      "create_failed": "Tạo tổ chức thất bại",
+      "owner_title": "{{tenant}} chưa bật {{app}}",
+      "owner_desc": "Đăng ký {{app}} cho tổ chức của bạn để tiếp tục.",
+      "subscribe_cta": "Đăng ký {{app}}",
+      "subscribing": "Đang đăng ký…",
+      "subscribed": "{{app}} đã được bật",
+      "subscribe_failed": "Đăng ký thất bại",
+      "member_title": "{{tenant}} chưa dùng {{app}}",
+      "member_desc": "Bạn đã đăng ký tại {{tenant}} với vai trò {{role}}. Hãy nhờ chủ tổ chức đăng ký {{app}} để có quyền truy cập.",
+      "separate_org_cta": "Dùng cho việc không liên quan? Tạo một tổ chức riêng"
     }
   },
   "users": {
@@ -265,6 +306,13 @@
     "edit_position": "Sửa chức vụ",
     "position_name": "Tên",
     "no_positions": "Phòng ban này chưa có chức vụ nào.",
-    "confirm_delete": "Xóa mục này?"
+    "confirm_delete": "Xóa mục này?",
+    "title_employee": "Nhân viên",
+    "title_contractor": "Nhà thầu",
+    "desc_employee": "Danh sách nhân viên hưởng lương, dùng chung cho mọi ứng dụng JoaSuite.",
+    "desc_contractor": "Nhà thầu và nhà cung cấp bên ngoài, dùng chung cho mọi ứng dụng JoaSuite.",
+    "add_employee": "Thêm nhân viên",
+    "add_contractor": "Thêm nhà thầu",
+    "team_group": "Nhóm"
   }
 }

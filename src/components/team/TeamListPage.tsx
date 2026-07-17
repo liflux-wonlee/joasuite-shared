@@ -7,11 +7,13 @@ import { TeamMemberForm } from "./TeamMemberForm";
 
 export type TeamListPageProps = {
   tenantId: string;
+  /** Restrict this view to one worker type. Omit to show the combined directory. */
+  workerType?: "employee" | "contractor";
   /** Called after any create/edit save, in addition to closing the dialog — e.g. so a host app can trigger its own app-specific follow-up (JoaSOP re-runs Requirements Matrix auto-assignment when the saved entry is linked to a tenant login). */
   onEntrySaved?: (result: { party_id: string; created: boolean }) => void;
 };
 
-export function TeamListPage({ tenantId, onEntrySaved }: TeamListPageProps) {
+export function TeamListPage({ tenantId, workerType, onEntrySaved }: TeamListPageProps) {
   const { t } = useTranslation();
   const { ui, fns } = useJoaSuite();
   const {
@@ -30,11 +32,31 @@ export function TeamListPage({ tenantId, onEntrySaved }: TeamListPageProps) {
   const [addOpen, setAddOpen] = useState(false);
 
   const listQ = useQuery({
-    queryKey: ["team-list", tenantId, search],
+    queryKey: ["team-list", tenantId, search, workerType],
     enabled: !!tenantId,
-    queryFn: () => fns.listTeamMembers({ tenant_id: tenantId, search: search || undefined }),
+    queryFn: () =>
+      fns.listTeamMembers({ tenant_id: tenantId, search: search || undefined, worker_type: workerType }),
   });
   const rows = listQ.data?.rows ?? [];
+
+  const title =
+    workerType === "employee"
+      ? t("team.title_employee", "Employees")
+      : workerType === "contractor"
+        ? t("team.title_contractor", "Contractors")
+        : t("team.title", "Team");
+  const desc =
+    workerType === "employee"
+      ? t("team.desc_employee", "People on payroll, shared across JoaSuite apps.")
+      : workerType === "contractor"
+        ? t("team.desc_contractor", "External contractors and vendors, shared across JoaSuite apps.")
+        : t("team.desc", "Basic employee and contractor info shared across JoaSuite apps.");
+  const addLabel =
+    workerType === "employee"
+      ? t("team.add_employee", "Add employee")
+      : workerType === "contractor"
+        ? t("team.add_contractor", "Add contractor")
+        : t("team.add", "Add person");
 
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-4">
@@ -42,18 +64,13 @@ export function TeamListPage({ tenantId, onEntrySaved }: TeamListPageProps) {
         <div>
           <h1 className="text-2xl font-semibold flex items-center gap-2">
             <Users className="h-6 w-6" />
-            {t("team.title", "Team")}
+            {title}
           </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t(
-              "team.desc",
-              "Basic employee and contractor info shared across JoaSuite apps.",
-            )}
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">{desc}</p>
         </div>
         <Button size="sm" onClick={() => setAddOpen(true)}>
           <Plus className="h-4 w-4" />
-          {t("team.add", "Add person")}
+          {addLabel}
         </Button>
       </div>
 
@@ -74,14 +91,16 @@ export function TeamListPage({ tenantId, onEntrySaved }: TeamListPageProps) {
               <th className="px-3 py-2 min-w-[220px]">{t("team.col_name", "Name")}</th>
               <th className="px-3 py-2 min-w-[140px]">{t("team.department", "Department")}</th>
               <th className="px-3 py-2 min-w-[140px]">{t("team.position", "Position")}</th>
-              <th className="px-3 py-2 min-w-[110px]">{t("team.worker_type", "Worker type")}</th>
+              {!workerType && (
+                <th className="px-3 py-2 min-w-[110px]">{t("team.worker_type", "Worker type")}</th>
+              )}
               <th className="px-3 py-2 min-w-[100px]">{t("team.employment_status", "Status")}</th>
             </tr>
           </thead>
           <tbody>
             {!listQ.isLoading && rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">
+                <td colSpan={workerType ? 4 : 5} className="px-3 py-6 text-center text-muted-foreground">
                   {t("team.empty", "No team members yet.")}
                 </td>
               </tr>
@@ -98,11 +117,13 @@ export function TeamListPage({ tenantId, onEntrySaved }: TeamListPageProps) {
                 </td>
                 <td className="px-3 py-2">{r.department ?? "—"}</td>
                 <td className="px-3 py-2">{r.position ?? "—"}</td>
-                <td className="px-3 py-2">
-                  <Badge variant="outline" className="capitalize text-[10px]">
-                    {t(`team.worker_type_${r.worker_type ?? "employee"}`, r.worker_type ?? "employee")}
-                  </Badge>
-                </td>
+                {!workerType && (
+                  <td className="px-3 py-2">
+                    <Badge variant="outline" className="capitalize text-[10px]">
+                      {t(`team.worker_type_${r.worker_type ?? "employee"}`, r.worker_type ?? "employee")}
+                    </Badge>
+                  </td>
+                )}
                 <td className="px-3 py-2">
                   {r.employment_status
                     ? t(`team.status_${r.employment_status}`, String(r.employment_status))
@@ -117,10 +138,11 @@ export function TeamListPage({ tenantId, onEntrySaved }: TeamListPageProps) {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{t("team.add", "Add person")}</DialogTitle>
+            <DialogTitle>{addLabel}</DialogTitle>
           </DialogHeader>
           <TeamMemberForm
             tenantId={tenantId}
+            defaultWorkerType={workerType}
             onSaved={(res) => {
               setAddOpen(false);
               onEntrySaved?.(res);

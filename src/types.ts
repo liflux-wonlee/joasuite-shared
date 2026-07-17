@@ -7,6 +7,8 @@ export type Membership = {
   tenant_name: string | null;
   roles: string[];
   portal?: "internal" | "vendor" | "approver" | "customer";
+  /** Active `tenant_apps.app_code` values for this tenant. Drives PostLoginGate's app-subscription check. */
+  apps: string[];
 };
 
 /**

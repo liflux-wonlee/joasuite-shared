@@ -27,7 +27,9 @@ export { NotificationsBell } from "./components/NotificationsBell";
 export { SuiteSwitcher } from "./components/SuiteSwitcher";
 export { SuiteHomePage } from "./components/SuiteHomePage";
 export { SuiteSettingsHub } from "./components/SuiteSettingsHub";
-export { AppSubscriptionsSummary } from "./components/AppSubscriptionsSummary";
+export { PostLoginGate } from "./components/PostLoginGate";
+export { SignUpForm } from "./components/SignUpForm";
+export { SetPasswordForm } from "./components/SetPasswordForm";
 export { OrgScopeToggle } from "./components/OrgScopeToggle";
 export { AppOverviewSection } from "./components/AppOverviewSection";
 export { UserListPage } from "./components/users/UserListPage";
@@ -36,6 +38,18 @@ export { UserDetailPage } from "./components/users/UserDetailPage";
 export { TeamListPage } from "./components/team/TeamListPage";
 export { TeamMemberForm } from "./components/team/TeamMemberForm";
 export { OrgStructureSettingsPage } from "./components/org-structure/OrgStructureSettingsPage";
+
+// Billing (organization-scoped; identical across every JoaSuite app)
+export { BillingLayout } from "./components/billing/BillingLayout";
+export { BillingOverviewPage } from "./components/billing/BillingOverviewPage";
+export { PlansSection } from "./components/billing/PlansSection";
+export { BillingPaymentMethodsPage } from "./components/billing/BillingPaymentMethodsPage";
+export { BillingInvoicesPage } from "./components/billing/BillingInvoicesPage";
+export { BillingDiscountsPage } from "./components/billing/BillingDiscountsPage";
+export { BillingReferralsPage } from "./components/billing/BillingReferralsPage";
+export { BillingUsagePage } from "./components/billing/BillingUsagePage";
+export { BillingDetailsPage } from "./components/billing/BillingDetailsPage";
+export { BillingComparePage } from "./components/billing/BillingComparePage";
 
 // Hooks
 export { useOrgScope } from "./hooks/useOrgScope";

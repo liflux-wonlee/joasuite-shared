@@ -9,6 +9,8 @@ type Membership = {
     tenant_name: string | null;
     roles: string[];
     portal?: "internal" | "vendor" | "approver" | "customer";
+    /** Active `tenant_apps.app_code` values for this tenant. Drives PostLoginGate's app-subscription check. */
+    apps: string[];
 };
 /**
  * "Users" (suite login/tenant-membership management) types. Deliberately
@@ -172,6 +174,8 @@ type AuthState = {
     currentTenantId: string | null;
     currentMembership: Membership | null;
     memberships: Membership[];
+    setCurrentTenantId: (id: string) => void;
+    refresh: () => Promise<void>;
     signOut: () => Promise<void> | void;
 };
 /**
@@ -205,6 +209,7 @@ type UiAdapter = {
     SelectValue: ComponentType<any>;
     Dialog: ComponentType<any>;
     DialogContent: ComponentType<any>;
+    DialogDescription: ComponentType<any>;
     DialogFooter: ComponentType<any>;
     DialogHeader: ComponentType<any>;
     DialogTitle: ComponentType<any>;
@@ -213,6 +218,7 @@ type UiAdapter = {
     TabsList: ComponentType<any>;
     TabsTrigger: ComponentType<any>;
     TabsContent: ComponentType<any>;
+    Textarea: ComponentType<any>;
     EmailInput: ComponentType<any>;
 };
 /**
@@ -226,6 +232,8 @@ type RouterAdapter = {
         to: string;
         params?: Record<string, string>;
     }) => void;
+    /** Current location pathname, for active-tab/nav highlighting in layout-style components. */
+    usePathname: () => string;
 };
 /**
  * Bound server function. The host app exports a `useServerFn`-wrapped
@@ -252,6 +260,15 @@ type BoundServerFns = {
         appCode: string;
     }) => Promise<{
         ok: true;
+    }>;
+    createTenant: (input: {
+        name: string;
+        display_name?: string;
+    }) => Promise<{
+        tenant: {
+            id: string;
+            [k: string]: any;
+        };
     }>;
     getSuiteHome: (input: {
         tenantId: string;
@@ -301,6 +318,7 @@ type BoundServerFns = {
     listTeamMembers: (input: {
         tenant_id: string;
         search?: string;
+        worker_type?: "employee" | "contractor";
     }) => Promise<{
         rows: any[];
     }>;
@@ -347,6 +365,121 @@ type BoundServerFns = {
         tenant_id: string;
         id: string;
     }) => Promise<any>;
+    canManageBillingFn: (input: {
+        tenant_id: string;
+    }) => Promise<{
+        can_manage: boolean;
+        can_view: boolean;
+        roles: string[];
+    }>;
+    getBillingOverview: (input: {
+        tenant_id: string;
+    }) => Promise<any>;
+    updateBillingCustomer: (input: any) => Promise<any>;
+    listBillingPlans: (input?: {
+        app_code?: string;
+        interval?: "month" | "year";
+    }) => Promise<any[]>;
+    changeSubscriptionPlan: (input: {
+        tenant_id: string;
+        app_code: string;
+        plan_code: string;
+        interval?: "month" | "year";
+        seats?: number;
+    }) => Promise<any>;
+    cancelSubscription: (input: {
+        tenant_id: string;
+        app_code: string;
+        at_period_end?: boolean;
+    }) => Promise<any>;
+    listBillingInvoices: (input: {
+        tenant_id: string;
+        limit?: number;
+    }) => Promise<any[]>;
+    getBillingInvoice: (input: {
+        tenant_id: string;
+        id: string;
+    }) => Promise<any>;
+    retryInvoicePayment: (input: {
+        tenant_id: string;
+        id: string;
+    }) => Promise<any>;
+    seedSampleBillingInvoices: (input: {
+        tenant_id: string;
+    }) => Promise<any>;
+    listBillingPaymentMethods: (input: {
+        tenant_id: string;
+    }) => Promise<any[]>;
+    addMockPaymentMethod: (input: {
+        tenant_id: string;
+        brand: string;
+        last4: string;
+        exp_month: number;
+        exp_year: number;
+        make_default?: boolean;
+    }) => Promise<any>;
+    setDefaultPaymentMethod: (input: {
+        tenant_id: string;
+        id: string;
+    }) => Promise<any>;
+    removePaymentMethod: (input: {
+        tenant_id: string;
+        id: string;
+    }) => Promise<any>;
+    startTrial: (input: {
+        tenant_id: string;
+        app_code: string;
+        plan_code?: string;
+        interval?: "month" | "year";
+        trial_days?: number;
+    }) => Promise<any>;
+    reactivateSubscription: (input: {
+        tenant_id: string;
+        app_code: string;
+    }) => Promise<any>;
+    addAppSubscription: (input: {
+        tenant_id: string;
+        app_code: string;
+        plan_code?: string;
+        interval?: "month" | "year";
+    }) => Promise<any>;
+    removeAppSubscription: (input: {
+        tenant_id: string;
+        app_code: string;
+    }) => Promise<any>;
+    listAvailablePromotions: (input: {
+        tenant_id: string;
+    }) => Promise<any[]>;
+    listTenantDiscounts: (input: {
+        tenant_id: string;
+    }) => Promise<any[]>;
+    redeemPromoCode: (input: {
+        tenant_id: string;
+        code: string;
+    }) => Promise<any>;
+    removeTenantDiscount: (input: {
+        tenant_id: string;
+        discount_id: string;
+    }) => Promise<any>;
+    getReferralProgram: (input: {
+        tenant_id: string;
+    }) => Promise<any>;
+    addMockReferral: (input: {
+        tenant_id: string;
+        referee_email: string;
+        referee_org_name?: string;
+        status?: "pending" | "signed_up" | "subscribed";
+    }) => Promise<any>;
+    updateReferralStatus: (input: {
+        tenant_id: string;
+        referral_id: string;
+        status: "pending" | "signed_up" | "subscribed" | "canceled";
+    }) => Promise<any>;
+    getTenantUsage: (input: {
+        tenant_id: string;
+        app_code?: string;
+    }) => Promise<any>;
+    listActiveBundleRules: () => Promise<any[]>;
 };
 type JoaSuiteContextValue = {
     /** The current host app's canonical code. */
@@ -408,7 +541,49 @@ declare function SuiteHomePage(): react.JSX.Element | null;
 
 declare function SuiteSettingsHub(): react.JSX.Element;
 
-declare function AppSubscriptionsSummary(): react.JSX.Element | null;
+/**
+ * Renders `children` once the signed-in user has an active membership in a
+ * tenant that's subscribed to the current app. Otherwise renders the branch
+ * that applies:
+ *   - no membership anywhere -> create an organization
+ *   - owner/super_admin of a tenant that hasn't enabled this app -> one-click subscribe
+ *   - member (non-owner) of a tenant that hasn't enabled this app -> ask the owner
+ * All three reuse existing primitives (createTenant / subscribeApp) - no new
+ * server functions. Membership existence itself is never revealed pre-auth;
+ * this component only runs post-authentication.
+ */
+declare function PostLoginGate({ children }: {
+    children: ReactNode;
+}): react.JSX.Element;
+
+/**
+ * Passwordless, email-first signup. Calls signInWithOtp with
+ * shouldCreateUser:true, which is safe to use identically for both a
+ * brand-new email and an email that already has a JoaSuite account
+ * (Supabase never reveals which case it is, never touches an existing
+ * password, and never creates a duplicate account) - the two cases are
+ * disambiguated later, safely, by SetPasswordForm after the link is
+ * clicked, not here. No password field on this screen at all, so there's
+ * nothing for an existing user to "silently lose" by re-submitting this
+ * form with a new value.
+ */
+declare function SignUpForm(): react.JSX.Element;
+
+/**
+ * Landing page for SignUpForm's magic-link email. Supabase's client
+ * auto-detects the session from the callback URL, so this just waits for
+ * that, then decides what to show:
+ *   - Account created within the last few minutes (this signup flow just
+ *     created it) -> genuinely new user, offer to set a password.
+ *   - Otherwise -> an existing user who already has a password just
+ *     re-verified their email via magic link; nothing new to set up,
+ *     send them straight into the app.
+ * This is what safely resolves the new-vs-existing ambiguity that
+ * SignUpForm deliberately can't: it happens post-auth, after Supabase has
+ * already proven which case it is via account age, not by asking a
+ * pre-auth endpoint to reveal it.
+ */
+declare function SetPasswordForm(): react.JSX.Element;
 
 /**
  * Lets the user widen a screen (Dashboard, JoaSuite Home) from "this
@@ -450,13 +625,15 @@ declare function UserDetailPage({ userId }: {
 
 type TeamListPageProps = {
     tenantId: string;
+    /** Restrict this view to one worker type. Omit to show the combined directory. */
+    workerType?: "employee" | "contractor";
     /** Called after any create/edit save, in addition to closing the dialog — e.g. so a host app can trigger its own app-specific follow-up (JoaSOP re-runs Requirements Matrix auto-assignment when the saved entry is linked to a tenant login). */
     onEntrySaved?: (result: {
         party_id: string;
         created: boolean;
     }) => void;
 };
-declare function TeamListPage({ tenantId, onEntrySaved }: TeamListPageProps): react.JSX.Element;
+declare function TeamListPage({ tenantId, workerType, onEntrySaved }: TeamListPageProps): react.JSX.Element;
 
 type TeamMemberFormProps = {
     tenantId: string;
@@ -466,6 +643,8 @@ type TeamMemberFormProps = {
     linkedUserId?: string;
     /** Disable all fields; used for self-view / read-only embeds. */
     readOnly?: boolean;
+    /** Preselect worker type for a brand-new entry (e.g. opened from a Contractor-only view). Still editable. */
+    defaultWorkerType?: "employee" | "contractor";
     onSaved?: (result: {
         party_id: string;
         created: boolean;
@@ -482,10 +661,41 @@ type TeamMemberFormProps = {
  * read-only Profile tab) or wrap it in their own Dialog (e.g. an "Add team
  * member" flow) as fits the surrounding page.
  */
-declare function TeamMemberForm({ tenantId, partyId, linkedUserId, readOnly, onSaved, }: TeamMemberFormProps): react.JSX.Element;
+declare function TeamMemberForm({ tenantId, partyId, linkedUserId, readOnly, defaultWorkerType, onSaved, }: TeamMemberFormProps): react.JSX.Element;
 
 declare function OrgStructureSettingsPage({ tenantId }: {
     tenantId: string;
+}): react.JSX.Element;
+
+declare function BillingLayout({ children }: {
+    children: React.ReactNode;
+}): react.JSX.Element;
+
+declare function BillingOverviewPage(): react.JSX.Element | null;
+
+declare function PlansSection(): react.JSX.Element;
+
+declare function BillingPaymentMethodsPage(): react.JSX.Element;
+
+declare function BillingInvoicesPage(): react.JSX.Element;
+
+declare function BillingDiscountsPage(): react.JSX.Element;
+
+declare function BillingReferralsPage(): react.JSX.Element;
+
+declare function BillingUsagePage(): react.JSX.Element;
+
+declare function BillingDetailsPage(): react.JSX.Element;
+
+/**
+ * Plan comparison for a single app. `appCode` is supplied by the host route
+ * file's own `validateSearch` (each app's `/app/account/billing/compare`
+ * route reads its own typed `app` search param and passes it down) —
+ * this component can't call `useSearch()` itself since that hook is typed
+ * to the host's own route tree.
+ */
+declare function BillingComparePage({ appCode }: {
+    appCode: string;
 }): react.JSX.Element;
 
 /**
@@ -497,4 +707,4 @@ declare function OrgStructureSettingsPage({ tenantId }: {
  */
 declare function useOrgScope(): [string[], (tenantIds: string[]) => void];
 
-export { type AppCatalogEntry, AppCode, AppOverviewSection, AppSubscriptionsSummary, type AppSummaryTile, type ApprovalSummary, type AuthState, type BoundServerFns, type Department, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, type Position, type RouterAdapter, SUPPORTED_LANGUAGES, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, type TeamMemberInput, type TeamMemberRow, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
+export { type AppCatalogEntry, AppCode, AppOverviewSection, type AppSummaryTile, type ApprovalSummary, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type Department, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, type RouterAdapter, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, type TeamMemberInput, type TeamMemberRow, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useJoaSuite } from "../../context";
-import { ROLES_BY_APP } from "../../constants";
+import { APP_CODES, ROLES_BY_APP } from "../../constants";
 import type { ManageableTenant, ManageableUserRow } from "../../types";
 
 function rolesForApp(code: string): string[] {
@@ -78,6 +78,7 @@ export function UserDetailPage({ userId }: { userId: string }) {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
+  const [editPosition, setEditPosition] = useState("");
   const [addOrgOpen, setAddOrgOpen] = useState(false);
   const [addTenantId, setAddTenantId] = useState<string>("");
   const [addApps, setAddApps] = useState<Record<string, string>>({});
@@ -86,11 +87,12 @@ export function UserDetailPage({ userId }: { userId: string }) {
     if (!user) return;
     setEditName(user.display_name ?? "");
     setEditEmail(user.email ?? "");
+    setEditPosition(user.position ?? "");
     setEditing(true);
   };
 
   const updateProfile = useMutation({
-    mutationFn: (i: { user_id: string; display_name: string; email?: string }) =>
+    mutationFn: (i: { user_id: string; display_name: string; email?: string; position?: string | null }) =>
       fns.accountUpdateUserProfile(i),
     onSuccess: () => {
       toast.success(t("set.updated", "Updated"));
@@ -196,6 +198,9 @@ export function UserDetailPage({ userId }: { userId: string }) {
           <div className="space-y-1">
             <h1 className="text-2xl font-semibold">{user.display_name ?? user.email ?? "—"}</h1>
             <div className="text-sm text-muted-foreground">{user.email}</div>
+            {user.position && (
+              <div className="text-sm text-muted-foreground">{user.position}</div>
+            )}
             <div className="text-xs text-muted-foreground mt-2">
               {t("users.joined", "Joined")}: {formatDate(user.joined_at)} ·{" "}
               {t("users.last_active", "Last active")}: {formatDate(user.last_sign_in_at)}
@@ -264,9 +269,11 @@ export function UserDetailPage({ userId }: { userId: string }) {
               const tn = tenantById.get(a.tenant_id);
               if (!tn) return null;
               const subscribedCodes = tn.app_codes ?? [];
-              const allCodes = Array.from(
-                new Set([...subscribedCodes, ...Object.keys(a.apps)]),
-              ).sort();
+              const merged = new Set<string>([...APP_CODES, ...subscribedCodes, ...Object.keys(a.apps)]);
+              const allCodes = [
+                ...APP_CODES.filter((c) => merged.has(c)),
+                ...Array.from(merged).filter((c) => !(APP_CODES as readonly string[]).includes(c)).sort(),
+              ];
               const isOwner = Object.values(a.apps).some((v) => v.roles.includes("owner"));
               return (
                 <TabsContent key={a.tenant_id} value={a.tenant_id} className="p-4 pt-2 space-y-4">
@@ -335,7 +342,10 @@ export function UserDetailPage({ userId }: { userId: string }) {
                             <div className="flex-1">
                               {!subscribed ? (
                                 <span className="text-xs text-muted-foreground">
-                                  {t("users.org_not_subscribed_hint", "Organization is not subscribed to this app. Subscribe in Suite settings to assign roles.")}
+                                  {t("users.org_not_subscribed_hint", "Organization is not subscribed to this app. Subscribe in Suite settings to assign roles.")}{" "}
+                                  <Link to="/app/suite" className="underline text-primary">
+                                    {t("users.go_to_suite", "Open Suite settings")}
+                                  </Link>
                                 </span>
                               ) : (
                                 <Select
@@ -393,6 +403,14 @@ export function UserDetailPage({ userId }: { userId: string }) {
               <Label>{t("common.email")}</Label>
               <EmailInput value={editEmail} onChange={(e: any) => setEditEmail(e.target.value)} />
             </div>
+            <div>
+              <Label>{t("users.position", "Position / Title")}</Label>
+              <Input
+                value={editPosition}
+                onChange={(e: any) => setEditPosition(e.target.value)}
+                placeholder={t("users.position_placeholder", "e.g. Accountant, Operations Manager")}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditing(false)}>
@@ -400,9 +418,10 @@ export function UserDetailPage({ userId }: { userId: string }) {
             </Button>
             <Button
               onClick={() => {
-                const payload: { user_id: string; display_name: string; email?: string } = {
+                const payload: { user_id: string; display_name: string; email?: string; position?: string | null } = {
                   user_id: user.user_id,
                   display_name: editName.trim(),
+                  position: editPosition.trim() ? editPosition.trim() : null,
                 };
                 if (editEmail && editEmail !== user.email) payload.email = editEmail.trim();
                 updateProfile.mutate(payload);

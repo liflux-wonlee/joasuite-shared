@@ -1,4 +1,4 @@
-export { A as AppCode } from '../constants-B39zophS.js';
+export { A as AppCode, a as BILLING_APP_CODES, A as BillingAppCode } from '../constants-B39zophS.js';
 import * as _tanstack_start_client_core from '@tanstack/start-client-core';
 import { SupabaseClient } from '@supabase/supabase-js';
 
@@ -295,6 +295,7 @@ type TeamDeps = {
 declare function createListTeamMembers(deps: TeamDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
     tenant_id: string;
     search?: string | undefined;
+    worker_type?: "employee" | "contractor" | undefined;
 }, Promise<{
     rows: any;
 }>>;
@@ -692,4 +693,247 @@ declare function createMergeParties(deps: MergePartiesDeps): _tanstack_start_cli
     reassigned: Record<string, number>;
 }>>;
 
-export { type AccountDeps, type AdminDeps, type AppCatalogEntry, type MergePartiesDeps, type OrgStructureDeps, type PartyRefTable, type SuiteHomeData, type TeamDeps, type TenantAppRow, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createArchiveParty, createCancelApp, createCleanupPartyContacts, createCreateDepartment, createCreatePosition, createDeleteDepartment, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDeletePosition, createGetMyProfile, createGetParty, createGetSuiteHome, createGetTeamMember, createGetTenantSettings, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListDepartmentsAndPositions, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTeamMembers, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSetUserAppRoles, createSubscribeApp, createUnarchiveParty, createUpdateDepartment, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdatePosition, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, createUpsertTeamMember, resolveScopedTenantIds };
+declare const PLAN_CODES: readonly ["free", "basic", "pro", "business"];
+declare const INTERVALS: readonly ["month", "year"];
+type PlanCode = (typeof PLAN_CODES)[number];
+type BillingInterval = (typeof INTERVALS)[number];
+type BillingDeps = {
+    requireSupabaseAuth: any;
+    supabaseAdmin: any;
+};
+declare function createCanManageBillingFn(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+}, Promise<{
+    can_manage: boolean;
+    can_view: boolean;
+    roles: string[];
+}>>;
+declare function createGetBillingOverview(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+}, Promise<{
+    tenant: any;
+    customer: any;
+    subscriptions: any;
+    default_payment_method: any;
+    next_invoice_estimate_cents: number;
+    roles: string[];
+    can_manage: boolean;
+    can_view: boolean;
+}>>;
+declare function createUpdateBillingCustomer(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    billing_email?: string | null | undefined;
+    company_legal_name?: string | null | undefined;
+    tax_id?: string | null | undefined;
+    address_line1?: string | null | undefined;
+    address_line2?: string | null | undefined;
+    city?: string | null | undefined;
+    state?: string | null | undefined;
+    postal_code?: string | null | undefined;
+    country?: string | null | undefined;
+    default_currency?: string | undefined;
+    billing_phone?: string | null | undefined;
+    billing_contact_name?: string | null | undefined;
+    billing_contact_email?: string | null | undefined;
+    invoice_memo?: string | null | undefined;
+}, Promise<any>>;
+declare function createListBillingPlans(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<undefined, (i: unknown) => {
+    app_code?: "joabooks" | "joaapproval" | "joacrm" | "joaoffice" | "joasop" | "joahr" | undefined;
+    interval?: "month" | "year" | undefined;
+}, Promise<any>>;
+declare function createChangeSubscriptionPlan(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    app_code: "joabooks" | "joaapproval" | "joacrm" | "joaoffice" | "joasop" | "joahr";
+    plan_code: "basic" | "business" | "free" | "pro";
+    interval: "month" | "year";
+    seats: number;
+}, Promise<{
+    ok: true;
+    mock: true;
+    subscription: any;
+}>>;
+declare function createCancelSubscription(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    app_code: "joabooks" | "joaapproval" | "joacrm" | "joaoffice" | "joasop" | "joahr";
+    at_period_end: boolean;
+}, Promise<{
+    ok: true;
+    mock: true;
+    subscription: any;
+}>>;
+declare function createListBillingInvoices(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    limit: number;
+}, Promise<any>>;
+declare function createGetBillingInvoice(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    id: string;
+}, Promise<any>>;
+declare function createRetryInvoicePayment(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    id: string;
+}, Promise<{
+    ok: false;
+    mock: true;
+    message: "Stripe integration coming later";
+}>>;
+declare function createSeedSampleBillingInvoices(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+}, Promise<{
+    ok: true;
+    inserted: 0;
+    skipped: true;
+} | {
+    ok: true;
+    inserted: number;
+    skipped?: undefined;
+}>>;
+declare function createListBillingPaymentMethods(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+}, Promise<any>>;
+declare function createAddMockPaymentMethod(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    brand: string;
+    last4: string;
+    exp_month: number;
+    exp_year: number;
+    make_default: boolean;
+}, Promise<any>>;
+declare function createSetDefaultPaymentMethod(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    id: string;
+}, Promise<{
+    ok: true;
+}>>;
+declare function createRemovePaymentMethod(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    id: string;
+}, Promise<{
+    ok: true;
+}>>;
+declare function createStartTrial(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    app_code: "joabooks" | "joaapproval" | "joacrm" | "joaoffice" | "joasop" | "joahr";
+    plan_code: "basic" | "business" | "free" | "pro";
+    interval: "month" | "year";
+    trial_days: number;
+}, Promise<{
+    ok: true;
+    mock: true;
+    subscription: any;
+}>>;
+declare function createReactivateSubscription(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    app_code: "joabooks" | "joaapproval" | "joacrm" | "joaoffice" | "joasop" | "joahr";
+}, Promise<{
+    ok: true;
+    mock: true;
+    subscription: any;
+}>>;
+declare function createAddAppSubscription(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    app_code: "joabooks" | "joaapproval" | "joacrm" | "joaoffice" | "joasop" | "joahr";
+    plan_code: "basic" | "business" | "free" | "pro";
+    interval: "month" | "year";
+}, Promise<{
+    ok: true;
+    mock: true;
+    subscription: any;
+}>>;
+declare function createRemoveAppSubscription(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    app_code: "joabooks" | "joaapproval" | "joacrm" | "joaoffice" | "joasop" | "joahr";
+}, Promise<{
+    ok: true;
+    mock: true;
+}>>;
+declare function createListAvailablePromotions(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+}, Promise<any>>;
+declare function createListTenantDiscounts(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+}, Promise<any>>;
+declare function createRedeemPromoCode(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    code: string;
+}, Promise<{
+    ok: false;
+    reason: "not_found";
+    discount?: undefined;
+} | {
+    ok: false;
+    reason: "upcoming" | "expired";
+    discount?: undefined;
+} | {
+    ok: false;
+    reason: "exhausted";
+    discount?: undefined;
+} | {
+    ok: false;
+    reason: "already_applied";
+    discount?: undefined;
+} | {
+    ok: true;
+    discount: any;
+    reason?: undefined;
+}>>;
+declare function createRemoveTenantDiscount(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    discount_id: string;
+}, Promise<{
+    ok: true;
+}>>;
+declare function createGetReferralProgram(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+}, Promise<{
+    program: any;
+    referrals: any;
+}>>;
+declare function createAddMockReferral(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    referee_email: string;
+    status: "pending" | "signed_up" | "subscribed";
+    referee_org_name?: string | undefined;
+}, Promise<{
+    ok: true;
+    referral: any;
+}>>;
+declare function createUpdateReferralStatus(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+    referral_id: string;
+    status: "canceled" | "pending" | "signed_up" | "subscribed";
+}, Promise<{
+    ok: true;
+}>>;
+type PlanLimits = {
+    users: number | null;
+    customers: number | null;
+    invoices_per_month: number | null;
+    storage_gb: number | null;
+    projects: number | null;
+    attachments: number | null;
+};
+declare function createGetTenantUsage(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (data: {
+    tenant_id: string;
+    app_code?: string;
+}) => {
+    tenant_id: string;
+    app_code?: string;
+}, Promise<{
+    app_code: any;
+    plan_code: any;
+    plan_status: any;
+    limits: PlanLimits;
+    usage: {
+        users: any;
+        customers: any;
+        invoices_this_month: any;
+        attachments: any;
+        storage_gb: number;
+        active_apps: any;
+        projects: 0;
+    };
+}>>;
+declare function createListActiveBundleRules(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], undefined, Promise<any>>;
+
+export { type AccountDeps, type AdminDeps, type AppCatalogEntry, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, type BillingDeps, type BillingInterval, type PlanCode as BillingPlanCode, type MergePartiesDeps, type OrgStructureDeps, type PartyRefTable, type SuiteHomeData, type TeamDeps, type TenantAppRow, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createCreateDepartment, createCreatePosition, createDeleteDepartment, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDeletePosition, createGetBillingInvoice, createGetBillingOverview, createGetMyProfile, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTeamMember, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListDepartmentsAndPositions, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTeamMembers, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createSetUserAppRoles, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateDepartment, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdatePosition, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, createUpsertTeamMember, resolveScopedTenantIds };
