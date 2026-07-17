@@ -4676,7 +4676,7 @@ function PlansSection() {
       /* @__PURE__ */ jsx(Sparkles, { className: "h-4 w-4 mt-0.5 shrink-0" }),
       /* @__PURE__ */ jsx("span", { children: t("billing.stripe_future", "Stripe payment will be connected in a future phase. All actions on this page update local data only.") })
     ] }),
-    /* @__PURE__ */ jsx("div", { className: "hidden md:block border rounded-lg bg-card overflow-hidden", children: /* @__PURE__ */ jsxs("table", { className: "w-full text-sm", children: [
+    /* @__PURE__ */ jsx("div", { className: "border rounded-lg bg-card overflow-x-auto", children: /* @__PURE__ */ jsxs("table", { className: "w-full text-sm", children: [
       /* @__PURE__ */ jsx("thead", { children: /* @__PURE__ */ jsxs("tr", { className: "border-b bg-muted/50", children: [
         /* @__PURE__ */ jsx("th", { className: "text-left px-4 py-2.5 font-medium text-muted-foreground", children: t("billing.app", "App") }),
         /* @__PURE__ */ jsx("th", { className: "text-left px-4 py-2.5 font-medium text-muted-foreground", children: t("billing.current_plan", "Plan") }),
@@ -4695,7 +4695,7 @@ function PlansSection() {
         const yearly = plans.find((p) => p.plan_code === currentPlan && p.interval === "year");
         const isTrialing = status === "trialing";
         const isCanceled = status === "canceled" || sub?.cancel_at_period_end;
-        const hasSub = !!sub && !sub.synthetic && status !== "inactive";
+        const hasSub = !!sub;
         return /* @__PURE__ */ jsxs("tr", { className: "hover:bg-muted/30", children: [
           /* @__PURE__ */ jsxs("td", { className: "px-4 py-3 align-top", children: [
             /* @__PURE__ */ jsx("div", { className: "font-medium", children: app.name }),
@@ -4769,101 +4769,6 @@ function PlansSection() {
         ] }, app.code);
       }) })
     ] }) }),
-    /* @__PURE__ */ jsx("div", { className: "md:hidden grid grid-cols-1 gap-3", children: APPS.map((app) => {
-      const sub = subByApp.get(app.code);
-      const plans = plansByApp.get(app.code) ?? [];
-      const status = sub?.status ?? "inactive";
-      const currentPlan = sub?.plan_code ?? "\u2014";
-      const currentInterval = sub?.interval ?? "month";
-      const monthly = plans.find((p) => p.plan_code === currentPlan && p.interval === "month");
-      const yearly = plans.find((p) => p.plan_code === currentPlan && p.interval === "year");
-      const isTrialing = status === "trialing";
-      const isCanceled = status === "canceled" || sub?.cancel_at_period_end;
-      const hasSub = !!sub && !sub.synthetic && status !== "inactive";
-      return /* @__PURE__ */ jsxs("div", { className: "border rounded-lg bg-card p-4 flex flex-col gap-3", children: [
-        /* @__PURE__ */ jsxs("div", { className: "flex items-start justify-between gap-3", children: [
-          /* @__PURE__ */ jsxs("div", { className: "min-w-0", children: [
-            /* @__PURE__ */ jsx("h3", { className: "font-semibold", children: app.name }),
-            /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground mt-0.5", children: app.description })
-          ] }),
-          !hasSub ? /* @__PURE__ */ jsx("span", { className: "text-[10px] uppercase font-semibold px-2 py-0.5 rounded border bg-muted text-muted-foreground border-border", children: t("billing.not_subscribed", "Not subscribed") }) : /* @__PURE__ */ jsxs(
-            "span",
-            {
-              className: "text-[10px] uppercase font-semibold px-2 py-0.5 rounded",
-              style: planBadgeStyle(currentPlan) ?? { backgroundColor: "#454545", color: "#fff" },
-              children: [
-                currentPlan,
-                isTrialing ? ` \xB7 ${t("billing.trial", "Trial")}` : "",
-                isCanceled ? ` \xB7 ${t("billing.canceling", "Canceling")}` : ""
-              ]
-            }
-          )
-        ] }),
-        /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-3 gap-3 text-xs border-t pt-3", children: [
-          /* @__PURE__ */ jsxs("div", { children: [
-            /* @__PURE__ */ jsx("div", { className: "text-muted-foreground", children: t("billing.current_plan", "Current plan") }),
-            /* @__PURE__ */ jsxs("div", { className: "font-medium capitalize mt-0.5", children: [
-              currentPlan,
-              hasSub && /* @__PURE__ */ jsxs("span", { className: "text-muted-foreground", children: [
-                " / ",
-                currentInterval
-              ] })
-            ] })
-          ] }),
-          /* @__PURE__ */ jsxs("div", { children: [
-            /* @__PURE__ */ jsx("div", { className: "text-muted-foreground", children: t("billing.monthly", "Monthly") }),
-            /* @__PURE__ */ jsx("div", { className: "font-medium mt-0.5", children: monthly ? fmtMoney2(monthly.price_cents) : "\u2014" })
-          ] }),
-          /* @__PURE__ */ jsxs("div", { children: [
-            /* @__PURE__ */ jsx("div", { className: "text-muted-foreground", children: t("billing.yearly", "Yearly") }),
-            /* @__PURE__ */ jsx("div", { className: "font-medium mt-0.5", children: yearly ? fmtMoney2(yearly.price_cents) : "\u2014" })
-          ] })
-        ] }),
-        isTrialing && sub?.trial_end && /* @__PURE__ */ jsxs("div", { className: "text-xs flex items-center gap-1.5 text-blue-700 dark:text-blue-300", children: [
-          /* @__PURE__ */ jsx(Clock, { className: "h-3.5 w-3.5" }),
-          t("billing.trial_ends_on", "Trial ends on"),
-          " ",
-          fmtDate2(sub.trial_end)
-        ] }),
-        /* @__PURE__ */ jsxs("div", { className: "flex flex-wrap gap-2 pt-1 border-t", children: [
-          !hasSub ? /* @__PURE__ */ jsxs(Fragment, { children: [
-            /* @__PURE__ */ jsxs(Button, { size: "sm", disabled: !canManage || mAdd.isPending, onClick: () => mAdd.mutate({ app_code: app.code }), className: "gap-1.5", children: [
-              /* @__PURE__ */ jsx(Plus, { className: "h-3.5 w-3.5" }),
-              t("billing.add_app", "Add App")
-            ] }),
-            /* @__PURE__ */ jsxs(Button, { size: "sm", variant: "outline", disabled: !canManage || mTrial.isPending, onClick: () => mTrial.mutate({ app_code: app.code }), className: "gap-1.5", children: [
-              /* @__PURE__ */ jsx(Zap, { className: "h-3.5 w-3.5" }),
-              t("billing.start_trial", "Start Trial")
-            ] })
-          ] }) : /* @__PURE__ */ jsxs(Fragment, { children: [
-            /* @__PURE__ */ jsx(Button, { size: "sm", variant: "outline", disabled: !canManage, onClick: () => setChangeFor(app.code), className: "gap-1.5", children: t("billing.change_plan", "Change Plan") }),
-            isCanceled ? /* @__PURE__ */ jsxs(Button, { size: "sm", disabled: !canManage || mReactivate.isPending, onClick: () => mReactivate.mutate({ app_code: app.code }), className: "gap-1.5", children: [
-              /* @__PURE__ */ jsx(RefreshCw, { className: "h-3.5 w-3.5" }),
-              t("billing.reactivate", "Reactivate")
-            ] }) : /* @__PURE__ */ jsxs(Button, { size: "sm", variant: "outline", disabled: !canManage || mCancel.isPending, onClick: () => mCancel.mutate({ app_code: app.code }), className: "gap-1.5", children: [
-              /* @__PURE__ */ jsx(XCircle, { className: "h-3.5 w-3.5" }),
-              t("billing.cancel_at_period_end", "Cancel at Period End")
-            ] }),
-            app.removable && /* @__PURE__ */ jsxs(Button, { size: "sm", variant: "ghost", disabled: !canManage || mRemove.isPending, onClick: () => mRemove.mutate({ app_code: app.code }), className: "gap-1.5 text-destructive hover:text-destructive", children: [
-              /* @__PURE__ */ jsx(Trash2, { className: "h-3.5 w-3.5" }),
-              t("billing.remove_app", "Remove App")
-            ] })
-          ] }),
-          /* @__PURE__ */ jsxs(
-            Link,
-            {
-              to: "/app/account/billing/compare",
-              search: { app: app.code },
-              className: "inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border hover:bg-accent ml-auto",
-              children: [
-                /* @__PURE__ */ jsx(GitCompare, { className: "h-3.5 w-3.5" }),
-                t("billing.compare_plans", "Compare plans")
-              ]
-            }
-          )
-        ] })
-      ] }, app.code);
-    }) }),
     /* @__PURE__ */ jsx(Dialog, { open: !!changeFor, onOpenChange: (o) => !o && setChangeFor(null), children: /* @__PURE__ */ jsxs(DialogContent, { className: "max-w-2xl", children: [
       /* @__PURE__ */ jsxs(DialogHeader, { children: [
         /* @__PURE__ */ jsxs(DialogTitle, { children: [

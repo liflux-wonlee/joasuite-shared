@@ -150,8 +150,7 @@ export function PlansSection() {
         <span>{t("billing.stripe_future", "Stripe payment will be connected in a future phase. All actions on this page update local data only.")}</span>
       </div>
 
-      {/* Desktop list */}
-      <div className="hidden md:block border rounded-lg bg-card overflow-hidden">
+      <div className="border rounded-lg bg-card overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/50">
@@ -174,7 +173,7 @@ export function PlansSection() {
               const yearly = plans.find((p) => p.plan_code === currentPlan && p.interval === "year");
               const isTrialing = status === "trialing";
               const isCanceled = status === "canceled" || sub?.cancel_at_period_end;
-              const hasSub = !!sub && !sub.synthetic && status !== "inactive";
+              const hasSub = !!sub;
 
               return (
                 <tr key={app.code} className="hover:bg-muted/30">
@@ -265,118 +264,6 @@ export function PlansSection() {
             })}
           </tbody>
         </table>
-      </div>
-
-      {/* Mobile cards */}
-      <div className="md:hidden grid grid-cols-1 gap-3">
-        {APPS.map((app) => {
-          const sub = subByApp.get(app.code);
-          const plans = (plansByApp.get(app.code) ?? []) as any[];
-          const status: string = sub?.status ?? "inactive";
-          const currentPlan = sub?.plan_code ?? "—";
-          const currentInterval = sub?.interval ?? "month";
-          const monthly = plans.find((p) => p.plan_code === currentPlan && p.interval === "month");
-          const yearly = plans.find((p) => p.plan_code === currentPlan && p.interval === "year");
-          const isTrialing = status === "trialing";
-          const isCanceled = status === "canceled" || sub?.cancel_at_period_end;
-          const hasSub = !!sub && !sub.synthetic && status !== "inactive";
-
-          return (
-            <div key={app.code} className="border rounded-lg bg-card p-4 flex flex-col gap-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h3 className="font-semibold">{app.name}</h3>
-                  <p className="text-xs text-muted-foreground mt-0.5">{app.description}</p>
-                </div>
-                {!hasSub ? (
-                  <span className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded border bg-muted text-muted-foreground border-border">
-                    {t("billing.not_subscribed", "Not subscribed")}
-                  </span>
-                ) : (
-                  <span
-                    className="text-[10px] uppercase font-semibold px-2 py-0.5 rounded"
-                    style={planBadgeStyle(currentPlan) ?? { backgroundColor: "#454545", color: "#fff" }}
-                  >
-                    {currentPlan}
-                    {isTrialing ? ` · ${t("billing.trial", "Trial")}` : ""}
-                    {isCanceled ? ` · ${t("billing.canceling", "Canceling")}` : ""}
-                  </span>
-                )}
-              </div>
-
-              <div className="grid grid-cols-3 gap-3 text-xs border-t pt-3">
-                <div>
-                  <div className="text-muted-foreground">{t("billing.current_plan", "Current plan")}</div>
-                  <div className="font-medium capitalize mt-0.5">
-                    {currentPlan}
-                    {hasSub && <span className="text-muted-foreground"> / {currentInterval}</span>}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground">{t("billing.monthly", "Monthly")}</div>
-                  <div className="font-medium mt-0.5">{monthly ? fmtMoney(monthly.price_cents) : "—"}</div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground">{t("billing.yearly", "Yearly")}</div>
-                  <div className="font-medium mt-0.5">{yearly ? fmtMoney(yearly.price_cents) : "—"}</div>
-                </div>
-              </div>
-
-              {isTrialing && sub?.trial_end && (
-                <div className="text-xs flex items-center gap-1.5 text-blue-700 dark:text-blue-300">
-                  <Clock className="h-3.5 w-3.5" />
-                  {t("billing.trial_ends_on", "Trial ends on")} {fmtDate(sub.trial_end)}
-                </div>
-              )}
-
-              <div className="flex flex-wrap gap-2 pt-1 border-t">
-                {!hasSub ? (
-                  <>
-                    <Button size="sm" disabled={!canManage || mAdd.isPending} onClick={() => mAdd.mutate({ app_code: app.code })} className="gap-1.5">
-                      <Plus className="h-3.5 w-3.5" />
-                      {t("billing.add_app", "Add App")}
-                    </Button>
-                    <Button size="sm" variant="outline" disabled={!canManage || mTrial.isPending} onClick={() => mTrial.mutate({ app_code: app.code })} className="gap-1.5">
-                      <Zap className="h-3.5 w-3.5" />
-                      {t("billing.start_trial", "Start Trial")}
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button size="sm" variant="outline" disabled={!canManage} onClick={() => setChangeFor(app.code)} className="gap-1.5">
-                      {t("billing.change_plan", "Change Plan")}
-                    </Button>
-                    {isCanceled ? (
-                      <Button size="sm" disabled={!canManage || mReactivate.isPending} onClick={() => mReactivate.mutate({ app_code: app.code })} className="gap-1.5">
-                        <RefreshCw className="h-3.5 w-3.5" />
-                        {t("billing.reactivate", "Reactivate")}
-                      </Button>
-                    ) : (
-                      <Button size="sm" variant="outline" disabled={!canManage || mCancel.isPending} onClick={() => mCancel.mutate({ app_code: app.code })} className="gap-1.5">
-                        <XCircle className="h-3.5 w-3.5" />
-                        {t("billing.cancel_at_period_end", "Cancel at Period End")}
-                      </Button>
-                    )}
-                    {app.removable && (
-                      <Button size="sm" variant="ghost" disabled={!canManage || mRemove.isPending} onClick={() => mRemove.mutate({ app_code: app.code })} className="gap-1.5 text-destructive hover:text-destructive">
-                        <Trash2 className="h-3.5 w-3.5" />
-                        {t("billing.remove_app", "Remove App")}
-                      </Button>
-                    )}
-                  </>
-                )}
-                <Link
-                  to="/app/account/billing/compare"
-                  search={{ app: app.code }}
-                  className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md border hover:bg-accent ml-auto"
-                >
-                  <GitCompare className="h-3.5 w-3.5" />
-                  {t("billing.compare_plans", "Compare plans")}
-                </Link>
-              </div>
-            </div>
-          );
-        })}
       </div>
 
       <Dialog open={!!changeFor} onOpenChange={(o: boolean) => !o && setChangeFor(null)}>
