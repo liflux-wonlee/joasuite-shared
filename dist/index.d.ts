@@ -1,5 +1,5 @@
-import { A as AppCode } from './constants-B39zophS.js';
-export { a as APP_CODES, b as APP_DISPLAY, D as DEFAULT_APP_URLS, R as ROLES_BY_APP, S as SETTINGS_KV_APP_URL_KEYS } from './constants-B39zophS.js';
+import { A as AppCode } from './constants-ME_hdmjZ.js';
+export { a as APP_CODES, b as APP_DISPLAY, D as DEFAULT_APP_URLS, R as ROLES_BY_APP, S as SETTINGS_KV_APP_URL_KEYS, r as roleLabel } from './constants-ME_hdmjZ.js';
 import * as react from 'react';
 import { ComponentType, ReactNode } from 'react';
 import { SupabaseClient } from '@supabase/supabase-js';

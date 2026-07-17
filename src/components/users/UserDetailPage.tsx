@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useJoaSuite } from "../../context";
-import { APP_CODES, ROLES_BY_APP } from "../../constants";
+import { APP_CODES, ROLES_BY_APP, roleLabel } from "../../constants";
 import type { ManageableTenant, ManageableUserRow } from "../../types";
 
 function rolesForApp(code: string): string[] {
@@ -368,7 +368,7 @@ export function UserDetailPage({ userId }: { userId: string }) {
                                     </SelectItem>
                                     {options.map((r) => (
                                       <SelectItem key={r} value={r} className="text-xs">
-                                        {r}
+                                        {roleLabel(r)}
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
@@ -502,7 +502,7 @@ export function UserDetailPage({ userId }: { userId: string }) {
                           <SelectContent>
                             {options.map((r) => (
                               <SelectItem key={r} value={r} className="text-xs">
-                                {r}
+                                {roleLabel(r)}
                               </SelectItem>
                             ))}
                           </SelectContent>

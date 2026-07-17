@@ -52,7 +52,7 @@ export const ROLES_BY_APP: Record<AppCode, string[]> = {
     "accountant",
     "approver",
   ],
-  joasop: ["sop_admin", "sop_author", "sop_reviewer", "sop_operator"],
+  joasop: ["owner", "super_admin", "sop_admin", "sop_author", "sop_reviewer", "sop_operator"],
   joaoffice: ["owner", "super_admin", "approver"],
   joaapproval: ["owner", "super_admin", "approver"],
   joacrm: ["owner", "super_admin", "approver"],
@@ -60,3 +60,13 @@ export const ROLES_BY_APP: Record<AppCode, string[]> = {
 };
 
 export const SETTINGS_KV_APP_URL_KEYS = APP_CODES.map((c) => `app_url.${c}` as const);
+
+/**
+ * Display-only: the stored/submitted role value keeps its "sop_" prefix
+ * (it's a real DB enum value used by JoaSOP's own authorization checks);
+ * this just makes the label shown to admins less redundant, since the
+ * row is already badged with the app code.
+ */
+export function roleLabel(role: string): string {
+  return role.startsWith("sop_") ? role.slice(4) : role;
+}

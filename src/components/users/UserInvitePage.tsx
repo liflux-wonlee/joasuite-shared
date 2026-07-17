@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ArrowLeft, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useJoaSuite } from "../../context";
-import { ROLES_BY_APP } from "../../constants";
+import { ROLES_BY_APP, roleLabel } from "../../constants";
 import type { InvitePresetKey, ManageableTenant } from "../../types";
 
 function rolesForApp(code: string): string[] {
@@ -352,7 +352,7 @@ export function UserInvitePage() {
                             <SelectContent>
                               {options.map((r) => (
                                 <SelectItem key={r} value={r} className="text-xs">
-                                  {r}
+                                  {roleLabel(r)}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -401,7 +401,7 @@ export function UserInvitePage() {
                         <ul className="text-xs text-muted-foreground list-disc pl-4">
                           {apps.map(([code, role]) => (
                             <li key={code}>
-                              <span className="uppercase">{code}</span>: {role}
+                              <span className="uppercase">{code}</span>: {roleLabel(role)}
                             </li>
                           ))}
                         </ul>
