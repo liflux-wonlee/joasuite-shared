@@ -34,13 +34,16 @@ var ROLES_BY_APP = {
     "accountant",
     "approver"
   ],
-  joasop: ["sop_admin", "sop_author", "sop_reviewer", "sop_operator"],
+  joasop: ["owner", "super_admin", "sop_admin", "sop_author", "sop_reviewer", "sop_operator"],
   joaoffice: ["owner", "super_admin", "approver"],
   joaapproval: ["owner", "super_admin", "approver"],
   joacrm: ["owner", "super_admin", "approver"],
   joahr: ["owner", "super_admin", "approver"]
 };
 var SETTINGS_KV_APP_URL_KEYS = APP_CODES.map((c) => `app_url.${c}`);
+function roleLabel(role) {
+  return role.startsWith("sop_") ? role.slice(4) : role;
+}
 var JoaSuiteContext = createContext(null);
 function JoaSuiteProvider({
   value,
@@ -1820,7 +1823,7 @@ function UserBadge() {
   const showEmail = !!email;
   const position = current?.position || "";
   const roles = currentMembership?.roles ?? [];
-  const roleLabel = roles[0]?.replace(/_/g, " ").toUpperCase();
+  const roleLabel2 = roles[0]?.replace(/_/g, " ").toUpperCase();
   const portal = currentMembership?.portal;
   const isVendorPortal = portal === "vendor";
   const isExternalPortal = portal === "vendor" || portal === "approver" || portal === "customer";
@@ -1835,7 +1838,7 @@ function UserBadge() {
     /* @__PURE__ */ jsx(DropdownMenuTrigger, { asChild: true, children: /* @__PURE__ */ jsxs("button", { className: "min-w-0 leading-tight text-left rounded px-2 py-1 hover:bg-muted transition", children: [
       showName && /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 min-w-0", children: [
         /* @__PURE__ */ jsx("span", { className: "text-sm font-bold truncate", children: nameLine }),
-        roleLabel && /* @__PURE__ */ jsx("span", { className: "text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0", children: roleLabel })
+        roleLabel2 && /* @__PURE__ */ jsx("span", { className: "text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground shrink-0", children: roleLabel2 })
       ] }),
       showEmail && /* @__PURE__ */ jsx("div", { className: "text-[10px] font-normal text-muted-foreground/50 truncate", children: email }),
       position && /* @__PURE__ */ jsx("div", { className: "text-[10px] text-muted-foreground/60 truncate", children: position })
@@ -3395,7 +3398,7 @@ function UserInvitePage() {
                     disabled: !has,
                     children: [
                       /* @__PURE__ */ jsx(SelectTrigger, { className: "h-7 text-xs flex-1", children: /* @__PURE__ */ jsx(SelectValue, {}) }),
-                      /* @__PURE__ */ jsx(SelectContent, { children: options.map((r) => /* @__PURE__ */ jsx(SelectItem, { value: r, className: "text-xs", children: r }, r)) })
+                      /* @__PURE__ */ jsx(SelectContent, { children: options.map((r) => /* @__PURE__ */ jsx(SelectItem, { value: r, className: "text-xs", children: roleLabel(r) }, r)) })
                     ]
                   }
                 )
@@ -3435,7 +3438,7 @@ function UserInvitePage() {
               apps.length === 0 ? /* @__PURE__ */ jsx("div", { className: "text-xs text-muted-foreground", children: t("users.no_app_access", "No app access") }) : /* @__PURE__ */ jsx("ul", { className: "text-xs text-muted-foreground list-disc pl-4", children: apps.map(([code, role]) => /* @__PURE__ */ jsxs("li", { children: [
                 /* @__PURE__ */ jsx("span", { className: "uppercase", children: code }),
                 ": ",
-                role
+                roleLabel(role)
               ] }, code)) })
             ] }, tid);
           }) })
@@ -3765,7 +3768,7 @@ function UserDetailPage({ userId }) {
                           /* @__PURE__ */ jsx(SelectTrigger, { className: "h-8 text-xs max-w-xs", children: /* @__PURE__ */ jsx(SelectValue, { placeholder: t("set.select_role", "Select role") }) }),
                           /* @__PURE__ */ jsxs(SelectContent, { children: [
                             /* @__PURE__ */ jsx(SelectItem, { value: "__none__", className: "text-xs text-muted-foreground", children: t("users.no_access", "No access") }),
-                            options.map((r) => /* @__PURE__ */ jsx(SelectItem, { value: r, className: "text-xs", children: r }, r))
+                            options.map((r) => /* @__PURE__ */ jsx(SelectItem, { value: r, className: "text-xs", children: roleLabel(r) }, r))
                           ] })
                         ]
                       }
@@ -3872,7 +3875,7 @@ function UserDetailPage({ userId }) {
                   disabled: !checked,
                   children: [
                     /* @__PURE__ */ jsx(SelectTrigger, { className: "h-7 text-xs flex-1", children: /* @__PURE__ */ jsx(SelectValue, {}) }),
-                    /* @__PURE__ */ jsx(SelectContent, { children: options.map((r) => /* @__PURE__ */ jsx(SelectItem, { value: r, className: "text-xs", children: r }, r)) })
+                    /* @__PURE__ */ jsx(SelectContent, { children: options.map((r) => /* @__PURE__ */ jsx(SelectItem, { value: r, className: "text-xs", children: roleLabel(r) }, r)) })
                   ]
                 }
               )
@@ -6215,6 +6218,6 @@ function BillingComparePage({ appCode }) {
   ] });
 }
 
-export { APP_CODES, APP_DISPLAY, AppOverviewSection, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
+export { APP_CODES, APP_DISPLAY, AppOverviewSection, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, roleLabel, useJoaSuite, useOrgScope };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

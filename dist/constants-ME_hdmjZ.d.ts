@@ -26,5 +26,12 @@ declare const DEFAULT_APP_URLS: Record<AppCode, string>;
  */
 declare const ROLES_BY_APP: Record<AppCode, string[]>;
 declare const SETTINGS_KV_APP_URL_KEYS: ("app_url.joabooks" | "app_url.joaapproval" | "app_url.joacrm" | "app_url.joaoffice" | "app_url.joasop" | "app_url.joahr")[];
+/**
+ * Display-only: the stored/submitted role value keeps its "sop_" prefix
+ * (it's a real DB enum value used by JoaSOP's own authorization checks);
+ * this just makes the label shown to admins less redundant, since the
+ * row is already badged with the app code.
+ */
+declare function roleLabel(role: string): string;
 
-export { type AppCode as A, DEFAULT_APP_URLS as D, ROLES_BY_APP as R, SETTINGS_KV_APP_URL_KEYS as S, APP_CODES as a, APP_DISPLAY as b };
+export { type AppCode as A, DEFAULT_APP_URLS as D, ROLES_BY_APP as R, SETTINGS_KV_APP_URL_KEYS as S, APP_CODES as a, APP_DISPLAY as b, roleLabel as r };
