@@ -13,23 +13,31 @@ export type TeamListPageProps = {
   onEntrySaved?: (result: { party_id: string; created: boolean }) => void;
 };
 
-export function TeamListPage({ tenantId, workerType, onEntrySaved }: TeamListPageProps) {
+export function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySaved }: TeamListPageProps) {
   const { t } = useTranslation();
   const { ui, fns } = useJoaSuite();
   const {
     Button,
     Input,
-    Badge,
     Dialog,
     DialogContent,
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    Tabs,
+    TabsList,
+    TabsTrigger,
   } = ui;
 
   const [search, setSearch] = useState("");
   const [editingPartyId, setEditingPartyId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"employee" | "contractor">("employee");
+
+  // Callers that pin a single type (legacy embeds) skip the tabs entirely;
+  // otherwise the tabs pick which type is shown — this is the merged
+  // "Team Members" view with Employee (W2) / Contractor (1099) tabs.
+  const workerType = fixedWorkerType ?? activeTab;
 
   const listQ = useQuery({
     queryKey: ["team-list", tenantId, search, workerType],
@@ -39,24 +47,16 @@ export function TeamListPage({ tenantId, workerType, onEntrySaved }: TeamListPag
   });
   const rows = listQ.data?.rows ?? [];
 
-  const title =
-    workerType === "employee"
+  const title = fixedWorkerType
+    ? fixedWorkerType === "employee"
       ? t("team.title_employee", "Employees")
-      : workerType === "contractor"
-        ? t("team.title_contractor", "Contractors")
-        : t("team.title", "Team");
-  const desc =
-    workerType === "employee"
-      ? t("team.desc_employee", "People on payroll, shared across JoaSuite apps.")
-      : workerType === "contractor"
-        ? t("team.desc_contractor", "External contractors and vendors, shared across JoaSuite apps.")
-        : t("team.desc", "Basic employee and contractor info shared across JoaSuite apps.");
+      : t("team.title_contractor", "Contractors")
+    : t("team.title", "Team");
+  const desc = t("team.desc", "Basic employee and contractor info shared across JoaSuite apps.");
   const addLabel =
     workerType === "employee"
       ? t("team.add_employee", "Add employee")
-      : workerType === "contractor"
-        ? t("team.add_contractor", "Add contractor")
-        : t("team.add", "Add person");
+      : t("team.add_contractor", "Add contractor");
 
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-4">
@@ -73,6 +73,15 @@ export function TeamListPage({ tenantId, workerType, onEntrySaved }: TeamListPag
           {addLabel}
         </Button>
       </div>
+
+      {!fixedWorkerType && (
+        <Tabs value={activeTab} onValueChange={(v: string) => setActiveTab(v as "employee" | "contractor")}>
+          <TabsList>
+            <TabsTrigger value="employee">{t("team.tab_employee", "Employee (W2)")}</TabsTrigger>
+            <TabsTrigger value="contractor">{t("team.tab_contractor", "Contractor (1099)")}</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      )}
 
       <div className="relative max-w-sm">
         <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -91,16 +100,13 @@ export function TeamListPage({ tenantId, workerType, onEntrySaved }: TeamListPag
               <th className="px-3 py-2 min-w-[220px]">{t("team.col_name", "Name")}</th>
               <th className="px-3 py-2 min-w-[140px]">{t("team.department", "Department")}</th>
               <th className="px-3 py-2 min-w-[140px]">{t("team.position", "Position")}</th>
-              {!workerType && (
-                <th className="px-3 py-2 min-w-[110px]">{t("team.worker_type", "Worker type")}</th>
-              )}
               <th className="px-3 py-2 min-w-[100px]">{t("team.employment_status", "Status")}</th>
             </tr>
           </thead>
           <tbody>
             {!listQ.isLoading && rows.length === 0 && (
               <tr>
-                <td colSpan={workerType ? 4 : 5} className="px-3 py-6 text-center text-muted-foreground">
+                <td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">
                   {t("team.empty", "No team members yet.")}
                 </td>
               </tr>
@@ -117,13 +123,6 @@ export function TeamListPage({ tenantId, workerType, onEntrySaved }: TeamListPag
                 </td>
                 <td className="px-3 py-2">{r.department ?? "—"}</td>
                 <td className="px-3 py-2">{r.position ?? "—"}</td>
-                {!workerType && (
-                  <td className="px-3 py-2">
-                    <Badge variant="outline" className="capitalize text-[10px]">
-                      {t(`team.worker_type_${r.worker_type ?? "employee"}`, r.worker_type ?? "employee")}
-                    </Badge>
-                  </td>
-                )}
                 <td className="px-3 py-2">
                   {r.employment_status
                     ? t(`team.status_${r.employment_status}`, String(r.employment_status))

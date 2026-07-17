@@ -313,6 +313,16 @@
     "desc_contractor": "Contratistas y proveedores externos, compartidos entre las apps de JoaSuite.",
     "add_employee": "Agregar empleado",
     "add_contractor": "Agregar contratista",
+    "tab_employee": "Empleado (W2)",
+    "tab_contractor": "Contratista (1099)",
+    "parent_department": "Departamento superior",
+    "top_level": "Ninguno (nivel superior)",
+    "new_sub_department": "Subdepartamento",
+    "department_depth_hint": "Los departamentos pueden anidarse hasta 4 niveles.",
+    "view_manage": "Administrar",
+    "view_chart": "Organigrama",
+    "org_chart_empty": "Aún no hay departamentos: agrega uno para ver el organigrama.",
+    "org_chart_vacant": "Vacante",
     "team_group": "Equipo"
   }
 }

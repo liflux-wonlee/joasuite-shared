@@ -313,6 +313,16 @@
     "desc_contractor": "Nhà thầu và nhà cung cấp bên ngoài, dùng chung cho mọi ứng dụng JoaSuite.",
     "add_employee": "Thêm nhân viên",
     "add_contractor": "Thêm nhà thầu",
+    "tab_employee": "Nhân viên (W2)",
+    "tab_contractor": "Nhà thầu (1099)",
+    "parent_department": "Phòng ban cấp trên",
+    "top_level": "Không có (cấp cao nhất)",
+    "new_sub_department": "Phòng ban con",
+    "department_depth_hint": "Phòng ban có thể lồng tối đa 4 cấp.",
+    "view_manage": "Quản lý",
+    "view_chart": "Sơ đồ tổ chức",
+    "org_chart_empty": "Chưa có phòng ban nào — hãy thêm một phòng ban để xem sơ đồ tổ chức.",
+    "org_chart_vacant": "Còn trống",
     "team_group": "Nhóm"
   }
 }

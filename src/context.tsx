@@ -126,12 +126,18 @@ export type BoundServerFns = {
   listDepartmentsAndPositions: (input: {
     tenant_id: string;
   }) => Promise<{ departments: any[]; positions: any[] }>;
-  createDepartment: (input: { tenant_id: string; name: string; code?: string | null }) => Promise<any>;
+  createDepartment: (input: {
+    tenant_id: string;
+    name: string;
+    code?: string | null;
+    parent_department_id?: string | null;
+  }) => Promise<any>;
   updateDepartment: (input: {
     tenant_id: string;
     id: string;
     name: string;
     code?: string | null;
+    parent_department_id?: string | null;
   }) => Promise<any>;
   deleteDepartment: (input: { tenant_id: string; id: string }) => Promise<any>;
   createPosition: (input: {
@@ -141,6 +147,7 @@ export type BoundServerFns = {
   }) => Promise<any>;
   updatePosition: (input: { tenant_id: string; id: string; name: string }) => Promise<any>;
   deletePosition: (input: { tenant_id: string; id: string }) => Promise<any>;
+  getOrgChartTree: (input: { tenant_id: string }) => Promise<{ roots: any[] }>;
 
   // ── Billing (organization-scoped; identical across every JoaSuite app) ──
   canManageBillingFn: (input: { tenant_id: string }) => Promise<{

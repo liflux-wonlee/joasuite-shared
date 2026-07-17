@@ -328,6 +328,16 @@
     "desc_contractor": "External contractors and vendors, shared across JoaSuite apps.",
     "add_employee": "Add employee",
     "add_contractor": "Add contractor",
+    "tab_employee": "Employee (W2)",
+    "tab_contractor": "Contractor (1099)",
+    "parent_department": "Parent department",
+    "top_level": "None (top-level)",
+    "new_sub_department": "Sub-department",
+    "department_depth_hint": "Departments can nest up to 4 levels deep.",
+    "view_manage": "Manage",
+    "view_chart": "Org chart",
+    "org_chart_empty": "No departments yet — add one to see the org chart.",
+    "org_chart_vacant": "Vacant",
     "team_group": "Team"
   }
 }

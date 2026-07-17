@@ -366,6 +366,8 @@ type OrgStructureDeps = {
     /** Write-gate: who may create/edit/delete departments and positions. */
     assertCanManageOrgStructure: (tenantId: string, userId: string) => Promise<void>;
 };
+/** Departments may nest at most this many levels deep (1 = top-level). */
+declare const MAX_DEPARTMENT_DEPTH = 4;
 declare function createListDepartmentsAndPositions(deps: OrgStructureDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
     tenant_id: string;
 }, Promise<{
@@ -376,6 +378,7 @@ declare function createCreateDepartment(deps: OrgStructureDeps): _tanstack_start
     tenant_id: string;
     name: string;
     code?: string | null | undefined;
+    parent_department_id?: string | null | undefined;
 }, Promise<{
     id: any;
 }>>;
@@ -384,6 +387,7 @@ declare function createUpdateDepartment(deps: OrgStructureDeps): _tanstack_start
     id: string;
     name: string;
     code?: string | null | undefined;
+    parent_department_id?: string | null | undefined;
 }, Promise<{
     ok: true;
 }>>;
@@ -412,6 +416,36 @@ declare function createDeletePosition(deps: OrgStructureDeps): _tanstack_start_c
     id: string;
 }, Promise<{
     ok: true;
+}>>;
+type OrgChartPerson = {
+    party_id: string;
+    name: string;
+    worker_type: string | null;
+};
+type OrgChartPosition = {
+    id: string;
+    name: string;
+    people: OrgChartPerson[];
+};
+type OrgChartDepartment = {
+    id: string;
+    name: string;
+    depth: number;
+    positions: OrgChartPosition[];
+    children: OrgChartDepartment[];
+};
+/**
+ * Builds the department/position tree for the visual org chart: each
+ * department nests its child departments (up to MAX_DEPARTMENT_DEPTH) and
+ * its own positions, each position lists the active team members currently
+ * holding it. People with no department/position assignment don't have a
+ * natural place in a structural chart and are omitted (they still show up
+ * in the Team Members list).
+ */
+declare function createGetOrgChartTree(deps: OrgStructureDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    tenant_id: string;
+}, Promise<{
+    roots: OrgChartDepartment[];
 }>>;
 
 type SendEmail = (input: {
@@ -936,4 +970,4 @@ declare function createGetTenantUsage(deps: BillingDeps): _tanstack_start_client
 }>>;
 declare function createListActiveBundleRules(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], undefined, Promise<any>>;
 
-export { type AccountDeps, type AdminDeps, type AppCatalogEntry, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, type BillingDeps, type BillingInterval, type PlanCode as BillingPlanCode, type MergePartiesDeps, type OrgStructureDeps, type PartyRefTable, type SuiteHomeData, type TeamDeps, type TenantAppRow, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createCreateDepartment, createCreatePosition, createDeleteDepartment, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDeletePosition, createGetBillingInvoice, createGetBillingOverview, createGetMyProfile, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTeamMember, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListDepartmentsAndPositions, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTeamMembers, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createSetUserAppRoles, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateDepartment, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdatePosition, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, createUpsertTeamMember, resolveScopedTenantIds };
+export { type AccountDeps, type AdminDeps, type AppCatalogEntry, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, type BillingDeps, type BillingInterval, type PlanCode as BillingPlanCode, MAX_DEPARTMENT_DEPTH, type MergePartiesDeps, type OrgChartDepartment, type OrgChartPerson, type OrgChartPosition, type OrgStructureDeps, type PartyRefTable, type SuiteHomeData, type TeamDeps, type TenantAppRow, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createCreateDepartment, createCreatePosition, createDeleteDepartment, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDeletePosition, createGetBillingInvoice, createGetBillingOverview, createGetMyProfile, createGetOrgChartTree, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTeamMember, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListDepartmentsAndPositions, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTeamMembers, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createSetUserAppRoles, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateDepartment, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdatePosition, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, createUpsertTeamMember, resolveScopedTenantIds };
