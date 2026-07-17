@@ -13,7 +13,7 @@ export type Membership = {
 
 /**
  * "Users" (suite login/tenant-membership management) types. Deliberately
- * named distinctly from the Employee/Contractor Directory types below —
+ * named distinctly from the Team (Employee/Contractor) types below —
  * a Suite "user" is a login identity with per-app roles; an "employee" is a
  * `parties`/`employee_profiles` business record that may or may not have a
  * login at all. Do not conflate the two.
@@ -54,7 +54,7 @@ export type InvitePresetKey =
   | "custom";
 
 /**
- * Employee/Contractor Directory types (shared across every JoaSuite app
+ * Team (Employee/Contractor) types (shared across every JoaSuite app
  * except the future JoaHR app, which owns the full HR surface). These map
  * to the shared core tables `departments`/`positions`/`parties`/
  * `employee_profiles` — never to HR-confidential extension tables, which
@@ -72,7 +72,7 @@ export type Position = {
   department_id: string;
 };
 
-export type EmployeeDirectoryRow = {
+export type TeamMemberRow = {
   party_id: string;
   linked_user_id: string | null;
   name_en: string | null;
@@ -89,7 +89,7 @@ export type EmployeeDirectoryRow = {
   worker_type: "employee" | "contractor" | null;
 };
 
-export type EmployeeProfileInput = {
+export type TeamMemberInput = {
   tenant_id: string;
   party_id?: string;
   linked_user_id?: string;

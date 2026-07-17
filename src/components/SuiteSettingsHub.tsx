@@ -68,10 +68,10 @@ export function SuiteSettingsHub() {
     },
     {
       icon: Contact2,
-      label: t("suite.tile.directory", "Directory"),
+      label: t("suite.tile.team", "Team"),
       description: t(
-        "suite.tile.directory_desc",
-        "Directory will provide shared access to customers, vendors, employees, contractors, and contacts across JoaSuite apps.",
+        "suite.tile.team_desc",
+        "Team will provide shared access to basic employee and contractor info across JoaSuite apps.",
       ),
       disabled: true,
       badge: t("suite.state.coming_soon", "Coming Soon"),

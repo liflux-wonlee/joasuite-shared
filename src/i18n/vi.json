@@ -190,7 +190,9 @@
   "suite": {
     "tile": {
       "users": "Người dùng",
-      "users_desc": "Mời người dùng trên tất cả tổ chức và phân quyền theo từng ứng dụng."
+      "users_desc": "Mời người dùng trên tất cả tổ chức và phân quyền theo từng ứng dụng.",
+      "team": "Nhóm",
+      "team_desc": "Team sẽ cung cấp quyền truy cập chung vào thông tin cơ bản của nhân viên và nhà thầu trên các ứng dụng JoaSuite."
     },
     "gate": {
       "no_org_title": "Tạo tổ chức của bạn",
@@ -270,15 +272,15 @@
     "send_invite": "Gửi lời mời",
     "added_to_org": "Đã thêm vào tổ chức"
   },
-  "directory": {
-    "title": "Danh bạ nhân viên",
+  "team": {
+    "title": "Nhóm",
     "desc": "Thông tin cơ bản của nhân viên và nhà thầu, dùng chung giữa các ứng dụng JoaSuite.",
     "add": "Thêm người",
-    "edit": "Sửa mục danh bạ",
+    "edit": "Sửa thành viên nhóm",
     "search_placeholder": "Tìm theo tên hoặc email",
     "col_name": "Tên",
-    "empty": "Chưa có mục danh bạ nào.",
-    "saved": "Đã lưu mục danh bạ",
+    "empty": "Chưa có thành viên nhóm nào.",
+    "saved": "Đã lưu thông tin thành viên nhóm",
     "name": "Tên",
     "contact_email": "Email",
     "contact_phone": "Điện thoại",
@@ -294,7 +296,7 @@
     "status_terminated": "Đã nghỉ việc",
     "hire_date": "Ngày vào làm",
     "org_structure_title": "Phòng ban & Chức vụ",
-    "org_structure_desc": "Dùng chung giữa các ứng dụng JoaSuite. Được sử dụng bởi Danh bạ nhân viên và việc khớp yêu cầu.",
+    "org_structure_desc": "Dùng chung giữa các ứng dụng JoaSuite. Được sử dụng bởi Team và việc khớp yêu cầu.",
     "new_department": "Phòng ban mới",
     "edit_department": "Sửa phòng ban",
     "department_name": "Tên",

@@ -8,11 +8,11 @@ const ANY = "__any__";
 const WORKER_TYPES = ["employee", "contractor"] as const;
 const EMPLOYMENT_STATUSES = ["active", "on_leave", "terminated"] as const;
 
-export type EmployeeProfileFormProps = {
+export type TeamMemberFormProps = {
   tenantId: string;
-  /** Edit an existing directory entry by party id (no login required). */
+  /** Edit an existing team member by party id (no login required). */
   partyId?: string;
-  /** Edit (or create) the directory entry tied to an existing tenant login. */
+  /** Edit (or create) the team member tied to an existing tenant login. */
   linkedUserId?: string;
   /** Disable all fields; used for self-view / read-only embeds. */
   readOnly?: boolean;
@@ -29,32 +29,32 @@ export type EmployeeProfileFormProps = {
  * contracts, leave) — those stay in each app's own HR-owned tables.
  *
  * No Dialog/Card chrome of its own — callers embed it inline (e.g. a
- * read-only Profile tab) or wrap it in their own Dialog (e.g. an "Add
- * employee" flow) as fits the surrounding page.
+ * read-only Profile tab) or wrap it in their own Dialog (e.g. an "Add team
+ * member" flow) as fits the surrounding page.
  */
-export function EmployeeProfileForm({
+export function TeamMemberForm({
   tenantId,
   partyId,
   linkedUserId,
   readOnly,
   defaultWorkerType,
   onSaved,
-}: EmployeeProfileFormProps) {
+}: TeamMemberFormProps) {
   const { t } = useTranslation();
   const { ui, fns } = useJoaSuite();
   const { Button, Input, Label, EmailInput, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } = ui;
   const qc = useQueryClient();
 
   const orgQ = useQuery({
-    queryKey: ["directory-org", tenantId],
+    queryKey: ["team-org", tenantId],
     enabled: !!tenantId,
     queryFn: () => fns.listDepartmentsAndPositions({ tenant_id: tenantId }),
   });
 
   const entryQ = useQuery({
-    queryKey: ["directory-entry", tenantId, partyId],
+    queryKey: ["team-member", tenantId, partyId],
     enabled: !!tenantId && !!partyId,
-    queryFn: () => fns.getEmployeeDirectoryEntry({ tenant_id: tenantId, party_id: partyId! }),
+    queryFn: () => fns.getTeamMember({ tenant_id: tenantId, party_id: partyId! }),
   });
 
   const [nameEn, setNameEn] = useState("");
@@ -81,7 +81,7 @@ export function EmployeeProfileForm({
 
   const save = useMutation({
     mutationFn: () =>
-      fns.upsertEmployeeDirectoryEntry({
+      fns.upsertTeamMember({
         tenant_id: tenantId,
         party_id: partyId,
         linked_user_id: partyId ? undefined : linkedUserId,
@@ -95,9 +95,9 @@ export function EmployeeProfileForm({
         worker_type: workerType as (typeof WORKER_TYPES)[number],
       }),
     onSuccess: (res) => {
-      toast.success(t("directory.saved", "Directory entry saved"));
-      qc.invalidateQueries({ queryKey: ["directory-entry", tenantId, partyId] });
-      qc.invalidateQueries({ queryKey: ["directory-list", tenantId] });
+      toast.success(t("team.saved", "Team member saved"));
+      qc.invalidateQueries({ queryKey: ["team-member", tenantId, partyId] });
+      qc.invalidateQueries({ queryKey: ["team-list", tenantId] });
       onSaved?.(res);
     },
     onError: (e: Error) => toast.error(e.message),
@@ -118,11 +118,11 @@ export function EmployeeProfileForm({
       {(isNew || linkedUserId) && (
         <>
           <div>
-            <Label>{t("directory.name", "Name")}</Label>
+            <Label>{t("team.name", "Name")}</Label>
             <Input value={nameEn} onChange={(e: any) => setNameEn(e.target.value)} disabled={readOnly} />
           </div>
           <div>
-            <Label>{t("directory.contact_email", "Email")}</Label>
+            <Label>{t("team.contact_email", "Email")}</Label>
             <EmailInput
               value={contactEmail}
               onChange={(e: any) => setContactEmail(e.target.value)}
@@ -130,7 +130,7 @@ export function EmployeeProfileForm({
             />
           </div>
           <div>
-            <Label>{t("directory.contact_phone", "Phone")}</Label>
+            <Label>{t("team.contact_phone", "Phone")}</Label>
             <Input value={contactPhone} onChange={(e: any) => setContactPhone(e.target.value)} disabled={readOnly} />
           </div>
         </>
@@ -138,13 +138,13 @@ export function EmployeeProfileForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label>{t("directory.department", "Department")}</Label>
+          <Label>{t("team.department", "Department")}</Label>
           <Select value={departmentId} onValueChange={setDepartmentId} disabled={readOnly}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ANY}>{t("directory.none", "None")}</SelectItem>
+              <SelectItem value={ANY}>{t("team.none", "None")}</SelectItem>
               {departments.map((d: any) => (
                 <SelectItem key={d.id} value={d.id}>
                   {d.name}
@@ -154,13 +154,13 @@ export function EmployeeProfileForm({
           </Select>
         </div>
         <div>
-          <Label>{t("directory.position", "Position")}</Label>
+          <Label>{t("team.position", "Position")}</Label>
           <Select value={positionId} onValueChange={setPositionId} disabled={readOnly}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={ANY}>{t("directory.none", "None")}</SelectItem>
+              <SelectItem value={ANY}>{t("team.none", "None")}</SelectItem>
               {positions.map((p: any) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.name}
@@ -173,7 +173,7 @@ export function EmployeeProfileForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label>{t("directory.worker_type", "Worker type")}</Label>
+          <Label>{t("team.worker_type", "Worker type")}</Label>
           <Select value={workerType} onValueChange={setWorkerType} disabled={readOnly}>
             <SelectTrigger>
               <SelectValue />
@@ -181,14 +181,14 @@ export function EmployeeProfileForm({
             <SelectContent>
               {WORKER_TYPES.map((w) => (
                 <SelectItem key={w} value={w}>
-                  {t(`directory.worker_type_${w}`, w)}
+                  {t(`team.worker_type_${w}`, w)}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
         <div>
-          <Label>{t("directory.employment_status", "Status")}</Label>
+          <Label>{t("team.employment_status", "Status")}</Label>
           <Select value={employmentStatus} onValueChange={setEmploymentStatus} disabled={readOnly}>
             <SelectTrigger>
               <SelectValue />
@@ -196,7 +196,7 @@ export function EmployeeProfileForm({
             <SelectContent>
               {EMPLOYMENT_STATUSES.map((s) => (
                 <SelectItem key={s} value={s}>
-                  {t(`directory.status_${s}`, s)}
+                  {t(`team.status_${s}`, s)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -205,7 +205,7 @@ export function EmployeeProfileForm({
       </div>
 
       <div>
-        <Label>{t("directory.hire_date", "Hire date")}</Label>
+        <Label>{t("team.hire_date", "Hire date")}</Label>
         <Input type="date" value={hireDate} onChange={(e: any) => setHireDate(e.target.value)} disabled={readOnly} />
       </div>
 

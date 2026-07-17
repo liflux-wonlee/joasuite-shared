@@ -14,7 +14,7 @@ type Membership = {
 };
 /**
  * "Users" (suite login/tenant-membership management) types. Deliberately
- * named distinctly from the Employee/Contractor Directory types below —
+ * named distinctly from the Team (Employee/Contractor) types below —
  * a Suite "user" is a login identity with per-app roles; an "employee" is a
  * `parties`/`employee_profiles` business record that may or may not have a
  * login at all. Do not conflate the two.
@@ -47,7 +47,7 @@ type ManageableTenant = {
 };
 type InvitePresetKey = "owner_admin" | "manager" | "finance_staff" | "field_tech" | "approver" | "custom";
 /**
- * Employee/Contractor Directory types (shared across every JoaSuite app
+ * Team (Employee/Contractor) types (shared across every JoaSuite app
  * except the future JoaHR app, which owns the full HR surface). These map
  * to the shared core tables `departments`/`positions`/`parties`/
  * `employee_profiles` — never to HR-confidential extension tables, which
@@ -63,7 +63,7 @@ type Position = {
     name: string;
     department_id: string;
 };
-type EmployeeDirectoryRow = {
+type TeamMemberRow = {
     party_id: string;
     linked_user_id: string | null;
     name_en: string | null;
@@ -79,7 +79,7 @@ type EmployeeDirectoryRow = {
     termination_date: string | null;
     worker_type: "employee" | "contractor" | null;
 };
-type EmployeeProfileInput = {
+type TeamMemberInput = {
     tenant_id: string;
     party_id?: string;
     linked_user_id?: string;
@@ -315,18 +315,18 @@ type BoundServerFns = {
         user_id: string;
     }) => Promise<any>;
     accountUpdateUserProfile: (input: any) => Promise<any>;
-    listEmployeeDirectory: (input: {
+    listTeamMembers: (input: {
         tenant_id: string;
         search?: string;
         worker_type?: "employee" | "contractor";
     }) => Promise<{
         rows: any[];
     }>;
-    getEmployeeDirectoryEntry: (input: {
+    getTeamMember: (input: {
         tenant_id: string;
         party_id: string;
     }) => Promise<any>;
-    upsertEmployeeDirectoryEntry: (input: any) => Promise<{
+    upsertTeamMember: (input: any) => Promise<{
         party_id: string;
         created: boolean;
     }>;
@@ -623,17 +623,23 @@ declare function UserDetailPage({ userId }: {
     userId: string;
 }): react.JSX.Element;
 
-declare function EmployeeDirectoryListPage({ tenantId, workerType, }: {
+type TeamListPageProps = {
     tenantId: string;
     /** Restrict this view to one worker type. Omit to show the combined directory. */
     workerType?: "employee" | "contractor";
-}): react.JSX.Element;
+    /** Called after any create/edit save, in addition to closing the dialog — e.g. so a host app can trigger its own app-specific follow-up (JoaSOP re-runs Requirements Matrix auto-assignment when the saved entry is linked to a tenant login). */
+    onEntrySaved?: (result: {
+        party_id: string;
+        created: boolean;
+    }) => void;
+};
+declare function TeamListPage({ tenantId, workerType, onEntrySaved }: TeamListPageProps): react.JSX.Element;
 
-type EmployeeProfileFormProps = {
+type TeamMemberFormProps = {
     tenantId: string;
-    /** Edit an existing directory entry by party id (no login required). */
+    /** Edit an existing team member by party id (no login required). */
     partyId?: string;
-    /** Edit (or create) the directory entry tied to an existing tenant login. */
+    /** Edit (or create) the team member tied to an existing tenant login. */
     linkedUserId?: string;
     /** Disable all fields; used for self-view / read-only embeds. */
     readOnly?: boolean;
@@ -652,10 +658,10 @@ type EmployeeProfileFormProps = {
  * contracts, leave) — those stay in each app's own HR-owned tables.
  *
  * No Dialog/Card chrome of its own — callers embed it inline (e.g. a
- * read-only Profile tab) or wrap it in their own Dialog (e.g. an "Add
- * employee" flow) as fits the surrounding page.
+ * read-only Profile tab) or wrap it in their own Dialog (e.g. an "Add team
+ * member" flow) as fits the surrounding page.
  */
-declare function EmployeeProfileForm({ tenantId, partyId, linkedUserId, readOnly, defaultWorkerType, onSaved, }: EmployeeProfileFormProps): react.JSX.Element;
+declare function TeamMemberForm({ tenantId, partyId, linkedUserId, readOnly, defaultWorkerType, onSaved, }: TeamMemberFormProps): react.JSX.Element;
 
 declare function OrgStructureSettingsPage({ tenantId }: {
     tenantId: string;
@@ -701,4 +707,4 @@ declare function BillingComparePage({ appCode }: {
  */
 declare function useOrgScope(): [string[], (tenantIds: string[]) => void];
 
-export { type AppCatalogEntry, AppCode, AppOverviewSection, type AppSummaryTile, type ApprovalSummary, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type Department, EmployeeDirectoryListPage, type EmployeeDirectoryRow, EmployeeProfileForm, type EmployeeProfileInput, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, type RouterAdapter, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
+export { type AppCatalogEntry, AppCode, AppOverviewSection, type AppSummaryTile, type ApprovalSummary, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type Department, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, type RouterAdapter, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, type TeamMemberInput, type TeamMemberRow, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };

@@ -266,7 +266,7 @@ declare function createUpdateMyDefaultTenant(deps: AccountDeps): _tanstack_start
 }>>;
 
 /**
- * Shared Employee/Contractor Directory — basic identity + org-placement
+ * Shared Team (Employee/Contractor) module — basic identity + org-placement
  * fields ONLY (name, contact, department, position, manager, employment
  * status/dates, worker_type). Backed entirely by the shared core tables
  * `public.parties` (is_employee = true) and `public.employee_profiles`.
@@ -277,13 +277,13 @@ declare function createUpdateMyDefaultTenant(deps: AccountDeps): _tanstack_start
  * `office.employee_hr_records` / `office.employee_pto_balances`, gated by
  * their own role checks). This module must never import from, or grow a
  * dependency on, any app-specific HR schema — every JoaSuite app except
- * the future JoaHR app is expected to embed this same directory as-is.
+ * the future JoaHR app is expected to embed this same Team module as-is.
  */
-type EmployeeDirectoryDeps = {
+type TeamDeps = {
     requireSupabaseAuth: any;
     supabaseAdmin: any;
-    assertCanReadEmployeeDirectory: (tenantId: string, userId: string) => Promise<void>;
-    assertCanWriteEmployeeDirectory: (tenantId: string, userId: string) => Promise<void>;
+    assertCanReadTeam: (tenantId: string, userId: string) => Promise<void>;
+    assertCanWriteTeam: (tenantId: string, userId: string) => Promise<void>;
     /** Called after a successful write, e.g. to append an audit_logs row. Optional. */
     onWrite?: (input: {
         tenantId: string;
@@ -292,14 +292,14 @@ type EmployeeDirectoryDeps = {
         created: boolean;
     }) => Promise<void>;
 };
-declare function createListEmployeeDirectory(deps: EmployeeDirectoryDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+declare function createListTeamMembers(deps: TeamDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
     tenant_id: string;
     search?: string | undefined;
     worker_type?: "employee" | "contractor" | undefined;
 }, Promise<{
     rows: any;
 }>>;
-declare function createGetEmployeeDirectoryEntry(deps: EmployeeDirectoryDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+declare function createGetTeamMember(deps: TeamDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
     tenant_id: string;
     party_id: string;
 }, Promise<{
@@ -320,19 +320,19 @@ declare function createGetEmployeeDirectoryEntry(deps: EmployeeDirectoryDeps): _
     worker_type: any;
 }>>;
 /**
- * Create-or-update a directory entry. Accepts EITHER an existing `party_id`
+ * Create-or-update a Team member. Accepts EITHER an existing `party_id`
  * (the common case for apps managing employees/contractors that have no
  * login — e.g. JoaOffice) OR a `linked_user_id` (the common case for
- * resolving/creating the employee record tied to an existing tenant login —
- * e.g. JoaSOP's Users detail page), OR neither for a brand-new directory
- * entry created from scratch (name/contact fields required in that case).
+ * resolving/creating the Team record tied to an existing tenant login —
+ * e.g. JoaSOP's Team page), OR neither for a brand-new Team member created
+ * from scratch (name/contact fields required in that case).
  *
  * Always leaves both a `parties` row (is_employee = true) and a matching
  * `employee_profiles` row in place — this is the fix for the historical gap
  * where creating a party alone (e.g. via a Parties/Vendors admin screen)
  * never created the accompanying employee_profiles row.
  */
-declare function createUpsertEmployeeDirectoryEntry(deps: EmployeeDirectoryDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+declare function createUpsertTeamMember(deps: TeamDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
     tenant_id: string;
     worker_type: "employee" | "contractor";
     party_id?: string | undefined;
@@ -936,4 +936,4 @@ declare function createGetTenantUsage(deps: BillingDeps): _tanstack_start_client
 }>>;
 declare function createListActiveBundleRules(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], undefined, Promise<any>>;
 
-export { type AccountDeps, type AdminDeps, type AppCatalogEntry, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, type BillingDeps, type BillingInterval, type PlanCode as BillingPlanCode, type EmployeeDirectoryDeps, type MergePartiesDeps, type OrgStructureDeps, type PartyRefTable, type SuiteHomeData, type TenantAppRow, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createCreateDepartment, createCreatePosition, createDeleteDepartment, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDeletePosition, createGetBillingInvoice, createGetBillingOverview, createGetEmployeeDirectoryEntry, createGetMyProfile, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListDepartmentsAndPositions, createListEmployeeDirectory, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createSetUserAppRoles, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateDepartment, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdatePosition, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertEmployeeDirectoryEntry, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, resolveScopedTenantIds };
+export { type AccountDeps, type AdminDeps, type AppCatalogEntry, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, type BillingDeps, type BillingInterval, type PlanCode as BillingPlanCode, type MergePartiesDeps, type OrgStructureDeps, type PartyRefTable, type SuiteHomeData, type TeamDeps, type TenantAppRow, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createCreateDepartment, createCreatePosition, createDeleteDepartment, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDeletePosition, createGetBillingInvoice, createGetBillingOverview, createGetMyProfile, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTeamMember, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListDepartmentsAndPositions, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTeamMembers, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createSetUserAppRoles, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateDepartment, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdatePosition, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, createUpsertTeamMember, resolveScopedTenantIds };

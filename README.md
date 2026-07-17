@@ -37,9 +37,9 @@ joasuite-shared/
     │   │   ├── UserListPage.tsx   ✅
     │   │   ├── UserInvitePage.tsx ✅ (ROLES_BY_APP은 ../../constants에서 가져옴)
     │   │   └── UserDetailPage.tsx ✅ (userId를 prop으로 받음, Route.useParams() 아님)
-    │   ├── employees/             (직원/계약자 기본정보 — JoaHR 이외 모든 앱이 공유, 2026-07-12 신설)
-    │   │   ├── EmployeeDirectoryListPage.tsx ✅
-    │   │   └── EmployeeProfileForm.tsx       ✅
+    │   ├── team/                  (직원/계약자 기본정보 "Team" 메뉴 — JoaHR 이외 모든 앱이 공유, 2026-07-12 신설)
+    │   │   ├── TeamListPage.tsx   ✅
+    │   │   └── TeamMemberForm.tsx ✅
     │   └── org-structure/
     │       └── OrgStructureSettingsPage.tsx ✅ (부서/직급 CRUD, 원래 JoaSOP 전용이던 것을 공유로 승격)
     └── server/
@@ -49,7 +49,7 @@ joasuite-shared/
         ├── notifications.functions.ts ✅ createListNotifications 등 (appCode 하드코딩 버그 수정됨)
         ├── account.functions.ts      ✅ + getMyProfile/updateMyTimezone/updateMyDefaultTenant 추가
         ├── admin.functions.ts        ✅ tenant_users + parties 계열만 (재무 설정 함수는 의도적으로 제외, 아래 참고)
-        ├── employee-directory.functions.ts ✅ parties/employee_profiles 기본정보 CRUD (HR 기밀 테이블은 절대 다루지 않음)
+        ├── team.functions.ts          ✅ parties/employee_profiles 기본정보 CRUD (HR 기밀 테이블은 절대 다루지 않음)
         └── org-structure.functions.ts      ✅ departments/positions CRUD
 ```
 

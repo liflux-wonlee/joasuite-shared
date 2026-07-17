@@ -3,16 +3,17 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Plus, Users, Search } from "lucide-react";
 import { useJoaSuite } from "../../context";
-import { EmployeeProfileForm } from "./EmployeeProfileForm";
+import { TeamMemberForm } from "./TeamMemberForm";
 
-export function EmployeeDirectoryListPage({
-  tenantId,
-  workerType,
-}: {
+export type TeamListPageProps = {
   tenantId: string;
   /** Restrict this view to one worker type. Omit to show the combined directory. */
   workerType?: "employee" | "contractor";
-}) {
+  /** Called after any create/edit save, in addition to closing the dialog — e.g. so a host app can trigger its own app-specific follow-up (JoaSOP re-runs Requirements Matrix auto-assignment when the saved entry is linked to a tenant login). */
+  onEntrySaved?: (result: { party_id: string; created: boolean }) => void;
+};
+
+export function TeamListPage({ tenantId, workerType, onEntrySaved }: TeamListPageProps) {
   const { t } = useTranslation();
   const { ui, fns } = useJoaSuite();
   const {
@@ -31,31 +32,31 @@ export function EmployeeDirectoryListPage({
   const [addOpen, setAddOpen] = useState(false);
 
   const listQ = useQuery({
-    queryKey: ["directory-list", tenantId, search, workerType],
+    queryKey: ["team-list", tenantId, search, workerType],
     enabled: !!tenantId,
     queryFn: () =>
-      fns.listEmployeeDirectory({ tenant_id: tenantId, search: search || undefined, worker_type: workerType }),
+      fns.listTeamMembers({ tenant_id: tenantId, search: search || undefined, worker_type: workerType }),
   });
   const rows = listQ.data?.rows ?? [];
 
   const title =
     workerType === "employee"
-      ? t("directory.title_employee", "Employees")
+      ? t("team.title_employee", "Employees")
       : workerType === "contractor"
-        ? t("directory.title_contractor", "Contractors")
-        : t("directory.title", "Employee Directory");
+        ? t("team.title_contractor", "Contractors")
+        : t("team.title", "Team");
   const desc =
     workerType === "employee"
-      ? t("directory.desc_employee", "People on payroll, shared across JoaSuite apps.")
+      ? t("team.desc_employee", "People on payroll, shared across JoaSuite apps.")
       : workerType === "contractor"
-        ? t("directory.desc_contractor", "External contractors and vendors, shared across JoaSuite apps.")
-        : t("directory.desc", "Basic employee and contractor info shared across JoaSuite apps.");
+        ? t("team.desc_contractor", "External contractors and vendors, shared across JoaSuite apps.")
+        : t("team.desc", "Basic employee and contractor info shared across JoaSuite apps.");
   const addLabel =
     workerType === "employee"
-      ? t("directory.add_employee", "Add employee")
+      ? t("team.add_employee", "Add employee")
       : workerType === "contractor"
-        ? t("directory.add_contractor", "Add contractor")
-        : t("directory.add", "Add person");
+        ? t("team.add_contractor", "Add contractor")
+        : t("team.add", "Add person");
 
   return (
     <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-4">
@@ -76,7 +77,7 @@ export function EmployeeDirectoryListPage({
       <div className="relative max-w-sm">
         <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
-          placeholder={t("directory.search_placeholder", "Search name or email")}
+          placeholder={t("team.search_placeholder", "Search name or email")}
           value={search}
           onChange={(e: any) => setSearch(e.target.value)}
           className="pl-8"
@@ -87,20 +88,20 @@ export function EmployeeDirectoryListPage({
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-left">
             <tr>
-              <th className="px-3 py-2 min-w-[220px]">{t("directory.col_name", "Name")}</th>
-              <th className="px-3 py-2 min-w-[140px]">{t("directory.department", "Department")}</th>
-              <th className="px-3 py-2 min-w-[140px]">{t("directory.position", "Position")}</th>
+              <th className="px-3 py-2 min-w-[220px]">{t("team.col_name", "Name")}</th>
+              <th className="px-3 py-2 min-w-[140px]">{t("team.department", "Department")}</th>
+              <th className="px-3 py-2 min-w-[140px]">{t("team.position", "Position")}</th>
               {!workerType && (
-                <th className="px-3 py-2 min-w-[110px]">{t("directory.worker_type", "Worker type")}</th>
+                <th className="px-3 py-2 min-w-[110px]">{t("team.worker_type", "Worker type")}</th>
               )}
-              <th className="px-3 py-2 min-w-[100px]">{t("directory.employment_status", "Status")}</th>
+              <th className="px-3 py-2 min-w-[100px]">{t("team.employment_status", "Status")}</th>
             </tr>
           </thead>
           <tbody>
             {!listQ.isLoading && rows.length === 0 && (
               <tr>
                 <td colSpan={workerType ? 4 : 5} className="px-3 py-6 text-center text-muted-foreground">
-                  {t("directory.empty", "No directory entries yet.")}
+                  {t("team.empty", "No team members yet.")}
                 </td>
               </tr>
             )}
@@ -119,13 +120,13 @@ export function EmployeeDirectoryListPage({
                 {!workerType && (
                   <td className="px-3 py-2">
                     <Badge variant="outline" className="capitalize text-[10px]">
-                      {t(`directory.worker_type_${r.worker_type ?? "employee"}`, r.worker_type ?? "employee")}
+                      {t(`team.worker_type_${r.worker_type ?? "employee"}`, r.worker_type ?? "employee")}
                     </Badge>
                   </td>
                 )}
                 <td className="px-3 py-2">
                   {r.employment_status
-                    ? t(`directory.status_${r.employment_status}`, String(r.employment_status))
+                    ? t(`team.status_${r.employment_status}`, String(r.employment_status))
                     : "—"}
                 </td>
               </tr>
@@ -139,10 +140,13 @@ export function EmployeeDirectoryListPage({
           <DialogHeader>
             <DialogTitle>{addLabel}</DialogTitle>
           </DialogHeader>
-          <EmployeeProfileForm
+          <TeamMemberForm
             tenantId={tenantId}
             defaultWorkerType={workerType}
-            onSaved={() => setAddOpen(false)}
+            onSaved={(res) => {
+              setAddOpen(false);
+              onEntrySaved?.(res);
+            }}
           />
         </DialogContent>
       </Dialog>
@@ -150,13 +154,16 @@ export function EmployeeDirectoryListPage({
       <Dialog open={!!editingPartyId} onOpenChange={(open: boolean) => !open && setEditingPartyId(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{t("directory.edit", "Edit directory entry")}</DialogTitle>
+            <DialogTitle>{t("team.edit", "Edit team member")}</DialogTitle>
           </DialogHeader>
           {editingPartyId && (
-            <EmployeeProfileForm
+            <TeamMemberForm
               tenantId={tenantId}
               partyId={editingPartyId}
-              onSaved={() => setEditingPartyId(null)}
+              onSaved={(res) => {
+                setEditingPartyId(null);
+                onEntrySaved?.(res);
+              }}
             />
           )}
         </DialogContent>

@@ -57,11 +57,11 @@ export {
 } from "./account.functions";
 
 export {
-  createListEmployeeDirectory,
-  createGetEmployeeDirectoryEntry,
-  createUpsertEmployeeDirectoryEntry,
-  type EmployeeDirectoryDeps,
-} from "./employee-directory.functions";
+  createListTeamMembers,
+  createGetTeamMember,
+  createUpsertTeamMember,
+  type TeamDeps,
+} from "./team.functions";
 
 export {
   createListDepartmentsAndPositions,

@@ -116,13 +116,13 @@ export type BoundServerFns = {
   accountResendInvitation: (input: { user_id: string }) => Promise<any>;
   accountSendPasswordReset: (input: { user_id: string }) => Promise<any>;
   accountUpdateUserProfile: (input: any) => Promise<any>;
-  listEmployeeDirectory: (input: {
+  listTeamMembers: (input: {
     tenant_id: string;
     search?: string;
     worker_type?: "employee" | "contractor";
   }) => Promise<{ rows: any[] }>;
-  getEmployeeDirectoryEntry: (input: { tenant_id: string; party_id: string }) => Promise<any>;
-  upsertEmployeeDirectoryEntry: (input: any) => Promise<{ party_id: string; created: boolean }>;
+  getTeamMember: (input: { tenant_id: string; party_id: string }) => Promise<any>;
+  upsertTeamMember: (input: any) => Promise<{ party_id: string; created: boolean }>;
   listDepartmentsAndPositions: (input: {
     tenant_id: string;
   }) => Promise<{ departments: any[]; positions: any[] }>;

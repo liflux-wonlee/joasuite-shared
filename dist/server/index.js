@@ -800,7 +800,7 @@ async function loadDeptPosNames(supabaseAdmin, tenantId, deptIds, posIds) {
     posName: new Map((positions ?? []).map((p) => [p.id, p.name]))
   };
 }
-function createListEmployeeDirectory(deps) {
+function createListTeamMembers(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({
       tenant_id: z.string().uuid(),
@@ -808,7 +808,7 @@ function createListEmployeeDirectory(deps) {
       worker_type: z.enum(WORKER_TYPES).optional()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await deps.assertCanReadEmployeeDirectory(data.tenant_id, context.userId);
+    await deps.assertCanReadTeam(data.tenant_id, context.userId);
     let pq = deps.supabaseAdmin.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active").eq("tenant_id", data.tenant_id).eq("is_employee", true).order("name_en");
     if (data.search?.trim()) {
       const s = data.search.trim();
@@ -855,14 +855,14 @@ function createListEmployeeDirectory(deps) {
     return { rows };
   });
 }
-function createGetEmployeeDirectoryEntry(deps) {
+function createGetTeamMember(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({ tenant_id: z.string().uuid(), party_id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
-    await deps.assertCanReadEmployeeDirectory(data.tenant_id, context.userId);
+    await deps.assertCanReadTeam(data.tenant_id, context.userId);
     const { data: party, error: pErr } = await deps.supabaseAdmin.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active, is_employee").eq("tenant_id", data.tenant_id).eq("id", data.party_id).maybeSingle();
     if (pErr) throw new Error(pErr.message);
-    if (!party || !party.is_employee) throw new Error("Employee not found");
+    if (!party || !party.is_employee) throw new Error("Team member not found");
     const { data: profile, error: prErr } = await deps.supabaseAdmin.from("employee_profiles").select(
       "party_id, department_id, position_id, manager_id, employment_status, hire_date, termination_date, worker_type"
     ).eq("tenant_id", data.tenant_id).eq("party_id", data.party_id).maybeSingle();
@@ -892,7 +892,7 @@ function createGetEmployeeDirectoryEntry(deps) {
     };
   });
 }
-function createUpsertEmployeeDirectoryEntry(deps) {
+function createUpsertTeamMember(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({
       tenant_id: z.string().uuid(),
@@ -911,7 +911,7 @@ function createUpsertEmployeeDirectoryEntry(deps) {
     }).parse(i)
   ).handler(async ({ data, context }) => {
     const callerId = context.userId;
-    await deps.assertCanWriteEmployeeDirectory(data.tenant_id, callerId);
+    await deps.assertCanWriteTeam(data.tenant_id, callerId);
     let partyId;
     let created = false;
     if (data.party_id) {
@@ -948,7 +948,7 @@ function createUpsertEmployeeDirectoryEntry(deps) {
         created = true;
       }
     } else {
-      if (!data.name_en) throw new Error("name_en is required to create a new directory entry");
+      if (!data.name_en) throw new Error("name_en is required to create a new team member");
       const { data: newParty, error: insErr } = await deps.supabaseAdmin.from("parties").insert({
         tenant_id: data.tenant_id,
         name_en: data.name_en,
@@ -2773,6 +2773,6 @@ function createListActiveBundleRules(deps) {
   });
 }
 
-export { APP_CODES as BILLING_APP_CODES, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createCreateDepartment, createCreatePosition, createDeleteDepartment, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDeletePosition, createGetBillingInvoice, createGetBillingOverview, createGetEmployeeDirectoryEntry, createGetMyProfile, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListDepartmentsAndPositions, createListEmployeeDirectory, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createSetUserAppRoles, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateDepartment, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdatePosition, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertEmployeeDirectoryEntry, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, resolveScopedTenantIds };
+export { APP_CODES as BILLING_APP_CODES, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createCreateDepartment, createCreatePosition, createDeleteDepartment, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDeletePosition, createGetBillingInvoice, createGetBillingOverview, createGetMyProfile, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTeamMember, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListDepartmentsAndPositions, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTeamMembers, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createSetUserAppRoles, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateDepartment, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdatePosition, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, createUpsertTeamMember, resolveScopedTenantIds };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

@@ -205,7 +205,9 @@
     },
     "tile": {
       "users": "Users",
-      "users_desc": "Invite users across all organizations and assign per-app roles."
+      "users_desc": "Invite users across all organizations and assign per-app roles.",
+      "team": "Team",
+      "team_desc": "Team will provide shared access to basic employee and contractor info across JoaSuite apps."
     },
     "gate": {
       "no_org_title": "Create your organization",
@@ -285,15 +287,15 @@
     "send_invite": "Send invitation",
     "added_to_org": "Added to organization"
   },
-  "directory": {
-    "title": "Employee Directory",
+  "team": {
+    "title": "Team",
     "desc": "Basic employee and contractor info shared across JoaSuite apps.",
     "add": "Add person",
-    "edit": "Edit directory entry",
+    "edit": "Edit team member",
     "search_placeholder": "Search name or email",
     "col_name": "Name",
-    "empty": "No directory entries yet.",
-    "saved": "Directory entry saved",
+    "empty": "No team members yet.",
+    "saved": "Team member saved",
     "name": "Name",
     "contact_email": "Email",
     "contact_phone": "Phone",
@@ -309,7 +311,7 @@
     "status_terminated": "Terminated",
     "hire_date": "Hire date",
     "org_structure_title": "Departments & Positions",
-    "org_structure_desc": "Shared across JoaSuite apps. Used by the Employee Directory and requirements matching.",
+    "org_structure_desc": "Shared across JoaSuite apps. Used by Team and requirements matching.",
     "new_department": "New department",
     "edit_department": "Edit department",
     "department_name": "Name",
