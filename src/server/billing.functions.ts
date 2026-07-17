@@ -105,7 +105,7 @@ export function createGetBillingOverview(deps: BillingDeps) {
         deps.supabaseAdmin.from("billing_customers").select("*").eq("tenant_id", data.tenant_id).maybeSingle(),
         deps.supabaseAdmin.from("billing_subscriptions").select("*").eq("tenant_id", data.tenant_id),
         deps.supabaseAdmin.from("billing_payment_methods").select("*").eq("tenant_id", data.tenant_id).order("is_default", { ascending: false }),
-        deps.supabaseAdmin.from("tenant_apps").select("app_code, plan, status").eq("tenant_id", data.tenant_id),
+        deps.supabaseAdmin.from("tenant_apps").select("app_code, plan, status").eq("tenant_id", data.tenant_id).eq("status", "active"),
         deps.supabaseAdmin.from("tenants").select("id, name").eq("id", data.tenant_id).single(),
       ]);
 
