@@ -811,7 +811,7 @@ function createListTeamMembers(deps) {
     await deps.assertCanReadTeam(data.tenant_id, context.userId);
     let pq = deps.supabaseAdmin.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active").eq("tenant_id", data.tenant_id).eq("is_employee", true).order("name_en");
     if (data.search?.trim()) {
-      const s = data.search.trim();
+      const s = data.search.trim().replace(/[%,()]/g, "");
       pq = pq.or(`name_en.ilike.%${s}%,contact_email.ilike.%${s}%`);
     }
     const { data: parties, error: pErr } = await pq;
@@ -1287,9 +1287,15 @@ async function assertCanEditVendor(supabaseAdmin, appCode, tenantId, userId) {
   if (!ok) throw new Error("Forbidden: vendor edit role required");
 }
 async function assertTenantMember(supabaseAdmin, tenantId, userId) {
-  const { data, error } = await supabaseAdmin.from("tenant_users").select("id").eq("tenant_id", tenantId).eq("user_id", userId).eq("status", "active").maybeSingle();
+  const { data, error } = await supabaseAdmin.from("tenant_users").select("id, portal").eq("tenant_id", tenantId).eq("user_id", userId).eq("status", "active").maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Not a tenant member");
+  return data;
+}
+async function assertInternalTenantMember(supabaseAdmin, tenantId, userId) {
+  const member = await assertTenantMember(supabaseAdmin, tenantId, userId);
+  if (member.portal !== "internal") throw new Error("Forbidden: internal staff only");
+  return member;
 }
 async function findOrInviteUser(deps, email, displayName) {
   const { data: existing, error: lookupErr } = await deps.supabaseAdmin.auth.admin.listUsers({
@@ -1337,12 +1343,19 @@ async function sendInviteEmail(deps, opts) {
     </div>`;
   return deps.sendEmail({ to: opts.email, subject, html });
 }
+var VENDOR_SAFE_SETTINGS_KEYS = ["foreign_currency_enabled", "primary_currency_code"];
 function createGetTenantSettings(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => z.object({ tenant_id: z.string().uuid() }).parse(i)).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    const member = await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
     const { data: t, error } = await deps.supabaseAdmin.from("tenants").select("id, name, slug, status, settings").eq("id", data.tenant_id).single();
     if (error) throw new Error(error.message);
-    return t;
+    const settings = t.settings ?? {};
+    if (member.portal === "internal") return { ...t, settings };
+    const filteredSettings = {};
+    for (const k of VENDOR_SAFE_SETTINGS_KEYS) {
+      if (k in settings) filteredSettings[k] = settings[k];
+    }
+    return { ...t, settings: filteredSettings };
   });
 }
 function createUpdateTenantSettings(deps) {
@@ -1364,7 +1377,7 @@ function createUpdateTenantSettings(deps) {
 }
 function createListTenantUsers(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => z.object({ tenant_id: z.string().uuid() }).parse(i)).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
     const { data: members, error } = await deps.supabaseAdmin.from("tenant_users").select("id, user_id, portal, status, display_name, email, position, invited_at, joined_at").eq("tenant_id", data.tenant_id).order("created_at");
     if (error) throw new Error(error.message);
     const { data: roles } = await deps.supabaseAdmin.from("user_roles").select("user_id, role").eq("tenant_id", data.tenant_id);
@@ -1381,7 +1394,7 @@ function createGetTenantUser(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({ tenant_id: z.string().uuid(), user_id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
     const { data: m, error } = await deps.supabaseAdmin.from("tenant_users").select("id, user_id, portal, status, display_name, email, position, invited_at, joined_at").eq("tenant_id", data.tenant_id).eq("user_id", data.user_id).single();
     if (error) throw new Error(error.message);
     const { data: roles } = await deps.supabaseAdmin.from("user_roles").select("role").eq("tenant_id", data.tenant_id).eq("user_id", data.user_id);
@@ -1614,7 +1627,7 @@ function createListParties(deps) {
       kind: z.enum(["all", "vendor", "customer"]).default("all")
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
     let q = deps.supabaseAdmin.from("parties").select("*").eq("tenant_id", data.tenant_id).order("name_en");
     if (data.kind === "vendor") q = q.eq("is_vendor", true);
     if (data.kind === "customer") q = q.eq("is_customer", true);
@@ -1700,7 +1713,7 @@ function createDeleteParty(deps) {
       party_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { error } = await deps.supabaseAdmin.from("parties").delete().eq("id", data.party_id).eq("tenant_id", data.tenant_id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -1713,7 +1726,7 @@ function createGetParty(deps) {
       party_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
     const { data: row, error } = await deps.supabaseAdmin.from("parties").select("*").eq("tenant_id", data.tenant_id).eq("id", data.party_id).single();
     if (error) throw new Error(error.message);
     const [{ data: banks }, { data: contacts }] = await Promise.all([
@@ -1738,7 +1751,7 @@ function createListPartyContacts(deps) {
       party_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
     const { data: rows, error } = await deps.supabaseAdmin.from("party_contacts").select("*").eq("tenant_id", data.tenant_id).eq("party_id", data.party_id).order("is_primary", { ascending: false }).order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
     return rows ?? [];
@@ -1972,7 +1985,7 @@ function createArchiveParty(deps) {
       reason: z.string().trim().max(500).optional()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { error } = await deps.supabaseAdmin.from("parties").update({
       archived_at: (/* @__PURE__ */ new Date()).toISOString(),
       archived_by: context.userId,
@@ -1989,7 +2002,7 @@ function createUnarchiveParty(deps) {
       party_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { error } = await deps.supabaseAdmin.from("parties").update({
       archived_at: null,
       archived_by: null,
