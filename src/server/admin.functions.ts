@@ -103,13 +103,26 @@ async function assertCanEditVendor(supabaseAdmin: any, appCode: string, tenantId
 async function assertTenantMember(supabaseAdmin: any, tenantId: string, userId: string) {
   const { data, error } = await supabaseAdmin
     .from("tenant_users")
-    .select("id")
+    .select("id, portal")
     .eq("tenant_id", tenantId)
     .eq("user_id", userId)
     .eq("status", "active")
     .maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Not a tenant member");
+  return data as { id: string; portal: string };
+}
+
+/**
+ * Internal-staff-only admin data (tenant settings, full user roster with
+ * roles, party/vendor CRUD including bank account details) must never be
+ * reachable by vendor/customer/approver portal accounts, even though they
+ * hold an active tenant_users row.
+ */
+async function assertInternalTenantMember(supabaseAdmin: any, tenantId: string, userId: string) {
+  const member = await assertTenantMember(supabaseAdmin, tenantId, userId);
+  if (member.portal !== "internal") throw new Error("Forbidden: internal staff only");
+  return member;
 }
 
 async function findOrInviteUser(deps: AdminDeps, email: string, displayName?: string) {
@@ -179,19 +192,33 @@ async function sendInviteEmail(
 }
 
 // ---------- Tenant settings ----------
+// Non-internal portal members (vendor/customer/approver) legitimately need a
+// narrow slice of this (foreign_currency_enabled/primary_currency_code, read
+// by the payment-request form to size its currency picker) — but not the
+// full settings blob, which internal admins can put arbitrary config into.
+const VENDOR_SAFE_SETTINGS_KEYS = ["foreign_currency_enabled", "primary_currency_code"] as const;
+
 export function createGetTenantSettings(deps: AdminDeps) {
   return createServerFn({ method: "POST" })
     .middleware([deps.requireSupabaseAuth])
     .inputValidator((i) => z.object({ tenant_id: z.string().uuid() }).parse(i))
     .handler(async ({ data, context }) => {
-      await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+      const member = await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
       const { data: t, error } = await deps.supabaseAdmin
         .from("tenants")
         .select("id, name, slug, status, settings")
         .eq("id", data.tenant_id)
         .single();
       if (error) throw new Error(error.message);
-      return t;
+
+      const settings = (t.settings ?? {}) as Record<string, any>;
+      if (member.portal === "internal") return { ...t, settings };
+
+      const filteredSettings: Record<string, any> = {};
+      for (const k of VENDOR_SAFE_SETTINGS_KEYS) {
+        if (k in settings) filteredSettings[k] = settings[k];
+      }
+      return { ...t, settings: filteredSettings };
     });
 }
 
@@ -227,7 +254,7 @@ export function createListTenantUsers(deps: AdminDeps) {
     .middleware([deps.requireSupabaseAuth])
     .inputValidator((i) => z.object({ tenant_id: z.string().uuid() }).parse(i))
     .handler(async ({ data, context }) => {
-      await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
       const { data: members, error } = await deps.supabaseAdmin
         .from("tenant_users")
         .select("id, user_id, portal, status, display_name, email, position, invited_at, joined_at")
@@ -255,7 +282,7 @@ export function createGetTenantUser(deps: AdminDeps) {
       z.object({ tenant_id: z.string().uuid(), user_id: z.string().uuid() }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
       const { data: m, error } = await deps.supabaseAdmin
         .from("tenant_users")
         .select("id, user_id, portal, status, display_name, email, position, invited_at, joined_at")
@@ -622,7 +649,7 @@ export function createListParties(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
       let q = deps.supabaseAdmin
         .from("parties")
         .select("*")
@@ -725,7 +752,7 @@ export function createDeleteParty(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const { error } = await deps.supabaseAdmin
         .from("parties")
         .delete()
@@ -746,7 +773,7 @@ export function createGetParty(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
       const { data: row, error } = await deps.supabaseAdmin
         .from("parties")
         .select("*")
@@ -791,7 +818,7 @@ export function createListPartyContacts(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
       const { data: rows, error } = await deps.supabaseAdmin
         .from("party_contacts")
         .select("*")
@@ -1178,7 +1205,7 @@ export function createArchiveParty(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const { error } = await deps.supabaseAdmin
         .from("parties")
         .update({
@@ -1203,7 +1230,7 @@ export function createUnarchiveParty(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const { error } = await deps.supabaseAdmin
         .from("parties")
         .update({

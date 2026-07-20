@@ -310,6 +310,16 @@
     "desc_contractor": "外部承包商和供应商列表，跨所有 JoaSuite 应用共享。",
     "add_employee": "添加员工",
     "add_contractor": "添加承包商",
+    "tab_employee": "正式员工 (W2)",
+    "tab_contractor": "承包商 (1099)",
+    "parent_department": "上级部门",
+    "top_level": "无(顶级部门)",
+    "new_sub_department": "子部门",
+    "department_depth_hint": "部门最多可嵌套 4 级。",
+    "view_manage": "管理",
+    "view_chart": "组织架构图",
+    "org_chart_empty": "还没有部门 — 添加一个部门即可查看组织架构图。",
+    "org_chart_vacant": "空缺",
     "team_group": "团队"
   }
 }

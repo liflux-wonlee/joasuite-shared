@@ -71,7 +71,12 @@ export {
   createCreatePosition,
   createUpdatePosition,
   createDeletePosition,
+  createGetOrgChartTree,
+  MAX_DEPARTMENT_DEPTH,
   type OrgStructureDeps,
+  type OrgChartDepartment,
+  type OrgChartPosition,
+  type OrgChartPerson,
 } from "./org-structure.functions";
 
 export {

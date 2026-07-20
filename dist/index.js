@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
-import { Moon, Sun, Globe, User, Shield, Briefcase, CreditCard, LogOut, Bell, Check, Layers, Home, ChevronDown, UserCog, FileText, Users, ClipboardCheck, BookOpen, Lock, Settings2, ScrollText, Building2, LayoutGrid, AlertCircle, Inbox, Send, ArrowRight, Contact2, Link, Mail, EyeOff, Eye, Plus, Search, MoreHorizontal, KeyRound, ArrowLeft, Pencil, Trash2, AppWindow, CalendarClock, Zap, AlertTriangle, Sparkles, Clock, RefreshCw, XCircle, GitCompare, ShieldAlert, Package, Gift, Receipt, ExternalLink, Landmark, Star, Download, RefreshCcw, Ticket, Tag, DollarSign, Copy, ArrowUpRight, Activity, Info, ArrowUp, ArrowDown } from 'lucide-react';
+import { Moon, Sun, Globe, User, Shield, Briefcase, CreditCard, LogOut, Bell, Check, Layers, Home, ChevronDown, UserCog, FileText, Users, ClipboardCheck, BookOpen, Lock, Settings2, ScrollText, Building2, LayoutGrid, AlertCircle, Inbox, Send, ArrowRight, Contact2, Link, Mail, EyeOff, Eye, Plus, Search, MoreHorizontal, KeyRound, ArrowLeft, Pencil, Trash2, AppWindow, ListTree, Network, CalendarClock, Zap, AlertTriangle, Sparkles, Clock, RefreshCw, XCircle, GitCompare, ShieldAlert, Package, Gift, Receipt, ExternalLink, Landmark, Star, Download, RefreshCcw, Ticket, Tag, DollarSign, Copy, ArrowUpRight, Activity, Info, ArrowUp, ArrowDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -392,6 +392,16 @@ var en_default = {
     desc_contractor: "External contractors and vendors, shared across JoaSuite apps.",
     add_employee: "Add employee",
     add_contractor: "Add contractor",
+    tab_employee: "Employee (W2)",
+    tab_contractor: "Contractor (1099)",
+    parent_department: "Parent department",
+    top_level: "None (top-level)",
+    new_sub_department: "Sub-department",
+    department_depth_hint: "Departments can nest up to 4 levels deep.",
+    view_manage: "Manage",
+    view_chart: "Org chart",
+    org_chart_empty: "No departments yet \u2014 add one to see the org chart.",
+    org_chart_vacant: "Vacant",
     team_group: "Team"
   }
 };
@@ -724,6 +734,16 @@ var ko_default = {
     desc_contractor: "\uC678\uBD80 \uD611\uB825\uC5C5\uCCB4 \uBC0F \uBCA4\uB354 \uBAA9\uB85D \u2014 \uBAA8\uB4E0 JoaSuite \uC571\uC5D0\uC11C \uACF5\uC720\uB429\uB2C8\uB2E4.",
     add_employee: "\uC9C1\uC6D0 \uCD94\uAC00",
     add_contractor: "\uD611\uB825\uC5C5\uCCB4 \uCD94\uAC00",
+    tab_employee: "\uC815\uADDC\uC9C1 (W2)",
+    tab_contractor: "\uACC4\uC57D\uC9C1 (1099)",
+    parent_department: "\uC0C1\uC704 \uBD80\uC11C",
+    top_level: "\uC5C6\uC74C (\uCD5C\uC0C1\uC704)",
+    new_sub_department: "\uD558\uC704 \uBD80\uC11C",
+    department_depth_hint: "\uBD80\uC11C\uB294 \uCD5C\uB300 4\uB2E8\uACC4\uAE4C\uC9C0 \uC911\uCCA9\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+    view_manage: "\uAD00\uB9AC",
+    view_chart: "\uC870\uC9C1\uB3C4",
+    org_chart_empty: "\uC544\uC9C1 \uBD80\uC11C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uBD80\uC11C\uB97C \uCD94\uAC00\uD558\uBA74 \uC870\uC9C1\uB3C4\uAC00 \uD45C\uC2DC\uB429\uB2C8\uB2E4.",
+    org_chart_vacant: "\uACF5\uC11D",
     team_group: "\uD300"
   }
 };
@@ -1041,6 +1061,16 @@ var zh_default = {
     desc_contractor: "\u5916\u90E8\u627F\u5305\u5546\u548C\u4F9B\u5E94\u5546\u5217\u8868\uFF0C\u8DE8\u6240\u6709 JoaSuite \u5E94\u7528\u5171\u4EAB\u3002",
     add_employee: "\u6DFB\u52A0\u5458\u5DE5",
     add_contractor: "\u6DFB\u52A0\u627F\u5305\u5546",
+    tab_employee: "\u6B63\u5F0F\u5458\u5DE5 (W2)",
+    tab_contractor: "\u627F\u5305\u5546 (1099)",
+    parent_department: "\u4E0A\u7EA7\u90E8\u95E8",
+    top_level: "\u65E0(\u9876\u7EA7\u90E8\u95E8)",
+    new_sub_department: "\u5B50\u90E8\u95E8",
+    department_depth_hint: "\u90E8\u95E8\u6700\u591A\u53EF\u5D4C\u5957 4 \u7EA7\u3002",
+    view_manage: "\u7BA1\u7406",
+    view_chart: "\u7EC4\u7EC7\u67B6\u6784\u56FE",
+    org_chart_empty: "\u8FD8\u6CA1\u6709\u90E8\u95E8 \u2014 \u6DFB\u52A0\u4E00\u4E2A\u90E8\u95E8\u5373\u53EF\u67E5\u770B\u7EC4\u7EC7\u67B6\u6784\u56FE\u3002",
+    org_chart_vacant: "\u7A7A\u7F3A",
     team_group: "\u56E2\u961F"
   }
 };
@@ -1361,6 +1391,16 @@ var es_default = {
     desc_contractor: "Contratistas y proveedores externos, compartidos entre las apps de JoaSuite.",
     add_employee: "Agregar empleado",
     add_contractor: "Agregar contratista",
+    tab_employee: "Empleado (W2)",
+    tab_contractor: "Contratista (1099)",
+    parent_department: "Departamento superior",
+    top_level: "Ninguno (nivel superior)",
+    new_sub_department: "Subdepartamento",
+    department_depth_hint: "Los departamentos pueden anidarse hasta 4 niveles.",
+    view_manage: "Administrar",
+    view_chart: "Organigrama",
+    org_chart_empty: "A\xFAn no hay departamentos: agrega uno para ver el organigrama.",
+    org_chart_vacant: "Vacante",
     team_group: "Equipo"
   }
 };
@@ -1681,6 +1721,16 @@ var vi_default = {
     desc_contractor: "Nh\xE0 th\u1EA7u v\xE0 nh\xE0 cung c\u1EA5p b\xEAn ngo\xE0i, d\xF9ng chung cho m\u1ECDi \u1EE9ng d\u1EE5ng JoaSuite.",
     add_employee: "Th\xEAm nh\xE2n vi\xEAn",
     add_contractor: "Th\xEAm nh\xE0 th\u1EA7u",
+    tab_employee: "Nh\xE2n vi\xEAn (W2)",
+    tab_contractor: "Nh\xE0 th\u1EA7u (1099)",
+    parent_department: "Ph\xF2ng ban c\u1EA5p tr\xEAn",
+    top_level: "Kh\xF4ng c\xF3 (c\u1EA5p cao nh\u1EA5t)",
+    new_sub_department: "Ph\xF2ng ban con",
+    department_depth_hint: "Ph\xF2ng ban c\xF3 th\u1EC3 l\u1ED3ng t\u1ED1i \u0111a 4 c\u1EA5p.",
+    view_manage: "Qu\u1EA3n l\xFD",
+    view_chart: "S\u01A1 \u0111\u1ED3 t\u1ED5 ch\u1EE9c",
+    org_chart_empty: "Ch\u01B0a c\xF3 ph\xF2ng ban n\xE0o \u2014 h\xE3y th\xEAm m\u1ED9t ph\xF2ng ban \u0111\u1EC3 xem s\u01A1 \u0111\u1ED3 t\u1ED5 ch\u1EE9c.",
+    org_chart_vacant: "C\xF2n tr\u1ED1ng",
     team_group: "Nh\xF3m"
   }
 };
@@ -4039,31 +4089,35 @@ function TeamMemberForm({
     !readOnly && /* @__PURE__ */ jsx("div", { className: "flex justify-end", children: /* @__PURE__ */ jsx(Button, { onClick: () => save.mutate(), disabled: save.isPending || isNew && !nameEn.trim(), children: save.isPending ? t("set.sending", "Sending\u2026") : t("common.save") }) })
   ] });
 }
-function TeamListPage({ tenantId, workerType, onEntrySaved }) {
+function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySaved }) {
   const { t } = useTranslation();
   const { ui, fns } = useJoaSuite();
   const {
     Button,
     Input,
-    Badge,
     Dialog,
     DialogContent,
     DialogFooter,
     DialogHeader,
-    DialogTitle
+    DialogTitle,
+    Tabs,
+    TabsList,
+    TabsTrigger
   } = ui;
   const [search, setSearch] = useState("");
   const [editingPartyId, setEditingPartyId] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("employee");
+  const workerType = fixedWorkerType ?? activeTab;
   const listQ = useQuery({
     queryKey: ["team-list", tenantId, search, workerType],
     enabled: !!tenantId,
     queryFn: () => fns.listTeamMembers({ tenant_id: tenantId, search: search || void 0, worker_type: workerType })
   });
   const rows = listQ.data?.rows ?? [];
-  const title = workerType === "employee" ? t("team.title_employee", "Employees") : workerType === "contractor" ? t("team.title_contractor", "Contractors") : t("team.title", "Team");
-  const desc = workerType === "employee" ? t("team.desc_employee", "People on payroll, shared across JoaSuite apps.") : workerType === "contractor" ? t("team.desc_contractor", "External contractors and vendors, shared across JoaSuite apps.") : t("team.desc", "Basic employee and contractor info shared across JoaSuite apps.");
-  const addLabel = workerType === "employee" ? t("team.add_employee", "Add employee") : workerType === "contractor" ? t("team.add_contractor", "Add contractor") : t("team.add", "Add person");
+  const title = fixedWorkerType ? fixedWorkerType === "employee" ? t("team.title_employee", "Employees") : t("team.title_contractor", "Contractors") : t("team.title", "Team");
+  const desc = t("team.desc", "Basic employee and contractor info shared across JoaSuite apps.");
+  const addLabel = workerType === "employee" ? t("team.add_employee", "Add employee") : t("team.add_contractor", "Add contractor");
   return /* @__PURE__ */ jsxs("div", { className: "p-6 lg:p-8 max-w-5xl mx-auto space-y-4", children: [
     /* @__PURE__ */ jsxs("div", { className: "flex items-start justify-between gap-3 flex-wrap", children: [
       /* @__PURE__ */ jsxs("div", { children: [
@@ -4078,6 +4132,10 @@ function TeamListPage({ tenantId, workerType, onEntrySaved }) {
         addLabel
       ] })
     ] }),
+    !fixedWorkerType && /* @__PURE__ */ jsx(Tabs, { value: activeTab, onValueChange: (v) => setActiveTab(v), children: /* @__PURE__ */ jsxs(TabsList, { children: [
+      /* @__PURE__ */ jsx(TabsTrigger, { value: "employee", children: t("team.tab_employee", "Employee (W2)") }),
+      /* @__PURE__ */ jsx(TabsTrigger, { value: "contractor", children: t("team.tab_contractor", "Contractor (1099)") })
+    ] }) }),
     /* @__PURE__ */ jsxs("div", { className: "relative max-w-sm", children: [
       /* @__PURE__ */ jsx(Search, { className: "absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" }),
       /* @__PURE__ */ jsx(
@@ -4095,11 +4153,10 @@ function TeamListPage({ tenantId, workerType, onEntrySaved }) {
         /* @__PURE__ */ jsx("th", { className: "px-3 py-2 min-w-[220px]", children: t("team.col_name", "Name") }),
         /* @__PURE__ */ jsx("th", { className: "px-3 py-2 min-w-[140px]", children: t("team.department", "Department") }),
         /* @__PURE__ */ jsx("th", { className: "px-3 py-2 min-w-[140px]", children: t("team.position", "Position") }),
-        !workerType && /* @__PURE__ */ jsx("th", { className: "px-3 py-2 min-w-[110px]", children: t("team.worker_type", "Worker type") }),
         /* @__PURE__ */ jsx("th", { className: "px-3 py-2 min-w-[100px]", children: t("team.employment_status", "Status") })
       ] }) }),
       /* @__PURE__ */ jsxs("tbody", { children: [
-        !listQ.isLoading && rows.length === 0 && /* @__PURE__ */ jsx("tr", { children: /* @__PURE__ */ jsx("td", { colSpan: workerType ? 4 : 5, className: "px-3 py-6 text-center text-muted-foreground", children: t("team.empty", "No team members yet.") }) }),
+        !listQ.isLoading && rows.length === 0 && /* @__PURE__ */ jsx("tr", { children: /* @__PURE__ */ jsx("td", { colSpan: 4, className: "px-3 py-6 text-center text-muted-foreground", children: t("team.empty", "No team members yet.") }) }),
         rows.map((r) => /* @__PURE__ */ jsxs(
           "tr",
           {
@@ -4112,7 +4169,6 @@ function TeamListPage({ tenantId, workerType, onEntrySaved }) {
               ] }),
               /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: r.department ?? "\u2014" }),
               /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: r.position ?? "\u2014" }),
-              !workerType && /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: /* @__PURE__ */ jsx(Badge, { variant: "outline", className: "capitalize text-[10px]", children: t(`team.worker_type_${r.worker_type ?? "employee"}`, r.worker_type ?? "employee") }) }),
               /* @__PURE__ */ jsx("td", { className: "px-3 py-2", children: r.employment_status ? t(`team.status_${r.employment_status}`, String(r.employment_status)) : "\u2014" })
             ]
           },
@@ -4150,40 +4206,270 @@ function TeamListPage({ tenantId, workerType, onEntrySaved }) {
     ] }) })
   ] });
 }
+function initials(name) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+function PersonCard({ person, positionName }) {
+  return /* @__PURE__ */ jsxs("div", { className: "org-chart-box org-chart-person", children: [
+    person.avatar_url ? /* @__PURE__ */ jsx("img", { src: person.avatar_url, alt: "", className: "org-chart-avatar org-chart-avatar-img" }) : /* @__PURE__ */ jsx("div", { className: "org-chart-avatar", children: initials(person.name) }),
+    /* @__PURE__ */ jsx("div", { className: "org-chart-person-name", children: person.name }),
+    /* @__PURE__ */ jsx("div", { className: "org-chart-person-position", children: positionName })
+  ] });
+}
+function PositionNode({ position, vacantLabel }) {
+  return /* @__PURE__ */ jsxs("li", { children: [
+    /* @__PURE__ */ jsx("div", { className: "org-chart-box org-chart-position", children: position.name }),
+    /* @__PURE__ */ jsx("ul", { children: position.people.length > 0 ? position.people.map((person) => /* @__PURE__ */ jsx("li", { children: /* @__PURE__ */ jsx(PersonCard, { person, positionName: position.name }) }, person.party_id)) : /* @__PURE__ */ jsx("li", { children: /* @__PURE__ */ jsx("div", { className: "org-chart-box org-chart-vacant", children: vacantLabel }) }) })
+  ] });
+}
+function DepartmentNode({ dept, vacantLabel }) {
+  const hasChildren = dept.children.length > 0 || dept.positions.length > 0;
+  return /* @__PURE__ */ jsxs("li", { children: [
+    /* @__PURE__ */ jsxs("div", { className: "org-chart-box org-chart-dept", children: [
+      /* @__PURE__ */ jsx(Building2, { className: "h-3.5 w-3.5 shrink-0" }),
+      /* @__PURE__ */ jsx("span", { children: dept.name })
+    ] }),
+    hasChildren && /* @__PURE__ */ jsxs("ul", { children: [
+      dept.children.map((c) => /* @__PURE__ */ jsx(DepartmentNode, { dept: c, vacantLabel }, c.id)),
+      dept.positions.map((p) => /* @__PURE__ */ jsx(PositionNode, { position: p, vacantLabel }, p.id))
+    ] })
+  ] });
+}
+var ORG_CHART_CSS = `
+.org-chart-tree {
+  display: inline-flex;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.org-chart-tree li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  padding: 20px 12px 0 12px;
+}
+.org-chart-tree li ul {
+  display: flex;
+  list-style: none;
+  margin: 0;
+  padding: 20px 0 0 0;
+  position: relative;
+}
+.org-chart-tree li::before,
+.org-chart-tree li::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 50%;
+  width: 50%;
+  height: 20px;
+  border-top: 2px solid var(--border, #d4d4d8);
+}
+.org-chart-tree li::after {
+  right: auto;
+  left: 50%;
+  border-left: 2px solid var(--border, #d4d4d8);
+}
+.org-chart-tree li:only-child::after,
+.org-chart-tree li:only-child::before {
+  display: none;
+}
+.org-chart-tree > li:first-child::before,
+.org-chart-tree > li:last-child::after {
+  border: 0 none;
+}
+.org-chart-tree li:last-child::before {
+  border-right: 2px solid var(--border, #d4d4d8);
+  border-radius: 0 6px 0 0;
+}
+.org-chart-tree li:first-child::after {
+  border-radius: 6px 0 0 0;
+}
+.org-chart-tree li ul::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  border-left: 2px solid var(--border, #d4d4d8);
+  width: 0;
+  height: 20px;
+}
+.org-chart-box {
+  border: 1px solid var(--border, #d4d4d8);
+  border-radius: 8px;
+  background: var(--card, #fff);
+  padding: 8px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.org-chart-dept {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  background: var(--muted, #f4f4f5);
+}
+.org-chart-position {
+  font-weight: 500;
+  color: var(--muted-foreground, #71717a);
+}
+.org-chart-vacant {
+  color: var(--muted-foreground, #71717a);
+  font-style: italic;
+  border-style: dashed;
+}
+.org-chart-person {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 96px;
+  white-space: normal;
+  text-align: center;
+}
+.org-chart-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--primary, #18181b);
+  color: var(--primary-foreground, #fff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+.org-chart-avatar-img {
+  object-fit: cover;
+}
+.org-chart-person-name {
+  font-weight: 500;
+}
+.org-chart-person-position {
+  font-size: 11px;
+  color: var(--muted-foreground, #71717a);
+}
+`;
+function OrgChartView({ tenantId, tree, isLoading }) {
+  const { t } = useTranslation();
+  const { fns } = useJoaSuite();
+  const q = useQuery({
+    queryKey: ["org-chart-tree", tenantId],
+    enabled: !!tenantId && !tree,
+    queryFn: () => fns.getOrgChartTree({ tenant_id: tenantId })
+  });
+  const roots = tree ?? q.data?.roots ?? [];
+  const loading = isLoading ?? (!tree && q.isLoading);
+  const vacantLabel = t("team.org_chart_vacant", "Vacant");
+  if (loading) {
+    return /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("common.loading") });
+  }
+  if (roots.length === 0) {
+    return /* @__PURE__ */ jsx("div", { className: "border rounded-lg p-10 text-center text-muted-foreground", children: t("team.org_chart_empty", "No departments yet \u2014 add one to see the org chart.") });
+  }
+  return /* @__PURE__ */ jsxs("div", { className: "overflow-x-auto py-6", children: [
+    /* @__PURE__ */ jsx("style", { children: ORG_CHART_CSS }),
+    /* @__PURE__ */ jsx("ul", { className: "org-chart-tree", children: roots.map((d) => /* @__PURE__ */ jsx(DepartmentNode, { dept: d, vacantLabel }, d.id)) })
+  ] });
+}
+var ANY_PARENT = "__top_level__";
+function buildDeptTree(departments) {
+  const byParent = /* @__PURE__ */ new Map();
+  for (const d of departments) {
+    const key = d.parent_department_id ?? null;
+    const arr = byParent.get(key) ?? [];
+    arr.push(d);
+    byParent.set(key, arr);
+  }
+  const order = [];
+  const walk = (parentId) => {
+    for (const d of byParent.get(parentId) ?? []) {
+      order.push(d);
+      walk(d.id);
+    }
+  };
+  walk(null);
+  return order;
+}
+function eligibleParents(departments, excludeId) {
+  if (!excludeId) return departments;
+  const excluded = /* @__PURE__ */ new Set([excludeId]);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const d of departments) {
+      if (d.parent_department_id && excluded.has(d.parent_department_id) && !excluded.has(d.id)) {
+        excluded.add(d.id);
+        changed = true;
+      }
+    }
+  }
+  return departments.filter((d) => !excluded.has(d.id));
+}
 function OrgStructureSettingsPage({ tenantId }) {
   const { t } = useTranslation();
   const { ui, fns } = useJoaSuite();
-  const { Button, Input, Label, Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } = ui;
+  const {
+    Button,
+    Input,
+    Label,
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+    Tabs,
+    TabsList,
+    TabsTrigger
+  } = ui;
   const qc = useQueryClient();
+  const [view, setView] = useState("manage");
   const orgQ = useQuery({
-    queryKey: ["directory-org", tenantId],
+    queryKey: ["team-org-structure", tenantId],
     enabled: !!tenantId,
     queryFn: () => fns.listDepartmentsAndPositions({ tenant_id: tenantId })
   });
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["directory-org", tenantId] });
-  const [deptDialog, setDeptDialog] = useState({ open: false, name: "", code: "" });
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["team-org-structure", tenantId] });
+  const [deptDialog, setDeptDialog] = useState({
+    open: false,
+    name: "",
+    code: "",
+    parentDepartmentId: ANY_PARENT
+  });
   const [posDialog, setPosDialog] = useState({ open: false, departmentId: "", name: "" });
   const saveDept = useMutation({
     mutationFn: async () => {
+      const parent_department_id = deptDialog.parentDepartmentId === ANY_PARENT ? null : deptDialog.parentDepartmentId;
       if (deptDialog.id) {
         await fns.updateDepartment({
           tenant_id: tenantId,
           id: deptDialog.id,
           name: deptDialog.name,
-          code: deptDialog.code || void 0
+          code: deptDialog.code || void 0,
+          parent_department_id
         });
       } else {
         await fns.createDepartment({
           tenant_id: tenantId,
           name: deptDialog.name,
-          code: deptDialog.code || void 0
+          code: deptDialog.code || void 0,
+          parent_department_id
         });
       }
     },
     onSuccess: () => {
       toast.success(t("set.updated", "Updated"));
       invalidate();
-      setDeptDialog({ open: false, name: "", code: "" });
+      setDeptDialog({ open: false, name: "", code: "", parentDepartmentId: ANY_PARENT });
     },
     onError: (e) => toast.error(e.message)
   });
@@ -4224,150 +4510,231 @@ function OrgStructureSettingsPage({ tenantId }) {
   });
   const departments = orgQ.data?.departments ?? [];
   const positions = orgQ.data?.positions ?? [];
+  const orderedDepartments = buildDeptTree(departments);
+  const canAddSubDepartment = (d) => d.depth < 4;
   return /* @__PURE__ */ jsxs("div", { className: "py-6 space-y-4 max-w-2xl", children: [
-    /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between gap-3", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between gap-3 flex-wrap", children: [
       /* @__PURE__ */ jsxs("h1", { className: "text-2xl font-semibold tracking-tight flex items-center gap-2", children: [
         /* @__PURE__ */ jsx(Building2, { className: "h-5 w-5" }),
-        t("directory.org_structure_title", "Departments & Positions")
+        t("team.org_structure_title", "Departments & Positions")
       ] }),
-      /* @__PURE__ */ jsxs(Button, { size: "sm", onClick: () => setDeptDialog({ open: true, name: "", code: "" }), children: [
-        /* @__PURE__ */ jsx(Plus, { className: "h-4 w-4 mr-1" }),
-        " ",
-        t("directory.new_department", "New department")
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx(Tabs, { value: view, onValueChange: (v) => setView(v), children: /* @__PURE__ */ jsxs(TabsList, { children: [
+          /* @__PURE__ */ jsxs(TabsTrigger, { value: "manage", children: [
+            /* @__PURE__ */ jsx(ListTree, { className: "h-3.5 w-3.5 mr-1" }),
+            " ",
+            t("team.view_manage", "Manage")
+          ] }),
+          /* @__PURE__ */ jsxs(TabsTrigger, { value: "chart", children: [
+            /* @__PURE__ */ jsx(Network, { className: "h-3.5 w-3.5 mr-1" }),
+            " ",
+            t("team.view_chart", "Org chart")
+          ] })
+        ] }) }),
+        view === "manage" && /* @__PURE__ */ jsxs(
+          Button,
+          {
+            size: "sm",
+            onClick: () => setDeptDialog({ open: true, name: "", code: "", parentDepartmentId: ANY_PARENT }),
+            children: [
+              /* @__PURE__ */ jsx(Plus, { className: "h-4 w-4 mr-1" }),
+              " ",
+              t("team.new_department", "New department")
+            ]
+          }
+        )
       ] })
     ] }),
     /* @__PURE__ */ jsx("p", { className: "text-sm text-muted-foreground", children: t(
-      "directory.org_structure_desc",
-      "Shared across JoaSuite apps. Used by the Employee Directory and requirements matching."
+      "team.org_structure_desc",
+      "Shared across JoaSuite apps. Used by Team and requirements matching."
     ) }),
-    orgQ.isLoading && /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("common.loading") }),
-    !orgQ.isLoading && departments.length === 0 && /* @__PURE__ */ jsx("div", { className: "border rounded-lg p-10 text-center text-muted-foreground", children: t("directory.no_departments", "No departments yet.") }),
-    /* @__PURE__ */ jsx("div", { className: "space-y-3", children: departments.map((d) => /* @__PURE__ */ jsxs("div", { className: "border rounded-lg overflow-hidden", children: [
-      /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between gap-2 p-3 bg-muted/30", children: [
-        /* @__PURE__ */ jsxs("div", { className: "font-medium", children: [
-          d.name,
-          " ",
-          d.code && /* @__PURE__ */ jsxs("span", { className: "text-xs text-muted-foreground", children: [
-            "(",
-            d.code,
-            ")"
-          ] })
-        ] }),
-        /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1", children: [
-          /* @__PURE__ */ jsxs(
-            Button,
-            {
-              size: "sm",
-              variant: "ghost",
-              onClick: () => setPosDialog({ open: true, departmentId: d.id, name: "" }),
-              children: [
-                /* @__PURE__ */ jsx(Plus, { className: "h-3.5 w-3.5 mr-1" }),
+    view === "chart" ? /* @__PURE__ */ jsx(OrgChartView, { tenantId }) : /* @__PURE__ */ jsxs(Fragment, { children: [
+      orgQ.isLoading && /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("common.loading") }),
+      !orgQ.isLoading && departments.length === 0 && /* @__PURE__ */ jsx("div", { className: "border rounded-lg p-10 text-center text-muted-foreground", children: t("team.no_departments", "No departments yet.") }),
+      /* @__PURE__ */ jsx("div", { className: "space-y-3", children: orderedDepartments.map((d) => /* @__PURE__ */ jsxs(
+        "div",
+        {
+          className: "border rounded-lg overflow-hidden",
+          style: { marginLeft: (d.depth - 1) * 20 },
+          children: [
+            /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between gap-2 p-3 bg-muted/30", children: [
+              /* @__PURE__ */ jsxs("div", { className: "font-medium", children: [
+                d.name,
                 " ",
-                t("directory.new_position", "Position")
-              ]
-            }
-          ),
-          /* @__PURE__ */ jsx(
-            Button,
-            {
-              size: "sm",
-              variant: "ghost",
-              onClick: () => setDeptDialog({ open: true, id: d.id, name: d.name, code: d.code ?? "" }),
-              children: /* @__PURE__ */ jsx(Pencil, { className: "h-3.5 w-3.5" })
-            }
-          ),
-          /* @__PURE__ */ jsx(
-            Button,
-            {
-              size: "sm",
-              variant: "ghost",
-              onClick: () => {
-                if (confirm(t("directory.confirm_delete", "Delete this?"))) removeDept.mutate(d.id);
-              },
-              children: /* @__PURE__ */ jsx(Trash2, { className: "h-3.5 w-3.5" })
-            }
-          )
-        ] })
-      ] }),
-      /* @__PURE__ */ jsxs("ul", { className: "divide-y", children: [
-        positions.filter((p) => p.department_id === d.id).map((p) => /* @__PURE__ */ jsxs("li", { className: "flex items-center justify-between gap-2 px-3 py-2 text-sm", children: [
-          /* @__PURE__ */ jsx("span", { children: p.name }),
-          /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1", children: [
-            /* @__PURE__ */ jsx(
-              Button,
-              {
-                size: "sm",
-                variant: "ghost",
-                onClick: () => setPosDialog({ open: true, id: p.id, departmentId: d.id, name: p.name }),
-                children: /* @__PURE__ */ jsx(Pencil, { className: "h-3.5 w-3.5" })
-              }
-            ),
-            /* @__PURE__ */ jsx(
-              Button,
-              {
-                size: "sm",
-                variant: "ghost",
-                onClick: () => {
-                  if (confirm(t("directory.confirm_delete", "Delete this?"))) removePos.mutate(p.id);
-                },
-                children: /* @__PURE__ */ jsx(Trash2, { className: "h-3.5 w-3.5" })
-              }
-            )
-          ] })
-        ] }, p.id)),
-        positions.filter((p) => p.department_id === d.id).length === 0 && /* @__PURE__ */ jsx("li", { className: "px-3 py-2 text-sm text-muted-foreground", children: t("directory.no_positions", "No positions in this department yet.") })
-      ] })
-    ] }, d.id)) }),
-    /* @__PURE__ */ jsx(Dialog, { open: deptDialog.open, onOpenChange: (open) => setDeptDialog((s) => ({ ...s, open })), children: /* @__PURE__ */ jsx(DialogContent, { children: /* @__PURE__ */ jsxs(
-      "form",
-      {
-        onSubmit: (e) => {
-          e.preventDefault();
-          saveDept.mutate();
+                d.code && /* @__PURE__ */ jsxs("span", { className: "text-xs text-muted-foreground", children: [
+                  "(",
+                  d.code,
+                  ")"
+                ] })
+              ] }),
+              /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1", children: [
+                canAddSubDepartment(d) && /* @__PURE__ */ jsxs(
+                  Button,
+                  {
+                    size: "sm",
+                    variant: "ghost",
+                    onClick: () => setDeptDialog({ open: true, name: "", code: "", parentDepartmentId: d.id }),
+                    children: [
+                      /* @__PURE__ */ jsx(Plus, { className: "h-3.5 w-3.5 mr-1" }),
+                      " ",
+                      t("team.new_sub_department", "Sub-department")
+                    ]
+                  }
+                ),
+                /* @__PURE__ */ jsxs(
+                  Button,
+                  {
+                    size: "sm",
+                    variant: "ghost",
+                    onClick: () => setPosDialog({ open: true, departmentId: d.id, name: "" }),
+                    children: [
+                      /* @__PURE__ */ jsx(Plus, { className: "h-3.5 w-3.5 mr-1" }),
+                      " ",
+                      t("team.new_position", "Position")
+                    ]
+                  }
+                ),
+                /* @__PURE__ */ jsx(
+                  Button,
+                  {
+                    size: "sm",
+                    variant: "ghost",
+                    onClick: () => setDeptDialog({
+                      open: true,
+                      id: d.id,
+                      name: d.name,
+                      code: d.code ?? "",
+                      parentDepartmentId: d.parent_department_id ?? ANY_PARENT
+                    }),
+                    children: /* @__PURE__ */ jsx(Pencil, { className: "h-3.5 w-3.5" })
+                  }
+                ),
+                /* @__PURE__ */ jsx(
+                  Button,
+                  {
+                    size: "sm",
+                    variant: "ghost",
+                    onClick: () => {
+                      if (confirm(t("team.confirm_delete", "Delete this?"))) removeDept.mutate(d.id);
+                    },
+                    children: /* @__PURE__ */ jsx(Trash2, { className: "h-3.5 w-3.5" })
+                  }
+                )
+              ] })
+            ] }),
+            /* @__PURE__ */ jsxs("ul", { className: "divide-y", children: [
+              positions.filter((p) => p.department_id === d.id).map((p) => /* @__PURE__ */ jsxs("li", { className: "flex items-center justify-between gap-2 px-3 py-2 text-sm", children: [
+                /* @__PURE__ */ jsx("span", { children: p.name }),
+                /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1", children: [
+                  /* @__PURE__ */ jsx(
+                    Button,
+                    {
+                      size: "sm",
+                      variant: "ghost",
+                      onClick: () => setPosDialog({ open: true, id: p.id, departmentId: d.id, name: p.name }),
+                      children: /* @__PURE__ */ jsx(Pencil, { className: "h-3.5 w-3.5" })
+                    }
+                  ),
+                  /* @__PURE__ */ jsx(
+                    Button,
+                    {
+                      size: "sm",
+                      variant: "ghost",
+                      onClick: () => {
+                        if (confirm(t("team.confirm_delete", "Delete this?"))) removePos.mutate(p.id);
+                      },
+                      children: /* @__PURE__ */ jsx(Trash2, { className: "h-3.5 w-3.5" })
+                    }
+                  )
+                ] })
+              ] }, p.id)),
+              positions.filter((p) => p.department_id === d.id).length === 0 && /* @__PURE__ */ jsx("li", { className: "px-3 py-2 text-sm text-muted-foreground", children: t("team.no_positions", "No positions in this department yet.") })
+            ] })
+          ]
         },
-        className: "space-y-4",
-        children: [
-          /* @__PURE__ */ jsx(DialogHeader, { children: /* @__PURE__ */ jsx(DialogTitle, { children: deptDialog.id ? t("directory.edit_department", "Edit department") : t("directory.new_department", "New department") }) }),
-          /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
-            /* @__PURE__ */ jsx(Label, { children: t("directory.department_name", "Name") }),
-            /* @__PURE__ */ jsx(
-              Input,
-              {
-                value: deptDialog.name,
-                onChange: (e) => setDeptDialog((s) => ({ ...s, name: e.target.value })),
-                autoFocus: true,
-                required: true
-              }
-            )
-          ] }),
-          /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
-            /* @__PURE__ */ jsx(Label, { children: t("directory.department_code", "Code (optional)") }),
-            /* @__PURE__ */ jsx(
-              Input,
-              {
-                value: deptDialog.code,
-                onChange: (e) => setDeptDialog((s) => ({ ...s, code: e.target.value })),
-                maxLength: 20,
-                placeholder: "OPS"
-              }
-            )
-          ] }),
-          /* @__PURE__ */ jsxs(DialogFooter, { children: [
-            /* @__PURE__ */ jsx(
-              Button,
-              {
-                type: "button",
-                variant: "ghost",
-                onClick: () => setDeptDialog({ open: false, name: "", code: "" }),
-                disabled: saveDept.isPending,
-                children: t("common.cancel")
-              }
-            ),
-            /* @__PURE__ */ jsx(Button, { type: "submit", disabled: saveDept.isPending || !deptDialog.name.trim(), children: t("common.save") })
-          ] })
-        ]
+        d.id
+      )) })
+    ] }),
+    /* @__PURE__ */ jsx(
+      Dialog,
+      {
+        open: deptDialog.open,
+        onOpenChange: (open) => setDeptDialog((s) => ({ ...s, open, ...open ? {} : { name: "", code: "" } })),
+        children: /* @__PURE__ */ jsx(DialogContent, { children: /* @__PURE__ */ jsxs(
+          "form",
+          {
+            onSubmit: (e) => {
+              e.preventDefault();
+              saveDept.mutate();
+            },
+            className: "space-y-4",
+            children: [
+              /* @__PURE__ */ jsx(DialogHeader, { children: /* @__PURE__ */ jsx(DialogTitle, { children: deptDialog.id ? t("team.edit_department", "Edit department") : t("team.new_department", "New department") }) }),
+              /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+                /* @__PURE__ */ jsx(Label, { children: t("team.department_name", "Name") }),
+                /* @__PURE__ */ jsx(
+                  Input,
+                  {
+                    value: deptDialog.name,
+                    onChange: (e) => setDeptDialog((s) => ({ ...s, name: e.target.value })),
+                    autoFocus: true,
+                    required: true
+                  }
+                )
+              ] }),
+              /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+                /* @__PURE__ */ jsx(Label, { children: t("team.department_code", "Code (optional)") }),
+                /* @__PURE__ */ jsx(
+                  Input,
+                  {
+                    value: deptDialog.code,
+                    onChange: (e) => setDeptDialog((s) => ({ ...s, code: e.target.value })),
+                    maxLength: 20,
+                    placeholder: "OPS"
+                  }
+                )
+              ] }),
+              /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+                /* @__PURE__ */ jsx(Label, { children: t("team.parent_department", "Parent department") }),
+                /* @__PURE__ */ jsxs(
+                  Select,
+                  {
+                    value: deptDialog.parentDepartmentId,
+                    onValueChange: (v) => setDeptDialog((s) => ({ ...s, parentDepartmentId: v })),
+                    children: [
+                      /* @__PURE__ */ jsx(SelectTrigger, { children: /* @__PURE__ */ jsx(SelectValue, {}) }),
+                      /* @__PURE__ */ jsxs(SelectContent, { children: [
+                        /* @__PURE__ */ jsx(SelectItem, { value: ANY_PARENT, children: t("team.top_level", "None (top-level)") }),
+                        eligibleParents(departments, deptDialog.id).map((d) => /* @__PURE__ */ jsxs(SelectItem, { value: d.id, children: [
+                          "\u2014".repeat(d.depth - 1),
+                          " ",
+                          d.name
+                        ] }, d.id))
+                      ] })
+                    ]
+                  }
+                ),
+                /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground", children: t("team.department_depth_hint", "Departments can nest up to 4 levels deep.") })
+              ] }),
+              /* @__PURE__ */ jsxs(DialogFooter, { children: [
+                /* @__PURE__ */ jsx(
+                  Button,
+                  {
+                    type: "button",
+                    variant: "ghost",
+                    onClick: () => setDeptDialog({ open: false, name: "", code: "", parentDepartmentId: ANY_PARENT }),
+                    disabled: saveDept.isPending,
+                    children: t("common.cancel")
+                  }
+                ),
+                /* @__PURE__ */ jsx(Button, { type: "submit", disabled: saveDept.isPending || !deptDialog.name.trim(), children: t("common.save") })
+              ] })
+            ]
+          }
+        ) })
       }
-    ) }) }),
+    ),
     /* @__PURE__ */ jsx(Dialog, { open: posDialog.open, onOpenChange: (open) => setPosDialog((s) => ({ ...s, open })), children: /* @__PURE__ */ jsx(DialogContent, { children: /* @__PURE__ */ jsxs(
       "form",
       {
@@ -4377,9 +4744,9 @@ function OrgStructureSettingsPage({ tenantId }) {
         },
         className: "space-y-4",
         children: [
-          /* @__PURE__ */ jsx(DialogHeader, { children: /* @__PURE__ */ jsx(DialogTitle, { children: posDialog.id ? t("directory.edit_position", "Edit position") : t("directory.new_position", "New position") }) }),
+          /* @__PURE__ */ jsx(DialogHeader, { children: /* @__PURE__ */ jsx(DialogTitle, { children: posDialog.id ? t("team.edit_position", "Edit position") : t("team.new_position", "New position") }) }),
           /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
-            /* @__PURE__ */ jsx(Label, { children: t("directory.position_name", "Name") }),
+            /* @__PURE__ */ jsx(Label, { children: t("team.position_name", "Name") }),
             /* @__PURE__ */ jsx(
               Input,
               {
@@ -6218,6 +6585,6 @@ function BillingComparePage({ appCode }) {
   ] });
 }
 
-export { APP_CODES, APP_DISPLAY, AppOverviewSection, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, roleLabel, useJoaSuite, useOrgScope };
+export { APP_CODES, APP_DISPLAY, AppOverviewSection, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgChartView, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, roleLabel, useJoaSuite, useOrgScope };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

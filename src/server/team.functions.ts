@@ -69,7 +69,7 @@ export function createListTeamMembers(deps: TeamDeps) {
         .eq("is_employee", true)
         .order("name_en");
       if (data.search?.trim()) {
-        const s = data.search.trim();
+        const s = data.search.trim().replace(/[%,()]/g, "");
         pq = pq.or(`name_en.ilike.%${s}%,contact_email.ilike.%${s}%`);
       }
       const { data: parties, error: pErr } = await pq;

@@ -340,12 +340,14 @@ type BoundServerFns = {
         tenant_id: string;
         name: string;
         code?: string | null;
+        parent_department_id?: string | null;
     }) => Promise<any>;
     updateDepartment: (input: {
         tenant_id: string;
         id: string;
         name: string;
         code?: string | null;
+        parent_department_id?: string | null;
     }) => Promise<any>;
     deleteDepartment: (input: {
         tenant_id: string;
@@ -365,6 +367,11 @@ type BoundServerFns = {
         tenant_id: string;
         id: string;
     }) => Promise<any>;
+    getOrgChartTree: (input: {
+        tenant_id: string;
+    }) => Promise<{
+        roots: any[];
+    }>;
     canManageBillingFn: (input: {
         tenant_id: string;
     }) => Promise<{
@@ -633,7 +640,7 @@ type TeamListPageProps = {
         created: boolean;
     }) => void;
 };
-declare function TeamListPage({ tenantId, workerType, onEntrySaved }: TeamListPageProps): react.JSX.Element;
+declare function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySaved }: TeamListPageProps): react.JSX.Element;
 
 type TeamMemberFormProps = {
     tenantId: string;
@@ -666,6 +673,40 @@ declare function TeamMemberForm({ tenantId, partyId, linkedUserId, readOnly, def
 declare function OrgStructureSettingsPage({ tenantId }: {
     tenantId: string;
 }): react.JSX.Element;
+
+type OrgChartPersonT = {
+    party_id: string;
+    name: string;
+    worker_type?: string | null;
+    avatar_url?: string | null;
+};
+type OrgChartPositionT = {
+    id: string;
+    name: string;
+    people: OrgChartPersonT[];
+};
+type OrgChartDepartmentT = {
+    id: string;
+    name: string;
+    depth: number;
+    positions: OrgChartPositionT[];
+    children: OrgChartDepartmentT[];
+};
+type OrgChartViewProps = {
+    /** Fetch the tree via the shared `getOrgChartTree` server fn. Omit if passing `tree` directly. */
+    tenantId?: string;
+    /** Pre-fetched tree — use this to feed the chart from an app-local data layer (e.g. JoaHR's own Workforce module) instead of the shared server fn. */
+    tree?: OrgChartDepartmentT[];
+    isLoading?: boolean;
+};
+/**
+ * Visual org chart: department tree with nested positions, each position
+ * fanning out to the people currently holding it (photo/initials, name,
+ * position). Pure CSS connector lines — no graph library dependency, so
+ * this stays cheap to embed anywhere, including an app that feeds it a
+ * locally-shaped tree instead of the shared `getOrgChartTree` fn.
+ */
+declare function OrgChartView({ tenantId, tree, isLoading }: OrgChartViewProps): react.JSX.Element;
 
 declare function BillingLayout({ children }: {
     children: React.ReactNode;
@@ -707,4 +748,4 @@ declare function BillingComparePage({ appCode }: {
  */
 declare function useOrgScope(): [string[], (tenantIds: string[]) => void];
 
-export { type AppCatalogEntry, AppCode, AppOverviewSection, type AppSummaryTile, type ApprovalSummary, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type Department, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, type RouterAdapter, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, type TeamMemberInput, type TeamMemberRow, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
+export { type AppCatalogEntry, AppCode, AppOverviewSection, type AppSummaryTile, type ApprovalSummary, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type Department, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, type OrgChartDepartmentT, type OrgChartPersonT, type OrgChartPositionT, OrgChartView, type OrgChartViewProps, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, type RouterAdapter, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, type TeamMemberInput, type TeamMemberRow, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };

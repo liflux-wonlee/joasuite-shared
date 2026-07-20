@@ -38,6 +38,13 @@ export { UserDetailPage } from "./components/users/UserDetailPage";
 export { TeamListPage } from "./components/team/TeamListPage";
 export { TeamMemberForm } from "./components/team/TeamMemberForm";
 export { OrgStructureSettingsPage } from "./components/org-structure/OrgStructureSettingsPage";
+export { OrgChartView } from "./components/org-structure/OrgChartView";
+export type {
+  OrgChartViewProps,
+  OrgChartDepartmentT,
+  OrgChartPositionT,
+  OrgChartPersonT,
+} from "./components/org-structure/OrgChartView";
 
 // Billing (organization-scoped; identical across every JoaSuite app)
 export { BillingLayout } from "./components/billing/BillingLayout";

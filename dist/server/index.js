@@ -811,7 +811,7 @@ function createListTeamMembers(deps) {
     await deps.assertCanReadTeam(data.tenant_id, context.userId);
     let pq = deps.supabaseAdmin.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active").eq("tenant_id", data.tenant_id).eq("is_employee", true).order("name_en");
     if (data.search?.trim()) {
-      const s = data.search.trim();
+      const s = data.search.trim().replace(/[%,()]/g, "");
       pq = pq.or(`name_en.ilike.%${s}%,contact_email.ilike.%${s}%`);
     }
     const { data: parties, error: pErr } = await pq;
@@ -989,11 +989,46 @@ function createUpsertTeamMember(deps) {
     return { party_id: partyId, created };
   });
 }
+var MAX_DEPARTMENT_DEPTH = 4;
+async function fetchAllDepartments(supabaseAdmin, tenantId) {
+  const { data, error } = await supabaseAdmin.from("departments").select("id, parent_department_id, depth").eq("tenant_id", tenantId);
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+function isDescendantOf(all, candidateAncestorId, ofId) {
+  const byId = new Map(all.map((d) => [d.id, d]));
+  let cur = byId.get(ofId);
+  const seen = /* @__PURE__ */ new Set();
+  while (cur?.parent_department_id) {
+    if (seen.has(cur.id)) return false;
+    seen.add(cur.id);
+    if (cur.parent_department_id === candidateAncestorId) return true;
+    cur = byId.get(cur.parent_department_id);
+  }
+  return false;
+}
+function collectDescendants(all, id) {
+  const childrenOf = /* @__PURE__ */ new Map();
+  for (const d of all) {
+    if (!d.parent_department_id) continue;
+    const arr = childrenOf.get(d.parent_department_id) ?? [];
+    arr.push(d);
+    childrenOf.set(d.parent_department_id, arr);
+  }
+  const out = [];
+  const queue = [...childrenOf.get(id) ?? []];
+  while (queue.length) {
+    const next = queue.shift();
+    out.push(next);
+    queue.push(...childrenOf.get(next.id) ?? []);
+  }
+  return out;
+}
 function createListDepartmentsAndPositions(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => z.object({ tenant_id: z.string().uuid() }).parse(i)).handler(async ({ data, context }) => {
     await deps.assertCanReadOrgStructure(data.tenant_id, context.userId);
     const [{ data: departments, error: dErr }, { data: positions, error: pErr }] = await Promise.all([
-      deps.supabaseAdmin.from("departments").select("id, name, code").eq("tenant_id", data.tenant_id).order("name"),
+      deps.supabaseAdmin.from("departments").select("id, name, code, parent_department_id, depth").eq("tenant_id", data.tenant_id).order("depth").order("name"),
       deps.supabaseAdmin.from("positions").select("id, name, department_id").eq("tenant_id", data.tenant_id).order("name")
     ]);
     if (dErr) throw new Error(dErr.message);
@@ -1006,14 +1041,27 @@ function createCreateDepartment(deps) {
     (i) => z.object({
       tenant_id: z.string().uuid(),
       name: z.string().min(1).max(120),
-      code: z.string().max(20).optional().nullable()
+      code: z.string().max(20).optional().nullable(),
+      parent_department_id: z.string().uuid().optional().nullable()
     }).parse(i)
   ).handler(async ({ data, context }) => {
     await deps.assertCanManageOrgStructure(data.tenant_id, context.userId);
+    let depth = 1;
+    if (data.parent_department_id) {
+      const { data: parent, error: parentErr } = await deps.supabaseAdmin.from("departments").select("id, depth").eq("tenant_id", data.tenant_id).eq("id", data.parent_department_id).maybeSingle();
+      if (parentErr) throw new Error(parentErr.message);
+      if (!parent) throw new Error("Parent department not found");
+      depth = parent.depth + 1;
+      if (depth > MAX_DEPARTMENT_DEPTH) {
+        throw new Error(`Departments can nest at most ${MAX_DEPARTMENT_DEPTH} levels deep`);
+      }
+    }
     const { data: dept, error } = await deps.supabaseAdmin.from("departments").insert({
       tenant_id: data.tenant_id,
       name: data.name,
-      code: data.code ? data.code.toUpperCase() : null
+      code: data.code ? data.code.toUpperCase() : null,
+      parent_department_id: data.parent_department_id ?? null,
+      depth
     }).select("id").single();
     if (error) throw new Error(error.message);
     return { id: dept.id };
@@ -1025,11 +1073,49 @@ function createUpdateDepartment(deps) {
       tenant_id: z.string().uuid(),
       id: z.string().uuid(),
       name: z.string().min(1).max(120),
-      code: z.string().max(20).optional().nullable()
+      code: z.string().max(20).optional().nullable(),
+      /** Omit this field to leave the parent unchanged; pass null to promote to top-level. */
+      parent_department_id: z.string().uuid().optional().nullable()
     }).parse(i)
   ).handler(async ({ data, context }) => {
     await deps.assertCanManageOrgStructure(data.tenant_id, context.userId);
-    const { error } = await deps.supabaseAdmin.from("departments").update({ name: data.name, code: data.code ? data.code.toUpperCase() : null }).eq("id", data.id).eq("tenant_id", data.tenant_id);
+    const patch = {
+      name: data.name,
+      code: data.code ? data.code.toUpperCase() : null
+    };
+    if (data.parent_department_id !== void 0) {
+      if (data.parent_department_id === data.id) {
+        throw new Error("A department cannot be its own parent");
+      }
+      const all = await fetchAllDepartments(deps.supabaseAdmin, data.tenant_id);
+      const current = all.find((d) => d.id === data.id);
+      if (!current) throw new Error("Department not found");
+      let newDepth = 1;
+      if (data.parent_department_id) {
+        const parent = all.find((d) => d.id === data.parent_department_id);
+        if (!parent) throw new Error("Parent department not found");
+        if (isDescendantOf(all, data.id, data.parent_department_id)) {
+          throw new Error("Cannot move a department under one of its own sub-departments");
+        }
+        newDepth = parent.depth + 1;
+      }
+      const descendants = collectDescendants(all, data.id);
+      const depthDelta = newDepth - current.depth;
+      const deepestDescendant = descendants.reduce((max, d) => Math.max(max, d.depth), current.depth);
+      if (deepestDescendant + depthDelta > MAX_DEPARTMENT_DEPTH) {
+        throw new Error(`Departments can nest at most ${MAX_DEPARTMENT_DEPTH} levels deep`);
+      }
+      patch.parent_department_id = data.parent_department_id ?? null;
+      patch.depth = newDepth;
+      if (depthDelta !== 0 && descendants.length > 0) {
+        await Promise.all(
+          descendants.map(
+            (d) => deps.supabaseAdmin.from("departments").update({ depth: d.depth + depthDelta }).eq("id", d.id).eq("tenant_id", data.tenant_id)
+          )
+        );
+      }
+    }
+    const { error } = await deps.supabaseAdmin.from("departments").update(patch).eq("id", data.id).eq("tenant_id", data.tenant_id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
@@ -1039,6 +1125,18 @@ function createDeleteDepartment(deps) {
     (i) => z.object({ tenant_id: z.string().uuid(), id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
     await deps.assertCanManageOrgStructure(data.tenant_id, context.userId);
+    const [{ count: childCount, error: childErr }, { count: posCount, error: posErr }] = await Promise.all([
+      deps.supabaseAdmin.from("departments").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).eq("parent_department_id", data.id),
+      deps.supabaseAdmin.from("positions").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).eq("department_id", data.id)
+    ]);
+    if (childErr) throw new Error(childErr.message);
+    if (posErr) throw new Error(posErr.message);
+    if ((childCount ?? 0) > 0) {
+      throw new Error("Move or delete this department's sub-departments first");
+    }
+    if ((posCount ?? 0) > 0) {
+      throw new Error("Move or delete this department's positions first");
+    }
     const { error } = await deps.supabaseAdmin.from("departments").delete().eq("id", data.id).eq("tenant_id", data.tenant_id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -1080,6 +1178,64 @@ function createDeletePosition(deps) {
     const { error } = await deps.supabaseAdmin.from("positions").delete().eq("id", data.id).eq("tenant_id", data.tenant_id);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+}
+function createGetOrgChartTree(deps) {
+  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => z.object({ tenant_id: z.string().uuid() }).parse(i)).handler(async ({ data, context }) => {
+    await deps.assertCanReadOrgStructure(data.tenant_id, context.userId);
+    const [{ data: departments, error: dErr }, { data: positions, error: pErr }] = await Promise.all([
+      deps.supabaseAdmin.from("departments").select("id, name, parent_department_id, depth").eq("tenant_id", data.tenant_id),
+      deps.supabaseAdmin.from("positions").select("id, name, department_id").eq("tenant_id", data.tenant_id)
+    ]);
+    if (dErr) throw new Error(dErr.message);
+    if (pErr) throw new Error(pErr.message);
+    const { data: profiles, error: profErr } = await deps.supabaseAdmin.from("employee_profiles").select("party_id, department_id, position_id, worker_type, employment_status").eq("tenant_id", data.tenant_id).neq("employment_status", "terminated").not("position_id", "is", null);
+    if (profErr) throw new Error(profErr.message);
+    const partyIds = (profiles ?? []).map((p) => p.party_id);
+    let parties = [];
+    if (partyIds.length) {
+      const { data: partyRows, error: partyErr } = await deps.supabaseAdmin.from("parties").select("id, name_en").eq("tenant_id", data.tenant_id).in("id", partyIds);
+      if (partyErr) throw new Error(partyErr.message);
+      parties = partyRows ?? [];
+    }
+    const nameByParty = new Map((parties ?? []).map((p) => [p.id, p.name_en]));
+    const peopleByPosition = /* @__PURE__ */ new Map();
+    for (const prof of profiles ?? []) {
+      if (!prof.position_id) continue;
+      const arr = peopleByPosition.get(prof.position_id) ?? [];
+      arr.push({
+        party_id: prof.party_id,
+        name: nameByParty.get(prof.party_id) ?? "\u2014",
+        worker_type: prof.worker_type ?? null
+      });
+      peopleByPosition.set(prof.position_id, arr);
+    }
+    const positionsByDept = /* @__PURE__ */ new Map();
+    for (const pos of positions ?? []) {
+      const arr = positionsByDept.get(pos.department_id) ?? [];
+      arr.push({ id: pos.id, name: pos.name, people: peopleByPosition.get(pos.id) ?? [] });
+      positionsByDept.set(pos.department_id, arr);
+    }
+    const nodeById = /* @__PURE__ */ new Map();
+    for (const d of departments ?? []) {
+      nodeById.set(d.id, {
+        id: d.id,
+        name: d.name,
+        depth: d.depth,
+        positions: positionsByDept.get(d.id) ?? [],
+        children: []
+      });
+    }
+    const roots = [];
+    for (const d of departments ?? []) {
+      const node = nodeById.get(d.id);
+      if (d.parent_department_id && nodeById.has(d.parent_department_id)) {
+        nodeById.get(d.parent_department_id).children.push(node);
+      } else {
+        roots.push(node);
+      }
+    }
+    return { roots };
   });
 }
 function resolveAppBaseUrl2(deps) {
@@ -1131,9 +1287,15 @@ async function assertCanEditVendor(supabaseAdmin, appCode, tenantId, userId) {
   if (!ok) throw new Error("Forbidden: vendor edit role required");
 }
 async function assertTenantMember(supabaseAdmin, tenantId, userId) {
-  const { data, error } = await supabaseAdmin.from("tenant_users").select("id").eq("tenant_id", tenantId).eq("user_id", userId).eq("status", "active").maybeSingle();
+  const { data, error } = await supabaseAdmin.from("tenant_users").select("id, portal").eq("tenant_id", tenantId).eq("user_id", userId).eq("status", "active").maybeSingle();
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Not a tenant member");
+  return data;
+}
+async function assertInternalTenantMember(supabaseAdmin, tenantId, userId) {
+  const member = await assertTenantMember(supabaseAdmin, tenantId, userId);
+  if (member.portal !== "internal") throw new Error("Forbidden: internal staff only");
+  return member;
 }
 async function findOrInviteUser(deps, email, displayName) {
   const { data: existing, error: lookupErr } = await deps.supabaseAdmin.auth.admin.listUsers({
@@ -1181,12 +1343,19 @@ async function sendInviteEmail(deps, opts) {
     </div>`;
   return deps.sendEmail({ to: opts.email, subject, html });
 }
+var VENDOR_SAFE_SETTINGS_KEYS = ["foreign_currency_enabled", "primary_currency_code"];
 function createGetTenantSettings(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => z.object({ tenant_id: z.string().uuid() }).parse(i)).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    const member = await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
     const { data: t, error } = await deps.supabaseAdmin.from("tenants").select("id, name, slug, status, settings").eq("id", data.tenant_id).single();
     if (error) throw new Error(error.message);
-    return t;
+    const settings = t.settings ?? {};
+    if (member.portal === "internal") return { ...t, settings };
+    const filteredSettings = {};
+    for (const k of VENDOR_SAFE_SETTINGS_KEYS) {
+      if (k in settings) filteredSettings[k] = settings[k];
+    }
+    return { ...t, settings: filteredSettings };
   });
 }
 function createUpdateTenantSettings(deps) {
@@ -1208,7 +1377,7 @@ function createUpdateTenantSettings(deps) {
 }
 function createListTenantUsers(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => z.object({ tenant_id: z.string().uuid() }).parse(i)).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
     const { data: members, error } = await deps.supabaseAdmin.from("tenant_users").select("id, user_id, portal, status, display_name, email, position, invited_at, joined_at").eq("tenant_id", data.tenant_id).order("created_at");
     if (error) throw new Error(error.message);
     const { data: roles } = await deps.supabaseAdmin.from("user_roles").select("user_id, role").eq("tenant_id", data.tenant_id);
@@ -1225,7 +1394,7 @@ function createGetTenantUser(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({ tenant_id: z.string().uuid(), user_id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
     const { data: m, error } = await deps.supabaseAdmin.from("tenant_users").select("id, user_id, portal, status, display_name, email, position, invited_at, joined_at").eq("tenant_id", data.tenant_id).eq("user_id", data.user_id).single();
     if (error) throw new Error(error.message);
     const { data: roles } = await deps.supabaseAdmin.from("user_roles").select("role").eq("tenant_id", data.tenant_id).eq("user_id", data.user_id);
@@ -1458,7 +1627,7 @@ function createListParties(deps) {
       kind: z.enum(["all", "vendor", "customer"]).default("all")
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
     let q = deps.supabaseAdmin.from("parties").select("*").eq("tenant_id", data.tenant_id).order("name_en");
     if (data.kind === "vendor") q = q.eq("is_vendor", true);
     if (data.kind === "customer") q = q.eq("is_customer", true);
@@ -1544,7 +1713,7 @@ function createDeleteParty(deps) {
       party_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { error } = await deps.supabaseAdmin.from("parties").delete().eq("id", data.party_id).eq("tenant_id", data.tenant_id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -1557,7 +1726,7 @@ function createGetParty(deps) {
       party_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
     const { data: row, error } = await deps.supabaseAdmin.from("parties").select("*").eq("tenant_id", data.tenant_id).eq("id", data.party_id).single();
     if (error) throw new Error(error.message);
     const [{ data: banks }, { data: contacts }] = await Promise.all([
@@ -1582,7 +1751,7 @@ function createListPartyContacts(deps) {
       party_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
     const { data: rows, error } = await deps.supabaseAdmin.from("party_contacts").select("*").eq("tenant_id", data.tenant_id).eq("party_id", data.party_id).order("is_primary", { ascending: false }).order("created_at", { ascending: true });
     if (error) throw new Error(error.message);
     return rows ?? [];
@@ -1816,7 +1985,7 @@ function createArchiveParty(deps) {
       reason: z.string().trim().max(500).optional()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { error } = await deps.supabaseAdmin.from("parties").update({
       archived_at: (/* @__PURE__ */ new Date()).toISOString(),
       archived_by: context.userId,
@@ -1833,7 +2002,7 @@ function createUnarchiveParty(deps) {
       party_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     const { error } = await deps.supabaseAdmin.from("parties").update({
       archived_at: null,
       archived_by: null,
@@ -2773,6 +2942,6 @@ function createListActiveBundleRules(deps) {
   });
 }
 
-export { APP_CODES as BILLING_APP_CODES, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createCreateDepartment, createCreatePosition, createDeleteDepartment, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDeletePosition, createGetBillingInvoice, createGetBillingOverview, createGetMyProfile, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTeamMember, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListDepartmentsAndPositions, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTeamMembers, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createSetUserAppRoles, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateDepartment, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdatePosition, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, createUpsertTeamMember, resolveScopedTenantIds };
+export { APP_CODES as BILLING_APP_CODES, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, MAX_DEPARTMENT_DEPTH, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createCreateDepartment, createCreatePosition, createDeleteDepartment, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDeletePosition, createGetBillingInvoice, createGetBillingOverview, createGetMyProfile, createGetOrgChartTree, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTeamMember, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListDepartmentsAndPositions, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTeamMembers, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createSetUserAppRoles, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateDepartment, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdatePosition, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, createUpsertTeamMember, resolveScopedTenantIds };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map
