@@ -180,8 +180,23 @@ export function RecurringForm({
   type AccountOpt = { id: string; account_name: string; account_type?: string | null; bank_name?: string | null; last4?: string | null; active?: boolean | null };
   const accounts = (((accountsQ.data as { rows?: AccountOpt[] } | undefined)?.rows) ?? []).filter((a) => a.active !== false);
   type CategoryOpt = { id: string; name: string; type?: string | null; active?: boolean | null };
-  const categories = ((categoriesQ.data ?? []) as CategoryOpt[]).filter((c) => c.active !== false && c.type === "expense");
+  const INCOME_CATEGORY_TYPES = new Set(["income", "other_income"]);
+  const EXPENSE_CATEGORY_TYPES = new Set(["expense", "cogs", "other_expense"]);
+  const allowedCategoryTypes = v.direction === "money_in" ? INCOME_CATEGORY_TYPES : EXPENSE_CATEGORY_TYPES;
+  const categories = ((categoriesQ.data ?? []) as CategoryOpt[]).filter(
+    (c) => c.active !== false && !!c.type && allowedCategoryTypes.has(c.type),
+  );
   const [addVendorOpen, setAddVendorOpen] = useState(false);
+
+  // Switching Direction changes which categories are valid; drop a
+  // selection that no longer belongs to the newly-allowed type set instead
+  // of silently submitting a stale category_id.
+  useEffect(() => {
+    if (v.category_id && !categories.some((c) => c.id === v.category_id)) {
+      setV((s) => ({ ...s, category_id: null }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [v.direction, categoriesQ.data]);
 
   // Custom type list persisted per-tenant in localStorage so newly added types
   // remain selectable on subsequent visits within the same browser.
