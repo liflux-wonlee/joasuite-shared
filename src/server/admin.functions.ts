@@ -322,6 +322,28 @@ export function createUpdateTenantUserProfile(deps: AdminDeps) {
     });
 }
 
+/**
+ * Has this signed-in user ever held ANY tenant_users row, in any tenant,
+ * regardless of status? Used by PostLoginGate to tell a brand-new signup
+ * (never had one) apart from someone whose only membership was removed or
+ * deactivated (had one, doesn't anymore) — those two cases need different
+ * copy, since "create an organization" is misleading for the latter.
+ */
+export function createHasEverHadMembership(deps: AdminDeps) {
+  return createServerFn({ method: "POST" })
+    .middleware([deps.requireSupabaseAuth])
+    .handler(async ({ context }) => {
+      const { data, error } = await deps.supabaseAdmin
+        .from("tenant_users")
+        .select("id")
+        .eq("user_id", (context as any).userId)
+        .limit(1)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return { ever: !!data };
+    });
+}
+
 export function createInviteTenantUser(deps: AdminDeps) {
   return createServerFn({ method: "POST" })
     .middleware([deps.requireSupabaseAuth])
@@ -377,10 +399,14 @@ export function createInviteTenantUser(deps: AdminDeps) {
       if (muErr) throw new Error(muErr.message);
 
       if (data.roles.length > 0) {
+        // app_code scopes each role to the calling app — omitting it would
+        // land the row as a suite-wide (app_code IS NULL) grant, which per
+        // this file's own convention should only ever hold owner/super_admin.
         const rows = data.roles.map((r: any) => ({
           tenant_id: data.tenant_id,
           user_id: invited.user.id,
           role: r,
+          app_code: r === "owner" || r === "super_admin" ? null : deps.appCode,
         }));
         const { error: rErr } = await deps.supabaseAdmin
           .from("user_roles")

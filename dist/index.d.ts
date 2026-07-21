@@ -308,6 +308,24 @@ type BoundServerFns = {
     inviteUserToWorkspaces: (input: any) => Promise<any>;
     setUserAppRoles: (input: any) => Promise<any>;
     removeTenantUser: (input: any) => Promise<any>;
+    inviteTenantUser: (input: {
+        tenant_id: string;
+        email: string;
+        display_name: string;
+        position?: string;
+        portal?: "internal" | "vendor" | "approver" | "customer";
+        roles?: string[];
+        party_id?: string;
+    }) => Promise<{
+        user_id: string;
+        created: boolean;
+        added_existing: boolean;
+        already_member: boolean;
+    }>;
+    /** Has this signed-in user ever held ANY tenant_users row (any tenant, any status)? Used by PostLoginGate to tell a brand-new signup apart from someone whose access was removed. */
+    hasEverHadMembership: () => Promise<{
+        ever: boolean;
+    }>;
     accountResendInvitation: (input: {
         user_id: string;
     }) => Promise<any>;

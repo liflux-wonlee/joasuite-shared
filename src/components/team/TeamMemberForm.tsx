@@ -103,6 +103,29 @@ export function TeamMemberForm({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Team Members are HR/directory records first — creating one never
+  // auto-invites a login (some workers never need one). Inviting is a
+  // separate, explicit admin action: it invites-or-links this person's
+  // account and grants them the "employee" role for THIS app only, then
+  // links parties.linked_user_id so future self-scoped views resolve them.
+  const invite = useMutation({
+    mutationFn: () =>
+      fns.inviteTenantUser({
+        tenant_id: tenantId,
+        email: contactEmail.trim(),
+        display_name: nameEn.trim(),
+        portal: "internal",
+        roles: ["employee"],
+        party_id: partyId,
+      }),
+    onSuccess: () => {
+      toast.success(t("team.invite_sent", "Invitation sent"));
+      qc.invalidateQueries({ queryKey: ["team-member", tenantId, partyId] });
+      qc.invalidateQueries({ queryKey: ["team-list", tenantId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const isNew = !partyId && !linkedUserId;
   const departments = orgQ.data?.departments ?? [];
   const positions = (orgQ.data?.positions ?? []).filter(
@@ -134,6 +157,33 @@ export function TeamMemberForm({
             <Input value={contactPhone} onChange={(e: any) => setContactPhone(e.target.value)} disabled={readOnly} />
           </div>
         </>
+      )}
+
+      {partyId && !readOnly && (
+        <div className="rounded-md border p-3 space-y-1.5">
+          {(entryQ.data as any)?.linked_user_id ? (
+            <p className="text-xs text-muted-foreground">
+              {t("team.linked_to_user", "Linked to an app user account.")}
+            </p>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground">
+                {t("team.not_linked", "This person doesn't have an app login yet. Not everyone needs one.")}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => invite.mutate()}
+                disabled={invite.isPending || !contactEmail.trim() || !nameEn.trim()}
+              >
+                {invite.isPending
+                  ? t("team.inviting", "Inviting…")
+                  : t("team.invite_as_user", "Invite as user")}
+              </Button>
+            </>
+          )}
+        </div>
       )}
 
       <div className="grid grid-cols-2 gap-3">

@@ -86,6 +86,7 @@ export {
   createGetTenantUser,
   createUpdateTenantUserProfile,
   createInviteTenantUser,
+  createHasEverHadMembership,
   createResendInvitation,
   createSendPasswordResetLink,
   createUpdateTenantUserRoles,
