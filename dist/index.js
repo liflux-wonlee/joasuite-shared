@@ -367,6 +367,11 @@ var en_default = {
     invite_sent: "Invitation sent",
     linked_to_user: "Linked to an app user account.",
     not_linked: "This person doesn't have an app login yet. Not everyone needs one.",
+    not_found: "Team member not found.",
+    group_basic_info: "Basic info",
+    group_contact: "Contact",
+    group_organization: "Organization",
+    group_employment: "Employment",
     name: "Name",
     contact_email: "Email",
     contact_phone: "Phone",
@@ -716,6 +721,11 @@ var ko_default = {
     invite_sent: "\uCD08\uB300\uB97C \uBCF4\uB0C8\uC2B5\uB2C8\uB2E4",
     linked_to_user: "\uC571 \uC0AC\uC6A9\uC790 \uACC4\uC815\uACFC \uC5F0\uACB0\uB418\uC5B4 \uC788\uC2B5\uB2C8\uB2E4.",
     not_linked: "\uC544\uC9C1 \uC571 \uB85C\uADF8\uC778\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. \uBAA8\uB4E0 \uC0AC\uB78C\uC774 \uD544\uC694\uD55C \uAC83\uC740 \uC544\uB2D9\uB2C8\uB2E4.",
+    not_found: "\uD300\uC6D0\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    group_basic_info: "\uAE30\uBCF8 \uC815\uBCF4",
+    group_contact: "\uC5F0\uB77D\uCC98",
+    group_organization: "\uC870\uC9C1",
+    group_employment: "\uACE0\uC6A9 \uC815\uBCF4",
     name: "\uC774\uB984",
     contact_email: "\uC774\uBA54\uC77C",
     contact_phone: "\uC804\uD654\uBC88\uD638",
@@ -1050,6 +1060,11 @@ var zh_default = {
     invite_sent: "\u9080\u8BF7\u5DF2\u53D1\u9001",
     linked_to_user: "\u5DF2\u5173\u8054\u5E94\u7528\u7528\u6237\u8D26\u53F7\u3002",
     not_linked: "\u6B64\u4EBA\u5C1A\u65E0\u5E94\u7528\u767B\u5F55\u8D26\u53F7\u3002\u5E76\u975E\u6BCF\u4E2A\u4EBA\u90FD\u9700\u8981\u3002",
+    not_found: "\u672A\u627E\u5230\u8BE5\u56E2\u961F\u6210\u5458\u3002",
+    group_basic_info: "\u57FA\u672C\u4FE1\u606F",
+    group_contact: "\u8054\u7CFB\u65B9\u5F0F",
+    group_organization: "\u7EC4\u7EC7",
+    group_employment: "\u96C7\u4F63\u4FE1\u606F",
     name: "\u59D3\u540D",
     contact_email: "\u90AE\u7BB1",
     contact_phone: "\u7535\u8BDD",
@@ -1387,6 +1402,11 @@ var es_default = {
     invite_sent: "Invitaci\xF3n enviada",
     linked_to_user: "Vinculado a una cuenta de usuario de la app.",
     not_linked: "Esta persona a\xFAn no tiene acceso a la app. No todos necesitan uno.",
+    not_found: "Miembro del equipo no encontrado.",
+    group_basic_info: "Informaci\xF3n b\xE1sica",
+    group_contact: "Contacto",
+    group_organization: "Organizaci\xF3n",
+    group_employment: "Empleo",
     name: "Nombre",
     contact_email: "Correo",
     contact_phone: "Tel\xE9fono",
@@ -1724,6 +1744,11 @@ var vi_default = {
     invite_sent: "\u0110\xE3 g\u1EEDi l\u1EDDi m\u1EDDi",
     linked_to_user: "\u0110\xE3 li\xEAn k\u1EBFt v\u1EDBi m\u1ED9t t\xE0i kho\u1EA3n ng\u01B0\u1EDDi d\xF9ng \u1EE9ng d\u1EE5ng.",
     not_linked: "Ng\u01B0\u1EDDi n\xE0y ch\u01B0a c\xF3 t\xE0i kho\u1EA3n \u0111\u0103ng nh\u1EADp \u1EE9ng d\u1EE5ng. Kh\xF4ng ph\u1EA3i ai c\u0169ng c\u1EA7n m\u1ED9t t\xE0i kho\u1EA3n.",
+    not_found: "Kh\xF4ng t\xECm th\u1EA5y th\xE0nh vi\xEAn.",
+    group_basic_info: "Th\xF4ng tin c\u01A1 b\u1EA3n",
+    group_contact: "Li\xEAn h\u1EC7",
+    group_organization: "T\u1ED5 ch\u1EE9c",
+    group_employment: "Vi\u1EC7c l\xE0m",
     name: "T\xEAn",
     contact_email: "Email",
     contact_phone: "\u0110i\u1EC7n tho\u1EA1i",
@@ -3991,6 +4016,18 @@ function UserDetailPage({ userId }) {
     ] }) })
   ] });
 }
+function FieldGroup({ title, children, className }) {
+  return /* @__PURE__ */ jsxs("div", { className: `rounded-lg bg-muted/50 p-4 space-y-3 ${className ?? ""}`, children: [
+    /* @__PURE__ */ jsx("h3", { className: "text-xs font-semibold uppercase tracking-wide text-muted-foreground", children: title }),
+    /* @__PURE__ */ jsx("div", { className: "space-y-3", children })
+  ] });
+}
+function FieldRow({ label, value }) {
+  return /* @__PURE__ */ jsxs("div", { children: [
+    /* @__PURE__ */ jsx("dt", { className: "text-xs text-muted-foreground", children: label }),
+    /* @__PURE__ */ jsx("dd", { className: "text-sm", children: value ?? "\u2014" })
+  ] });
+}
 var ANY = "__any__";
 var WORKER_TYPES = ["employee", "contractor"];
 var EMPLOYMENT_STATUSES = ["active", "on_leave", "terminated"];
@@ -4058,22 +4095,6 @@ function TeamMemberForm({
     },
     onError: (e) => toast.error(e.message)
   });
-  const invite = useMutation({
-    mutationFn: () => fns.inviteTenantUser({
-      tenant_id: tenantId,
-      email: contactEmail.trim(),
-      display_name: nameEn.trim(),
-      portal: "internal",
-      roles: ["employee"],
-      party_id: partyId
-    }),
-    onSuccess: () => {
-      toast.success(t("team.invite_sent", "Invitation sent"));
-      qc.invalidateQueries({ queryKey: ["team-member", tenantId, partyId] });
-      qc.invalidateQueries({ queryKey: ["team-list", tenantId] });
-    },
-    onError: (e) => toast.error(e.message)
-  });
   const isNew = !partyId && !linkedUserId;
   const departments = orgQ.data?.departments ?? [];
   const positions = (orgQ.data?.positions ?? []).filter(
@@ -4082,8 +4103,8 @@ function TeamMemberForm({
   if (partyId && entryQ.isLoading) {
     return /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("common.loading") });
   }
-  return /* @__PURE__ */ jsxs("div", { className: "space-y-3", children: [
-    (isNew || linkedUserId) && /* @__PURE__ */ jsxs(Fragment, { children: [
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-4", children: [
+    (isNew || linkedUserId) && /* @__PURE__ */ jsxs(FieldGroup, { title: t("team.group_basic_info", "Basic info"), children: [
       /* @__PURE__ */ jsxs("div", { children: [
         /* @__PURE__ */ jsx(Label, { children: t("team.name", "Name") }),
         /* @__PURE__ */ jsx(Input, { value: nameEn, onChange: (e) => setNameEn(e.target.value), disabled: readOnly })
@@ -4104,22 +4125,7 @@ function TeamMemberForm({
         /* @__PURE__ */ jsx(Input, { value: contactPhone, onChange: (e) => setContactPhone(e.target.value), disabled: readOnly })
       ] })
     ] }),
-    partyId && !readOnly && /* @__PURE__ */ jsx("div", { className: "rounded-md border p-3 space-y-1.5", children: entryQ.data?.linked_user_id ? /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground", children: t("team.linked_to_user", "Linked to an app user account.") }) : /* @__PURE__ */ jsxs(Fragment, { children: [
-      /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground", children: t("team.not_linked", "This person doesn't have an app login yet. Not everyone needs one.") }),
-      /* @__PURE__ */ jsx(
-        Button,
-        {
-          type: "button",
-          variant: "outline",
-          size: "sm",
-          className: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-900 dark:hover:bg-blue-900",
-          onClick: () => invite.mutate(),
-          disabled: invite.isPending || !contactEmail.trim() || !nameEn.trim(),
-          children: invite.isPending ? t("team.inviting", "Inviting\u2026") : t("team.invite_as_user", "Invite as user")
-        }
-      )
-    ] }) }),
-    /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
+    /* @__PURE__ */ jsx(FieldGroup, { title: t("team.group_organization", "Organization"), children: /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
       /* @__PURE__ */ jsxs("div", { children: [
         /* @__PURE__ */ jsx(Label, { children: t("team.department", "Department") }),
         /* @__PURE__ */ jsxs(Select, { value: departmentId, onValueChange: setDepartmentId, disabled: readOnly, children: [
@@ -4140,47 +4146,43 @@ function TeamMemberForm({
           ] })
         ] })
       ] })
-    ] }),
-    /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
-      /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsx(Label, { children: t("team.worker_type", "Worker type") }),
-        /* @__PURE__ */ jsxs(Select, { value: workerType, onValueChange: setWorkerType, disabled: readOnly, children: [
-          /* @__PURE__ */ jsx(SelectTrigger, { children: /* @__PURE__ */ jsx(SelectValue, {}) }),
-          /* @__PURE__ */ jsx(SelectContent, { children: WORKER_TYPES.map((w) => /* @__PURE__ */ jsx(SelectItem, { value: w, children: t(`team.worker_type_${w}`, w) }, w)) })
+    ] }) }),
+    /* @__PURE__ */ jsxs(FieldGroup, { title: t("team.group_employment", "Employment"), children: [
+      /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
+        /* @__PURE__ */ jsxs("div", { children: [
+          /* @__PURE__ */ jsx(Label, { children: t("team.worker_type", "Worker type") }),
+          /* @__PURE__ */ jsxs(Select, { value: workerType, onValueChange: setWorkerType, disabled: readOnly, children: [
+            /* @__PURE__ */ jsx(SelectTrigger, { children: /* @__PURE__ */ jsx(SelectValue, {}) }),
+            /* @__PURE__ */ jsx(SelectContent, { children: WORKER_TYPES.map((w) => /* @__PURE__ */ jsx(SelectItem, { value: w, children: t(`team.worker_type_${w}`, w) }, w)) })
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxs("div", { children: [
+          /* @__PURE__ */ jsx(Label, { children: t("team.employment_status", "Status") }),
+          /* @__PURE__ */ jsxs(Select, { value: employmentStatus, onValueChange: setEmploymentStatus, disabled: readOnly, children: [
+            /* @__PURE__ */ jsx(SelectTrigger, { children: /* @__PURE__ */ jsx(SelectValue, {}) }),
+            /* @__PURE__ */ jsx(SelectContent, { children: EMPLOYMENT_STATUSES.map((s) => /* @__PURE__ */ jsx(SelectItem, { value: s, children: t(`team.status_${s}`, s) }, s)) })
+          ] })
         ] })
       ] }),
       /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsx(Label, { children: t("team.employment_status", "Status") }),
-        /* @__PURE__ */ jsxs(Select, { value: employmentStatus, onValueChange: setEmploymentStatus, disabled: readOnly, children: [
-          /* @__PURE__ */ jsx(SelectTrigger, { children: /* @__PURE__ */ jsx(SelectValue, {}) }),
-          /* @__PURE__ */ jsx(SelectContent, { children: EMPLOYMENT_STATUSES.map((s) => /* @__PURE__ */ jsx(SelectItem, { value: s, children: t(`team.status_${s}`, s) }, s)) })
-        ] })
+        /* @__PURE__ */ jsx(Label, { children: t("team.hire_date", "Hire date") }),
+        /* @__PURE__ */ jsx(Input, { type: "date", value: hireDate, onChange: (e) => setHireDate(e.target.value), disabled: readOnly })
       ] })
-    ] }),
-    /* @__PURE__ */ jsxs("div", { children: [
-      /* @__PURE__ */ jsx(Label, { children: t("team.hire_date", "Hire date") }),
-      /* @__PURE__ */ jsx(Input, { type: "date", value: hireDate, onChange: (e) => setHireDate(e.target.value), disabled: readOnly })
     ] }),
     !readOnly && /* @__PURE__ */ jsx("div", { className: "flex justify-end", children: /* @__PURE__ */ jsx(Button, { onClick: () => save.mutate(), disabled: save.isPending || isNew && !nameEn.trim(), children: save.isPending ? t("set.sending", "Sending\u2026") : t("common.save") }) })
   ] });
 }
-function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySaved, renderExtra }) {
+function TeamListPage({
+  tenantId,
+  workerType: fixedWorkerType,
+  onEntrySaved,
+  basePath = "/app/team/members"
+}) {
   const { t } = useTranslation();
-  const { ui, fns } = useJoaSuite();
-  const {
-    Button,
-    Input,
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    Tabs,
-    TabsList,
-    TabsTrigger
-  } = ui;
+  const { ui, fns, router } = useJoaSuite();
+  const { Button, Input, Dialog, DialogContent, DialogHeader, DialogTitle, Tabs, TabsList, TabsTrigger } = ui;
+  const navigate = router.useNavigate();
   const [search, setSearch] = useState("");
-  const [editingPartyId, setEditingPartyId] = useState(null);
   const [addOpen, setAddOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("employee");
   const workerType = fixedWorkerType ?? activeTab;
@@ -4236,7 +4238,7 @@ function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySaved, ren
           "tr",
           {
             className: "border-t hover:bg-muted/30 cursor-pointer",
-            onClick: () => setEditingPartyId(r.party_id),
+            onClick: () => navigate({ to: `${basePath}/$partyId`, params: { partyId: r.party_id } }),
             children: [
               /* @__PURE__ */ jsxs("td", { className: "px-3 py-2", children: [
                 /* @__PURE__ */ jsx("div", { className: "font-medium truncate", children: r.name_en ?? "\u2014" }),
@@ -4261,27 +4263,109 @@ function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySaved, ren
           onSaved: (res) => {
             setAddOpen(false);
             onEntrySaved?.(res);
+            navigate({ to: `${basePath}/$partyId`, params: { partyId: res.party_id } });
           }
         }
       )
-    ] }) }),
-    /* @__PURE__ */ jsx(Dialog, { open: !!editingPartyId, onOpenChange: (open) => !open && setEditingPartyId(null), children: /* @__PURE__ */ jsxs(DialogContent, { className: "max-w-md", children: [
-      /* @__PURE__ */ jsx(DialogHeader, { children: /* @__PURE__ */ jsx(DialogTitle, { children: t("team.edit", "Edit team member") }) }),
-      editingPartyId && /* @__PURE__ */ jsxs(Fragment, { children: [
-        /* @__PURE__ */ jsx(
-          TeamMemberForm,
-          {
-            tenantId,
-            partyId: editingPartyId,
-            onSaved: (res) => {
-              setEditingPartyId(null);
-              onEntrySaved?.(res);
-            }
-          }
-        ),
-        renderExtra?.({ partyId: editingPartyId, workerType })
-      ] })
     ] }) })
+  ] });
+}
+function InviteAsUserBanner({ tenantId, partyId, name, email, linkedUserId }) {
+  const { t } = useTranslation();
+  const { ui, fns } = useJoaSuite();
+  const { Button } = ui;
+  const qc = useQueryClient();
+  const invite = useMutation({
+    mutationFn: () => fns.inviteTenantUser({
+      tenant_id: tenantId,
+      email: (email ?? "").trim(),
+      display_name: (name ?? "").trim(),
+      portal: "internal",
+      roles: ["employee"],
+      party_id: partyId
+    }),
+    onSuccess: () => {
+      toast.success(t("team.invite_sent", "Invitation sent"));
+      qc.invalidateQueries({ queryKey: ["team-member", tenantId, partyId] });
+      qc.invalidateQueries({ queryKey: ["team-list", tenantId] });
+    },
+    onError: (e) => toast.error(e.message)
+  });
+  return /* @__PURE__ */ jsx("div", { className: "rounded-md border p-3 space-y-1.5", children: linkedUserId ? /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground", children: t("team.linked_to_user", "Linked to an app user account.") }) : /* @__PURE__ */ jsxs(Fragment, { children: [
+    /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground", children: t("team.not_linked", "This person doesn't have an app login yet. Not everyone needs one.") }),
+    /* @__PURE__ */ jsx(
+      Button,
+      {
+        type: "button",
+        variant: "outline",
+        size: "sm",
+        className: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-900 dark:hover:bg-blue-900",
+        onClick: () => invite.mutate(),
+        disabled: invite.isPending || !(email ?? "").trim() || !(name ?? "").trim(),
+        children: invite.isPending ? t("team.inviting", "Inviting\u2026") : t("team.invite_as_user", "Invite as user")
+      }
+    )
+  ] }) });
+}
+function TeamMemberView({ tenantId, partyId, onEdit }) {
+  const { t } = useTranslation();
+  const { ui, fns } = useJoaSuite();
+  const { Button } = ui;
+  const entryQ = useQuery({
+    queryKey: ["team-member", tenantId, partyId],
+    enabled: !!tenantId && !!partyId,
+    queryFn: () => fns.getTeamMember({ tenant_id: tenantId, party_id: partyId })
+  });
+  const e = entryQ.data;
+  if (entryQ.isLoading) {
+    return /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("common.loading") });
+  }
+  if (!e) {
+    return /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("team.not_found", "Team member not found.") });
+  }
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-4", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex items-start justify-between gap-3", children: [
+      /* @__PURE__ */ jsxs("div", { children: [
+        /* @__PURE__ */ jsx("div", { className: "text-lg font-bold", children: e.name_en || "\u2014" }),
+        e.contact_email && /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: e.contact_email })
+      ] }),
+      onEdit && /* @__PURE__ */ jsxs(Button, { variant: "outline", size: "sm", onClick: onEdit, children: [
+        /* @__PURE__ */ jsx(Pencil, { className: "h-4 w-4 mr-1" }),
+        t("common.edit", "Edit")
+      ] })
+    ] }),
+    /* @__PURE__ */ jsx(
+      InviteAsUserBanner,
+      {
+        tenantId,
+        partyId,
+        name: e.name_en,
+        email: e.contact_email,
+        linkedUserId: e.linked_user_id
+      }
+    ),
+    /* @__PURE__ */ jsx(FieldGroup, { title: t("team.group_contact", "Contact"), children: /* @__PURE__ */ jsx(FieldRow, { label: t("team.contact_phone", "Phone"), value: e.contact_phone }) }),
+    /* @__PURE__ */ jsxs(FieldGroup, { title: t("team.group_organization", "Organization"), children: [
+      /* @__PURE__ */ jsx(FieldRow, { label: t("team.department", "Department"), value: e.department }),
+      /* @__PURE__ */ jsx(FieldRow, { label: t("team.position", "Position"), value: e.position })
+    ] }),
+    /* @__PURE__ */ jsxs(FieldGroup, { title: t("team.group_employment", "Employment"), children: [
+      /* @__PURE__ */ jsx(
+        FieldRow,
+        {
+          label: t("team.worker_type", "Worker type"),
+          value: e.worker_type ? String(t(`team.worker_type_${e.worker_type}`, e.worker_type)) : null
+        }
+      ),
+      /* @__PURE__ */ jsx(
+        FieldRow,
+        {
+          label: t("team.employment_status", "Status"),
+          value: e.employment_status ? String(t(`team.status_${e.employment_status}`, e.employment_status)) : null
+        }
+      ),
+      /* @__PURE__ */ jsx(FieldRow, { label: t("team.hire_date", "Hire date"), value: e.hire_date })
+    ] })
   ] });
 }
 function initials(name) {
@@ -6663,6 +6747,6 @@ function BillingComparePage({ appCode }) {
   ] });
 }
 
-export { APP_CODES, APP_DISPLAY, AppOverviewSection, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgChartView, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, roleLabel, useJoaSuite, useOrgScope };
+export { APP_CODES, APP_DISPLAY, AppOverviewSection, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, FieldGroup, FieldRow, InviteAsUserBanner, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgChartView, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, TeamMemberView, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, roleLabel, useJoaSuite, useOrgScope };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

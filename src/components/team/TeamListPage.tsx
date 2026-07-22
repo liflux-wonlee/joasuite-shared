@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Plus, Users, Search } from "lucide-react";
@@ -9,37 +9,30 @@ export type TeamListPageProps = {
   tenantId: string;
   /** Restrict this view to one worker type. Omit to show the combined directory. */
   workerType?: "employee" | "contractor";
-  /** Called after any create/edit save, in addition to closing the dialog — e.g. so a host app can trigger its own app-specific follow-up (JoaSOP re-runs Requirements Matrix auto-assignment when the saved entry is linked to a tenant login). */
+  /** Called after a create-new save, in addition to closing the dialog — e.g. so a host app can trigger its own app-specific follow-up (JoaSOP re-runs Requirements Matrix auto-assignment when the saved entry is linked to a tenant login). */
   onEntrySaved?: (result: { party_id: string; created: boolean }) => void;
   /**
-   * Optional extra content rendered below TeamMemberForm inside the edit
-   * dialog — e.g. an app-specific compensation/compliance section backed by
-   * that app's own tables (TeamMemberForm itself deliberately stays generic
-   * and never touches HR-confidential fields, see its own doc comment).
-   * Omit to render nothing extra — every app except the one that opts in is
-   * completely unaffected by this prop existing.
+   * Route prefix a row navigates to on click, e.g. "/app/team/members" ->
+   * "/app/team/members/$partyId" (the read-only detail page; see
+   * TeamMemberView). Defaults to "/app/team/members", which every current
+   * consuming app mounts this at — override only if a host app uses a
+   * different path.
    */
-  renderExtra?: (ctx: { partyId: string; workerType: "employee" | "contractor" }) => ReactNode;
+  basePath?: string;
 };
 
-export function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySaved, renderExtra }: TeamListPageProps) {
+export function TeamListPage({
+  tenantId,
+  workerType: fixedWorkerType,
+  onEntrySaved,
+  basePath = "/app/team/members",
+}: TeamListPageProps) {
   const { t } = useTranslation();
-  const { ui, fns } = useJoaSuite();
-  const {
-    Button,
-    Input,
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    Tabs,
-    TabsList,
-    TabsTrigger,
-  } = ui;
+  const { ui, fns, router } = useJoaSuite();
+  const { Button, Input, Dialog, DialogContent, DialogHeader, DialogTitle, Tabs, TabsList, TabsTrigger } = ui;
+  const navigate = router.useNavigate();
 
   const [search, setSearch] = useState("");
-  const [editingPartyId, setEditingPartyId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<"employee" | "contractor">("employee");
 
@@ -124,7 +117,7 @@ export function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySav
               <tr
                 key={r.party_id}
                 className="border-t hover:bg-muted/30 cursor-pointer"
-                onClick={() => setEditingPartyId(r.party_id)}
+                onClick={() => navigate({ to: `${basePath}/$partyId`, params: { partyId: r.party_id } })}
               >
                 <td className="px-3 py-2">
                   <div className="font-medium truncate">{r.name_en ?? "—"}</div>
@@ -154,29 +147,9 @@ export function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySav
             onSaved={(res) => {
               setAddOpen(false);
               onEntrySaved?.(res);
+              navigate({ to: `${basePath}/$partyId`, params: { partyId: res.party_id } });
             }}
           />
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!editingPartyId} onOpenChange={(open: boolean) => !open && setEditingPartyId(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t("team.edit", "Edit team member")}</DialogTitle>
-          </DialogHeader>
-          {editingPartyId && (
-            <>
-              <TeamMemberForm
-                tenantId={tenantId}
-                partyId={editingPartyId}
-                onSaved={(res) => {
-                  setEditingPartyId(null);
-                  onEntrySaved?.(res);
-                }}
-              />
-              {renderExtra?.({ partyId: editingPartyId, workerType })}
-            </>
-          )}
         </DialogContent>
       </Dialog>
     </div>
