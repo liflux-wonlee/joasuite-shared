@@ -339,6 +339,8 @@
     "add_contractor": "협력업체 추가",
     "tab_employee": "정규직 (W2)",
     "tab_contractor": "계약직 (1099)",
+    "back_to_list": "팀으로 돌아가기",
+    "back_to_detail": "뒤로",
     "parent_department": "상위 부서",
     "top_level": "없음 (최상위)",
     "new_sub_department": "하위 부서",

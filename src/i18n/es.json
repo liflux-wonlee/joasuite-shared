@@ -327,6 +327,8 @@
     "add_contractor": "Agregar contratista",
     "tab_employee": "Empleado (W2)",
     "tab_contractor": "Contratista (1099)",
+    "back_to_list": "Volver al equipo",
+    "back_to_detail": "Volver",
     "parent_department": "Departamento superior",
     "top_level": "Ninguno (nivel superior)",
     "new_sub_department": "Subdepartamento",

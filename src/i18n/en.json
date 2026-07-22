@@ -342,6 +342,8 @@
     "add_contractor": "Add contractor",
     "tab_employee": "Employee (W2)",
     "tab_contractor": "Contractor (1099)",
+    "back_to_list": "Back to Team",
+    "back_to_detail": "Back",
     "parent_department": "Parent department",
     "top_level": "None (top-level)",
     "new_sub_department": "Sub-department",
