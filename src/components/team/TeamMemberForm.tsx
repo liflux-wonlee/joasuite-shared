@@ -174,6 +174,7 @@ export function TeamMemberForm({
                 type="button"
                 variant="outline"
                 size="sm"
+                className="bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 hover:text-blue-800 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-900 dark:hover:bg-blue-900"
                 onClick={() => invite.mutate()}
                 disabled={invite.isPending || !contactEmail.trim() || !nameEn.trim()}
               >
