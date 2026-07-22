@@ -308,6 +308,24 @@ type BoundServerFns = {
     inviteUserToWorkspaces: (input: any) => Promise<any>;
     setUserAppRoles: (input: any) => Promise<any>;
     removeTenantUser: (input: any) => Promise<any>;
+    inviteTenantUser: (input: {
+        tenant_id: string;
+        email: string;
+        display_name: string;
+        position?: string;
+        portal?: "internal" | "vendor" | "approver" | "customer";
+        roles?: string[];
+        party_id?: string;
+    }) => Promise<{
+        user_id: string;
+        created: boolean;
+        added_existing: boolean;
+        already_member: boolean;
+    }>;
+    /** Has this signed-in user ever held ANY tenant_users row (any tenant, any status)? Used by PostLoginGate to tell a brand-new signup apart from someone whose access was removed. */
+    hasEverHadMembership: () => Promise<{
+        ever: boolean;
+    }>;
     accountResendInvitation: (input: {
         user_id: string;
     }) => Promise<any>;
@@ -634,13 +652,21 @@ type TeamListPageProps = {
     tenantId: string;
     /** Restrict this view to one worker type. Omit to show the combined directory. */
     workerType?: "employee" | "contractor";
-    /** Called after any create/edit save, in addition to closing the dialog — e.g. so a host app can trigger its own app-specific follow-up (JoaSOP re-runs Requirements Matrix auto-assignment when the saved entry is linked to a tenant login). */
+    /** Called after a create-new save, in addition to closing the dialog — e.g. so a host app can trigger its own app-specific follow-up (JoaSOP re-runs Requirements Matrix auto-assignment when the saved entry is linked to a tenant login). */
     onEntrySaved?: (result: {
         party_id: string;
         created: boolean;
     }) => void;
+    /**
+     * Route prefix a row navigates to on click, e.g. "/app/team/members" ->
+     * "/app/team/members/$partyId" (the read-only detail page; see
+     * TeamMemberView). Defaults to "/app/team/members", which every current
+     * consuming app mounts this at — override only if a host app uses a
+     * different path.
+     */
+    basePath?: string;
 };
-declare function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySaved }: TeamListPageProps): react.JSX.Element;
+declare function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySaved, basePath, }: TeamListPageProps): react.JSX.Element;
 
 type TeamMemberFormProps = {
     tenantId: string;
@@ -664,11 +690,64 @@ type TeamMemberFormProps = {
  * the future JoaHR app. Never touches HR-confidential fields (compensation,
  * contracts, leave) — those stay in each app's own HR-owned tables.
  *
+ * Editing only — the invite-as-user action lives on TeamMemberView (the
+ * read-only detail page callers show first) rather than here, since it's a
+ * standalone action, not a field being edited.
+ *
  * No Dialog/Card chrome of its own — callers embed it inline (e.g. a
  * read-only Profile tab) or wrap it in their own Dialog (e.g. an "Add team
  * member" flow) as fits the surrounding page.
  */
 declare function TeamMemberForm({ tenantId, partyId, linkedUserId, readOnly, defaultWorkerType, onSaved, }: TeamMemberFormProps): react.JSX.Element;
+
+type TeamMemberViewProps = {
+    tenantId: string;
+    partyId: string;
+    /** Called when the top-right Edit button is clicked — the host app owns navigation to its own edit route. */
+    onEdit?: () => void;
+};
+/**
+ * Read-only Team Member detail — the default landing page when opening a
+ * team member (see TeamListPage). Editing happens on a separate page,
+ * reached via the Edit button here, not inline.
+ */
+declare function TeamMemberView({ tenantId, partyId, onEdit }: TeamMemberViewProps): react.JSX.Element;
+
+type InviteAsUserBannerProps = {
+    tenantId: string;
+    partyId: string;
+    name: string | null | undefined;
+    email: string | null | undefined;
+    linkedUserId: string | null | undefined;
+};
+/**
+ * Team Members are HR/directory records first — creating one never
+ * auto-invites a login (some workers never need one). Inviting is a
+ * separate, explicit admin action: it invites-or-links this person's
+ * account and grants them the "employee" role for THIS app only, then
+ * links parties.linked_user_id so future self-scoped views resolve them.
+ *
+ * Lives on TeamMemberView (the read-only detail page) rather than
+ * TeamMemberForm — it's a standalone action, not a field being edited.
+ */
+declare function InviteAsUserBanner({ tenantId, partyId, name, email, linkedUserId }: InviteAsUserBannerProps): react.JSX.Element;
+
+/**
+ * Groups related fields under a subtitle with a light gray background —
+ * shared visual convention for detail/edit pages across every JoaSuite app
+ * (Team Member view/edit, JoaHR's Workforce overview, etc.). Purely
+ * presentational, no data-fetching or app-specific logic.
+ */
+declare function FieldGroup({ title, children, className }: {
+    title: string;
+    children: ReactNode;
+    className?: string;
+}): react.JSX.Element;
+/** A single label/value row for read-only display inside a FieldGroup. */
+declare function FieldRow({ label, value }: {
+    label: string;
+    value: ReactNode;
+}): react.JSX.Element;
 
 declare function OrgStructureSettingsPage({ tenantId }: {
     tenantId: string;
@@ -748,4 +827,4 @@ declare function BillingComparePage({ appCode }: {
  */
 declare function useOrgScope(): [string[], (tenantIds: string[]) => void];
 
-export { type AppCatalogEntry, AppCode, AppOverviewSection, type AppSummaryTile, type ApprovalSummary, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type Department, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, type OrgChartDepartmentT, type OrgChartPersonT, type OrgChartPositionT, OrgChartView, type OrgChartViewProps, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, type RouterAdapter, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, type TeamMemberInput, type TeamMemberRow, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
+export { type AppCatalogEntry, AppCode, AppOverviewSection, type AppSummaryTile, type ApprovalSummary, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type Department, FieldGroup, FieldRow, InviteAsUserBanner, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, type OrgChartDepartmentT, type OrgChartPersonT, type OrgChartPositionT, OrgChartView, type OrgChartViewProps, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, type RouterAdapter, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, type TeamMemberInput, type TeamMemberRow, TeamMemberView, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };

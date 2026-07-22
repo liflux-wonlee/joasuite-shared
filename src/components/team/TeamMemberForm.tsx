@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { useJoaSuite } from "../../context";
+import { FieldGroup } from "../FieldGroup";
 
 const ANY = "__any__";
 const WORKER_TYPES = ["employee", "contractor"] as const;
@@ -27,6 +28,10 @@ export type TeamMemberFormProps = {
  * identically (same code, no per-app fork) across every JoaSuite app except
  * the future JoaHR app. Never touches HR-confidential fields (compensation,
  * contracts, leave) — those stay in each app's own HR-owned tables.
+ *
+ * Editing only — the invite-as-user action lives on TeamMemberView (the
+ * read-only detail page callers show first) rather than here, since it's a
+ * standalone action, not a field being edited.
  *
  * No Dialog/Card chrome of its own — callers embed it inline (e.g. a
  * read-only Profile tab) or wrap it in their own Dialog (e.g. an "Add team
@@ -114,9 +119,9 @@ export function TeamMemberForm({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {(isNew || linkedUserId) && (
-        <>
+        <FieldGroup title={t("team.group_basic_info", "Basic info")}>
           <div>
             <Label>{t("team.name", "Name")}</Label>
             <Input value={nameEn} onChange={(e: any) => setNameEn(e.target.value)} disabled={readOnly} />
@@ -133,81 +138,84 @@ export function TeamMemberForm({
             <Label>{t("team.contact_phone", "Phone")}</Label>
             <Input value={contactPhone} onChange={(e: any) => setContactPhone(e.target.value)} disabled={readOnly} />
           </div>
-        </>
+        </FieldGroup>
       )}
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label>{t("team.department", "Department")}</Label>
-          <Select value={departmentId} onValueChange={setDepartmentId} disabled={readOnly}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ANY}>{t("team.none", "None")}</SelectItem>
-              {departments.map((d: any) => (
-                <SelectItem key={d.id} value={d.id}>
-                  {d.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <FieldGroup title={t("team.group_organization", "Organization")}>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>{t("team.department", "Department")}</Label>
+            <Select value={departmentId} onValueChange={setDepartmentId} disabled={readOnly}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ANY}>{t("team.none", "None")}</SelectItem>
+                {departments.map((d: any) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>{t("team.position", "Position")}</Label>
+            <Select value={positionId} onValueChange={setPositionId} disabled={readOnly}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ANY}>{t("team.none", "None")}</SelectItem>
+                {positions.map((p: any) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div>
-          <Label>{t("team.position", "Position")}</Label>
-          <Select value={positionId} onValueChange={setPositionId} disabled={readOnly}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ANY}>{t("team.none", "None")}</SelectItem>
-              {positions.map((p: any) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      </FieldGroup>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label>{t("team.worker_type", "Worker type")}</Label>
-          <Select value={workerType} onValueChange={setWorkerType} disabled={readOnly}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {WORKER_TYPES.map((w) => (
-                <SelectItem key={w} value={w}>
-                  {t(`team.worker_type_${w}`, w)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <FieldGroup title={t("team.group_employment", "Employment")}>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Label>{t("team.worker_type", "Worker type")}</Label>
+            <Select value={workerType} onValueChange={setWorkerType} disabled={readOnly}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {WORKER_TYPES.map((w) => (
+                  <SelectItem key={w} value={w}>
+                    {t(`team.worker_type_${w}`, w)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>{t("team.employment_status", "Status")}</Label>
+            <Select value={employmentStatus} onValueChange={setEmploymentStatus} disabled={readOnly}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {EMPLOYMENT_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {t(`team.status_${s}`, s)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div>
-          <Label>{t("team.employment_status", "Status")}</Label>
-          <Select value={employmentStatus} onValueChange={setEmploymentStatus} disabled={readOnly}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {EMPLOYMENT_STATUSES.map((s) => (
-                <SelectItem key={s} value={s}>
-                  {t(`team.status_${s}`, s)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label>{t("team.hire_date", "Hire date")}</Label>
+          <Input type="date" value={hireDate} onChange={(e: any) => setHireDate(e.target.value)} disabled={readOnly} />
         </div>
-      </div>
-
-      <div>
-        <Label>{t("team.hire_date", "Hire date")}</Label>
-        <Input type="date" value={hireDate} onChange={(e: any) => setHireDate(e.target.value)} disabled={readOnly} />
-      </div>
+      </FieldGroup>
 
       {!readOnly && (
         <div className="flex justify-end">

@@ -37,6 +37,9 @@ export { UserInvitePage } from "./components/users/UserInvitePage";
 export { UserDetailPage } from "./components/users/UserDetailPage";
 export { TeamListPage } from "./components/team/TeamListPage";
 export { TeamMemberForm } from "./components/team/TeamMemberForm";
+export { TeamMemberView } from "./components/team/TeamMemberView";
+export { InviteAsUserBanner } from "./components/team/InviteAsUserBanner";
+export { FieldGroup, FieldRow } from "./components/FieldGroup";
 export { OrgStructureSettingsPage } from "./components/org-structure/OrgStructureSettingsPage";
 export { OrgChartView } from "./components/org-structure/OrgChartView";
 export type {

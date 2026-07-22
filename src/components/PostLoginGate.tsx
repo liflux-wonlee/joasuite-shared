@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Building2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
@@ -25,6 +25,13 @@ export function PostLoginGate({ children }: { children: ReactNode }) {
   const nav = useNavigate();
   const qc = useQueryClient();
   const { currentMembership, setCurrentTenantId, refresh } = useAuth();
+
+  const everHadMembershipQ = useQuery({
+    queryKey: ["suite-had-membership"],
+    enabled: !currentMembership,
+    queryFn: () => fns.hasEverHadMembership(),
+    staleTime: Infinity,
+  });
 
   const [creatingOrg, setCreatingOrg] = useState(false);
   const [orgName, setOrgName] = useState("");
@@ -126,20 +133,31 @@ export function PostLoginGate({ children }: { children: ReactNode }) {
         </div>
 
         {!currentMembership ? (
-          <>
-            <div>
-              <h1 className="text-lg font-semibold">
-                {t("suite.gate.no_org_title", "Create your organization")}
-              </h1>
-              <p className="mt-1.5 text-sm text-muted-foreground">
-                {t(
-                  "suite.gate.no_org_desc",
-                  "Your account isn't part of any organization yet. Create one to get started.",
-                )}
-              </p>
-            </div>
-            {newOrgForm}
-          </>
+          everHadMembershipQ.isLoading ? (
+            <div className="text-sm text-muted-foreground">{t("common.loading", "Loading…")}</div>
+          ) : (
+            <>
+              <div>
+                <h1 className="text-lg font-semibold">
+                  {everHadMembershipQ.data?.ever
+                    ? t("suite.gate.removed_title", "Your access was removed")
+                    : t("suite.gate.no_org_title", "Create your organization")}
+                </h1>
+                <p className="mt-1.5 text-sm text-muted-foreground">
+                  {everHadMembershipQ.data?.ever
+                    ? t(
+                        "suite.gate.removed_desc",
+                        "You're no longer a member of any organization. Contact your administrator if you believe this is a mistake, or create a new organization below.",
+                      )
+                    : t(
+                        "suite.gate.no_org_desc",
+                        "Your account isn't part of any organization yet. Create one to get started.",
+                      )}
+                </p>
+              </div>
+              {newOrgForm}
+            </>
+          )
         ) : isOwner ? (
           <>
             <div>
