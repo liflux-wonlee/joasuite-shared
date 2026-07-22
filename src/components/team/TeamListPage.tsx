@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Plus, Users, Search } from "lucide-react";
@@ -11,9 +11,18 @@ export type TeamListPageProps = {
   workerType?: "employee" | "contractor";
   /** Called after any create/edit save, in addition to closing the dialog — e.g. so a host app can trigger its own app-specific follow-up (JoaSOP re-runs Requirements Matrix auto-assignment when the saved entry is linked to a tenant login). */
   onEntrySaved?: (result: { party_id: string; created: boolean }) => void;
+  /**
+   * Optional extra content rendered below TeamMemberForm inside the edit
+   * dialog — e.g. an app-specific compensation/compliance section backed by
+   * that app's own tables (TeamMemberForm itself deliberately stays generic
+   * and never touches HR-confidential fields, see its own doc comment).
+   * Omit to render nothing extra — every app except the one that opts in is
+   * completely unaffected by this prop existing.
+   */
+  renderExtra?: (ctx: { partyId: string; workerType: "employee" | "contractor" }) => ReactNode;
 };
 
-export function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySaved }: TeamListPageProps) {
+export function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySaved, renderExtra }: TeamListPageProps) {
   const { t } = useTranslation();
   const { ui, fns } = useJoaSuite();
   const {
@@ -156,14 +165,17 @@ export function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySav
             <DialogTitle>{t("team.edit", "Edit team member")}</DialogTitle>
           </DialogHeader>
           {editingPartyId && (
-            <TeamMemberForm
-              tenantId={tenantId}
-              partyId={editingPartyId}
-              onSaved={(res) => {
-                setEditingPartyId(null);
-                onEntrySaved?.(res);
-              }}
-            />
+            <>
+              <TeamMemberForm
+                tenantId={tenantId}
+                partyId={editingPartyId}
+                onSaved={(res) => {
+                  setEditingPartyId(null);
+                  onEntrySaved?.(res);
+                }}
+              />
+              {renderExtra?.({ partyId: editingPartyId, workerType })}
+            </>
           )}
         </DialogContent>
       </Dialog>

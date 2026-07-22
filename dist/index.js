@@ -4163,7 +4163,7 @@ function TeamMemberForm({
     !readOnly && /* @__PURE__ */ jsx("div", { className: "flex justify-end", children: /* @__PURE__ */ jsx(Button, { onClick: () => save.mutate(), disabled: save.isPending || isNew && !nameEn.trim(), children: save.isPending ? t("set.sending", "Sending\u2026") : t("common.save") }) })
   ] });
 }
-function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySaved }) {
+function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySaved, renderExtra }) {
   const { t } = useTranslation();
   const { ui, fns } = useJoaSuite();
   const {
@@ -4266,17 +4266,20 @@ function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySaved }) {
     ] }) }),
     /* @__PURE__ */ jsx(Dialog, { open: !!editingPartyId, onOpenChange: (open) => !open && setEditingPartyId(null), children: /* @__PURE__ */ jsxs(DialogContent, { className: "max-w-md", children: [
       /* @__PURE__ */ jsx(DialogHeader, { children: /* @__PURE__ */ jsx(DialogTitle, { children: t("team.edit", "Edit team member") }) }),
-      editingPartyId && /* @__PURE__ */ jsx(
-        TeamMemberForm,
-        {
-          tenantId,
-          partyId: editingPartyId,
-          onSaved: (res) => {
-            setEditingPartyId(null);
-            onEntrySaved?.(res);
+      editingPartyId && /* @__PURE__ */ jsxs(Fragment, { children: [
+        /* @__PURE__ */ jsx(
+          TeamMemberForm,
+          {
+            tenantId,
+            partyId: editingPartyId,
+            onSaved: (res) => {
+              setEditingPartyId(null);
+              onEntrySaved?.(res);
+            }
           }
-        }
-      )
+        ),
+        renderExtra?.({ partyId: editingPartyId, workerType })
+      ] })
     ] }) })
   ] });
 }

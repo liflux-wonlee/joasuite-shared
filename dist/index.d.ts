@@ -657,8 +657,20 @@ type TeamListPageProps = {
         party_id: string;
         created: boolean;
     }) => void;
+    /**
+     * Optional extra content rendered below TeamMemberForm inside the edit
+     * dialog — e.g. an app-specific compensation/compliance section backed by
+     * that app's own tables (TeamMemberForm itself deliberately stays generic
+     * and never touches HR-confidential fields, see its own doc comment).
+     * Omit to render nothing extra — every app except the one that opts in is
+     * completely unaffected by this prop existing.
+     */
+    renderExtra?: (ctx: {
+        partyId: string;
+        workerType: "employee" | "contractor";
+    }) => ReactNode;
 };
-declare function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySaved }: TeamListPageProps): react.JSX.Element;
+declare function TeamListPage({ tenantId, workerType: fixedWorkerType, onEntrySaved, renderExtra }: TeamListPageProps): react.JSX.Element;
 
 type TeamMemberFormProps = {
     tenantId: string;
