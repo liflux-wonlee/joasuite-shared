@@ -808,8 +808,8 @@ function createListTeamMembers(deps) {
       worker_type: z.enum(WORKER_TYPES).optional()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await deps.assertCanReadTeam(data.tenant_id, context.userId);
     const supabase = context.supabase;
+    await deps.assertCanReadTeam(supabase, data.tenant_id, context.userId);
     let pq = supabase.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active").eq("tenant_id", data.tenant_id).eq("is_employee", true).order("name_en");
     if (data.search?.trim()) {
       const s = data.search.trim().replace(/[%,()]/g, "");
@@ -860,8 +860,8 @@ function createGetTeamMember(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({ tenant_id: z.string().uuid(), party_id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
-    await deps.assertCanReadTeam(data.tenant_id, context.userId);
     const supabase = context.supabase;
+    await deps.assertCanReadTeam(supabase, data.tenant_id, context.userId);
     const { data: party, error: pErr } = await supabase.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active, is_employee").eq("tenant_id", data.tenant_id).eq("id", data.party_id).maybeSingle();
     if (pErr) throw new Error(pErr.message);
     if (!party || !party.is_employee) throw new Error("Team member not found");
@@ -913,8 +913,8 @@ function createUpsertTeamMember(deps) {
     }).parse(i)
   ).handler(async ({ data, context }) => {
     const callerId = context.userId;
-    await deps.assertCanWriteTeam(data.tenant_id, callerId);
     const supabase = context.supabase;
+    await deps.assertCanWriteTeam(supabase, data.tenant_id, callerId);
     let partyId;
     let created = false;
     if (data.party_id) {
@@ -2216,11 +2216,11 @@ function createGetBillingOverview(deps) {
     const userId = context.userId;
     const roles = await assertView(context.supabase, data.tenant_id, userId);
     const [customerQ, subsQ, pmQ, tenantAppsQ, tenantQ] = await Promise.all([
-      deps.supabaseAdmin.from("billing_customers").select("*").eq("tenant_id", data.tenant_id).maybeSingle(),
-      deps.supabaseAdmin.from("billing_subscriptions").select("*").eq("tenant_id", data.tenant_id),
-      deps.supabaseAdmin.from("billing_payment_methods").select("*").eq("tenant_id", data.tenant_id).order("is_default", { ascending: false }),
-      deps.supabaseAdmin.from("tenant_apps").select("app_code, plan, status").eq("tenant_id", data.tenant_id).eq("status", "active"),
-      deps.supabaseAdmin.from("tenants").select("id, name").eq("id", data.tenant_id).single()
+      context.supabase.from("billing_customers").select("*").eq("tenant_id", data.tenant_id).maybeSingle(),
+      context.supabase.from("billing_subscriptions").select("*").eq("tenant_id", data.tenant_id),
+      context.supabase.from("billing_payment_methods").select("*").eq("tenant_id", data.tenant_id).order("is_default", { ascending: false }),
+      context.supabase.from("tenant_apps").select("app_code, plan, status").eq("tenant_id", data.tenant_id).eq("status", "active"),
+      context.supabase.from("tenants").select("id, name").eq("id", data.tenant_id).single()
     ]);
     if (tenantQ.error) throw new Error(tenantQ.error.message);
     const subs = subsQ.data ?? [];
@@ -2248,7 +2248,7 @@ function createGetBillingOverview(deps) {
     const defaultPm = (pmQ.data ?? [])[0] ?? null;
     let estimateCents = 0;
     if (merged.length) {
-      const planRows = await deps.supabaseAdmin.from("billing_plans").select("app_code, plan_code, interval, price_cents").in("app_code", merged.map((m) => m.app_code));
+      const planRows = await context.supabase.from("billing_plans").select("app_code, plan_code, interval, price_cents").in("app_code", merged.map((m) => m.app_code));
       (planRows.data ?? []).forEach((p) => {
         const m = merged.find((x) => x.app_code === p.app_code && x.plan_code === p.plan_code && x.interval === p.interval);
         if (m) estimateCents += (p.price_cents ?? 0) * (m.seats ?? 1);
@@ -2289,7 +2289,7 @@ function createUpdateBillingCustomer(deps) {
     const userId = context.userId;
     await assertManage(context.supabase, data.tenant_id, userId);
     const { tenant_id, ...patch } = data;
-    const { data: row, error } = await deps.supabaseAdmin.from("billing_customers").upsert({ tenant_id, ...patch }, { onConflict: "tenant_id" }).select().single();
+    const { data: row, error } = await context.supabase.from("billing_customers").upsert({ tenant_id, ...patch }, { onConflict: "tenant_id" }).select().single();
     if (error) throw new Error(error.message);
     await writeAudit(deps, { tenant_id, user_id: userId, action: "billing.customer_updated", record_id: tenant_id, payload: patch });
     return row;
@@ -2326,7 +2326,7 @@ function createChangeSubscriptionPlan(deps) {
     const end = new Date(now);
     if (data.interval === "year") end.setFullYear(end.getFullYear() + 1);
     else end.setMonth(end.getMonth() + 1);
-    const { data: row, error } = await deps.supabaseAdmin.from("billing_subscriptions").upsert(
+    const { data: row, error } = await context.supabase.from("billing_subscriptions").upsert(
       {
         tenant_id: data.tenant_id,
         app_code: data.app_code,
@@ -2362,7 +2362,7 @@ function createCancelSubscription(deps) {
     const userId = context.userId;
     await assertManage(context.supabase, data.tenant_id, userId);
     const update = data.at_period_end ? { cancel_at_period_end: true } : { cancel_at_period_end: true, status: "canceled" };
-    const { data: row, error } = await deps.supabaseAdmin.from("billing_subscriptions").update(update).eq("tenant_id", data.tenant_id).eq("app_code", data.app_code).select().maybeSingle();
+    const { data: row, error } = await context.supabase.from("billing_subscriptions").update(update).eq("tenant_id", data.tenant_id).eq("app_code", data.app_code).select().maybeSingle();
     if (error) throw new Error(error.message);
     await writeAudit(deps, {
       tenant_id: data.tenant_id,
@@ -2382,7 +2382,7 @@ function createListBillingInvoices(deps) {
     }).parse(i)
   ).handler(async ({ data, context }) => {
     await assertView(context.supabase, data.tenant_id, context.userId);
-    const { data: rows, error } = await deps.supabaseAdmin.from("billing_invoices").select("*").eq("tenant_id", data.tenant_id).order("issued_at", { ascending: false }).limit(data.limit);
+    const { data: rows, error } = await context.supabase.from("billing_invoices").select("*").eq("tenant_id", data.tenant_id).order("issued_at", { ascending: false }).limit(data.limit);
     if (error) throw new Error(error.message);
     return rows ?? [];
   });
@@ -2392,7 +2392,7 @@ function createGetBillingInvoice(deps) {
     (i) => z.object({ tenant_id: z.string().uuid(), id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
     await assertView(context.supabase, data.tenant_id, context.userId);
-    const { data: row, error } = await deps.supabaseAdmin.from("billing_invoices").select("*").eq("tenant_id", data.tenant_id).eq("id", data.id).single();
+    const { data: row, error } = await context.supabase.from("billing_invoices").select("*").eq("tenant_id", data.tenant_id).eq("id", data.id).single();
     if (error) throw new Error(error.message);
     return row;
   });
@@ -2417,7 +2417,7 @@ function createSeedSampleBillingInvoices(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => tenantInput.parse(i)).handler(async ({ data, context }) => {
     const userId = context.userId;
     await assertManage(context.supabase, data.tenant_id, userId);
-    const { count } = await deps.supabaseAdmin.from("billing_invoices").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id);
+    const { count } = await context.supabase.from("billing_invoices").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id);
     if ((count ?? 0) > 0) return { ok: true, inserted: 0, skipped: true };
     const now = /* @__PURE__ */ new Date();
     const monthStart = (offset) => {
@@ -2491,7 +2491,7 @@ function createSeedSampleBillingInvoices(deps) {
         description: "JoaSOP Pro \u2014 monthly (card declined)"
       }
     ];
-    const { error } = await deps.supabaseAdmin.from("billing_invoices").insert(rows);
+    const { error } = await context.supabase.from("billing_invoices").insert(rows);
     if (error) throw new Error(error.message);
     await writeAudit(deps, { tenant_id: data.tenant_id, user_id: userId, action: "billing.invoices_seeded", payload: { count: rows.length } });
     return { ok: true, inserted: rows.length };
@@ -2500,7 +2500,7 @@ function createSeedSampleBillingInvoices(deps) {
 function createListBillingPaymentMethods(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => tenantInput.parse(i)).handler(async ({ data, context }) => {
     await assertView(context.supabase, data.tenant_id, context.userId);
-    const { data: rows, error } = await deps.supabaseAdmin.from("billing_payment_methods").select("*").eq("tenant_id", data.tenant_id).order("is_default", { ascending: false }).order("created_at", { ascending: false });
+    const { data: rows, error } = await context.supabase.from("billing_payment_methods").select("*").eq("tenant_id", data.tenant_id).order("is_default", { ascending: false }).order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return rows ?? [];
   });
@@ -2519,9 +2519,9 @@ function createAddMockPaymentMethod(deps) {
     const userId = context.userId;
     await assertManage(context.supabase, data.tenant_id, userId);
     if (data.make_default) {
-      await deps.supabaseAdmin.from("billing_payment_methods").update({ is_default: false }).eq("tenant_id", data.tenant_id);
+      await context.supabase.from("billing_payment_methods").update({ is_default: false }).eq("tenant_id", data.tenant_id);
     }
-    const { data: row, error } = await deps.supabaseAdmin.from("billing_payment_methods").insert({
+    const { data: row, error } = await context.supabase.from("billing_payment_methods").insert({
       tenant_id: data.tenant_id,
       brand: data.brand,
       last4: data.last4,
@@ -2540,8 +2540,8 @@ function createSetDefaultPaymentMethod(deps) {
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
     await assertManage(context.supabase, data.tenant_id, userId);
-    await deps.supabaseAdmin.from("billing_payment_methods").update({ is_default: false }).eq("tenant_id", data.tenant_id);
-    const { error } = await deps.supabaseAdmin.from("billing_payment_methods").update({ is_default: true }).eq("tenant_id", data.tenant_id).eq("id", data.id);
+    await context.supabase.from("billing_payment_methods").update({ is_default: false }).eq("tenant_id", data.tenant_id);
+    const { error } = await context.supabase.from("billing_payment_methods").update({ is_default: true }).eq("tenant_id", data.tenant_id).eq("id", data.id);
     if (error) throw new Error(error.message);
     await writeAudit(deps, { tenant_id: data.tenant_id, user_id: userId, action: "billing.payment_method_default", record_id: data.id });
     return { ok: true };
@@ -2553,7 +2553,7 @@ function createRemovePaymentMethod(deps) {
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
     await assertManage(context.supabase, data.tenant_id, userId);
-    const { error } = await deps.supabaseAdmin.from("billing_payment_methods").delete().eq("tenant_id", data.tenant_id).eq("id", data.id);
+    const { error } = await context.supabase.from("billing_payment_methods").delete().eq("tenant_id", data.tenant_id).eq("id", data.id);
     if (error) throw new Error(error.message);
     await writeAudit(deps, { tenant_id: data.tenant_id, user_id: userId, action: "billing.payment_method_removed", record_id: data.id });
     return { ok: true };
@@ -2573,7 +2573,7 @@ function createStartTrial(deps) {
     await assertManage(context.supabase, data.tenant_id, userId);
     const now = /* @__PURE__ */ new Date();
     const end = new Date(now.getTime() + data.trial_days * 864e5);
-    const { data: row, error } = await deps.supabaseAdmin.from("billing_subscriptions").upsert(
+    const { data: row, error } = await context.supabase.from("billing_subscriptions").upsert(
       {
         tenant_id: data.tenant_id,
         app_code: data.app_code,
@@ -2589,7 +2589,7 @@ function createStartTrial(deps) {
       { onConflict: "tenant_id,app_code" }
     ).select().single();
     if (error) throw new Error(error.message);
-    await deps.supabaseAdmin.from("tenant_apps").upsert(
+    await context.supabase.from("tenant_apps").upsert(
       {
         tenant_id: data.tenant_id,
         app_code: data.app_code,
@@ -2611,9 +2611,9 @@ function createReactivateSubscription(deps) {
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
     await assertManage(context.supabase, data.tenant_id, userId);
-    const { data: row, error } = await deps.supabaseAdmin.from("billing_subscriptions").update({ status: "active", cancel_at_period_end: false }).eq("tenant_id", data.tenant_id).eq("app_code", data.app_code).select().maybeSingle();
+    const { data: row, error } = await context.supabase.from("billing_subscriptions").update({ status: "active", cancel_at_period_end: false }).eq("tenant_id", data.tenant_id).eq("app_code", data.app_code).select().maybeSingle();
     if (error) throw new Error(error.message);
-    await deps.supabaseAdmin.from("tenant_apps").update({ status: "active", canceled_at: null, deletion_scheduled_at: null }).eq("tenant_id", data.tenant_id).eq("app_code", data.app_code);
+    await context.supabase.from("tenant_apps").update({ status: "active", canceled_at: null, deletion_scheduled_at: null }).eq("tenant_id", data.tenant_id).eq("app_code", data.app_code);
     await writeAudit(deps, { tenant_id: data.tenant_id, user_id: userId, action: "billing.subscription_reactivated", record_id: row?.id ?? null, payload: { app_code: data.app_code, mock: true } });
     return { ok: true, mock: true, subscription: row };
   });
@@ -2633,7 +2633,7 @@ function createAddAppSubscription(deps) {
     const end = new Date(now);
     if (data.interval === "year") end.setFullYear(end.getFullYear() + 1);
     else end.setMonth(end.getMonth() + 1);
-    const { data: row, error } = await deps.supabaseAdmin.from("billing_subscriptions").upsert(
+    const { data: row, error } = await context.supabase.from("billing_subscriptions").upsert(
       {
         tenant_id: data.tenant_id,
         app_code: data.app_code,
@@ -2648,7 +2648,7 @@ function createAddAppSubscription(deps) {
       { onConflict: "tenant_id,app_code" }
     ).select().single();
     if (error) throw new Error(error.message);
-    await deps.supabaseAdmin.from("tenant_apps").upsert(
+    await context.supabase.from("tenant_apps").upsert(
       {
         tenant_id: data.tenant_id,
         app_code: data.app_code,
@@ -2671,8 +2671,8 @@ function createRemoveAppSubscription(deps) {
     const userId = context.userId;
     await assertManage(context.supabase, data.tenant_id, userId);
     if (data.app_code === "joabooks") throw new Error("JoaBooks cannot be removed");
-    await deps.supabaseAdmin.from("billing_subscriptions").delete().eq("tenant_id", data.tenant_id).eq("app_code", data.app_code);
-    await deps.supabaseAdmin.from("tenant_apps").update({ status: "canceled", canceled_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("tenant_id", data.tenant_id).eq("app_code", data.app_code);
+    await context.supabase.from("billing_subscriptions").delete().eq("tenant_id", data.tenant_id).eq("app_code", data.app_code);
+    await context.supabase.from("tenant_apps").update({ status: "canceled", canceled_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("tenant_id", data.tenant_id).eq("app_code", data.app_code);
     await writeAudit(deps, { tenant_id: data.tenant_id, user_id: userId, action: "billing.app_removed", payload: { app_code: data.app_code, mock: true } });
     return { ok: true, mock: true };
   });
@@ -2688,7 +2688,7 @@ function createListAvailablePromotions(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => tenantInput.parse(i)).handler(async ({ data, context }) => {
     const userId = context.userId;
     await assertView(context.supabase, data.tenant_id, userId);
-    const { data: rows, error } = await deps.supabaseAdmin.from("promotion_codes").select("*").order("created_at", { ascending: false });
+    const { data: rows, error } = await context.supabase.from("promotion_codes").select("*").order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return (rows ?? []).map((r) => ({ ...r, computed_status: computePromoStatus(r) }));
   });
@@ -2697,7 +2697,7 @@ function createListTenantDiscounts(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => tenantInput.parse(i)).handler(async ({ data, context }) => {
     const userId = context.userId;
     await assertView(context.supabase, data.tenant_id, userId);
-    const { data: rows, error } = await deps.supabaseAdmin.from("billing_discounts").select("*").eq("tenant_id", data.tenant_id).order("created_at", { ascending: false });
+    const { data: rows, error } = await context.supabase.from("billing_discounts").select("*").eq("tenant_id", data.tenant_id).order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return rows ?? [];
   });
@@ -2708,7 +2708,7 @@ function createRedeemPromoCode(deps) {
     const userId = context.userId;
     await assertManage(context.supabase, data.tenant_id, userId);
     const code = data.code.trim().toUpperCase();
-    const { data: promo, error: pErr } = await deps.supabaseAdmin.from("promotion_codes").select("*").eq("code", code).maybeSingle();
+    const { data: promo, error: pErr } = await context.supabase.from("promotion_codes").select("*").eq("code", code).maybeSingle();
     if (pErr) throw new Error(pErr.message);
     if (!promo) return { ok: false, reason: "not_found" };
     const status = computePromoStatus(promo);
@@ -2716,9 +2716,9 @@ function createRedeemPromoCode(deps) {
     if (promo.max_redemptions != null && promo.redemption_count >= promo.max_redemptions) {
       return { ok: false, reason: "exhausted" };
     }
-    const { data: existing } = await deps.supabaseAdmin.from("billing_discounts").select("id").eq("tenant_id", data.tenant_id).eq("promotion_code_id", promo.id).eq("status", "active").maybeSingle();
+    const { data: existing } = await context.supabase.from("billing_discounts").select("id").eq("tenant_id", data.tenant_id).eq("promotion_code_id", promo.id).eq("status", "active").maybeSingle();
     if (existing) return { ok: false, reason: "already_applied" };
-    const { data: inserted, error: iErr } = await deps.supabaseAdmin.from("billing_discounts").insert({
+    const { data: inserted, error: iErr } = await context.supabase.from("billing_discounts").insert({
       tenant_id: data.tenant_id,
       promotion_code_id: promo.id,
       code: promo.code,
@@ -2739,7 +2739,7 @@ function createRedeemPromoCode(deps) {
       applied_by: userId
     }).select("*").single();
     if (iErr) throw new Error(iErr.message);
-    await deps.supabaseAdmin.from("promotion_codes").update({ redemption_count: (promo.redemption_count ?? 0) + 1 }).eq("id", promo.id);
+    await context.supabase.from("promotion_codes").update({ redemption_count: (promo.redemption_count ?? 0) + 1 }).eq("id", promo.id);
     await writeAudit(deps, {
       tenant_id: data.tenant_id,
       user_id: userId,
@@ -2754,7 +2754,7 @@ function createRemoveTenantDiscount(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => z.object({ tenant_id: z.string().uuid(), discount_id: z.string().uuid() }).parse(i)).handler(async ({ data, context }) => {
     const userId = context.userId;
     await assertManage(context.supabase, data.tenant_id, userId);
-    const { error } = await deps.supabaseAdmin.from("billing_discounts").update({ status: "canceled", ends_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("tenant_id", data.tenant_id).eq("id", data.discount_id);
+    const { error } = await context.supabase.from("billing_discounts").update({ status: "canceled", ends_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("tenant_id", data.tenant_id).eq("id", data.discount_id);
     if (error) throw new Error(error.message);
     await writeAudit(deps, { tenant_id: data.tenant_id, user_id: userId, action: "billing.discount_removed", record_id: data.discount_id });
     return { ok: true };
@@ -2771,18 +2771,18 @@ function createGetReferralProgram(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => tenantInput.parse(i)).handler(async ({ data, context }) => {
     const userId = context.userId;
     await assertView(context.supabase, data.tenant_id, userId);
-    let { data: prog, error } = await deps.supabaseAdmin.from("referral_programs").select("*").eq("tenant_id", data.tenant_id).maybeSingle();
+    let { data: prog, error } = await context.supabase.from("referral_programs").select("*").eq("tenant_id", data.tenant_id).maybeSingle();
     if (error) throw new Error(error.message);
     if (!prog) {
-      const { data: tenant } = await deps.supabaseAdmin.from("tenants").select("name").eq("id", data.tenant_id).single();
+      const { data: tenant } = await context.supabase.from("tenants").select("name").eq("id", data.tenant_id).single();
       for (let i = 0; i < 5 && !prog; i++) {
         const { code, slug } = genReferralCode(tenant?.name);
-        const ins = await deps.supabaseAdmin.from("referral_programs").insert({ tenant_id: data.tenant_id, code, slug }).select("*").single();
+        const ins = await context.supabase.from("referral_programs").insert({ tenant_id: data.tenant_id, code, slug }).select("*").single();
         if (!ins.error) prog = ins.data;
       }
       if (!prog) throw new Error("Failed to create referral program");
     }
-    const { data: referrals } = await deps.supabaseAdmin.from("referrals").select("*").eq("referrer_tenant_id", data.tenant_id).order("created_at", { ascending: false });
+    const { data: referrals } = await context.supabase.from("referrals").select("*").eq("referrer_tenant_id", data.tenant_id).order("created_at", { ascending: false });
     return { program: prog, referrals: referrals ?? [] };
   });
 }
@@ -2797,11 +2797,11 @@ function createAddMockReferral(deps) {
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
     await assertManage(context.supabase, data.tenant_id, userId);
-    const { data: prog } = await deps.supabaseAdmin.from("referral_programs").select("*").eq("tenant_id", data.tenant_id).maybeSingle();
+    const { data: prog } = await context.supabase.from("referral_programs").select("*").eq("tenant_id", data.tenant_id).maybeSingle();
     if (!prog) throw new Error("Referral program not initialized");
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const reward = data.status === "subscribed" ? prog.reward_amount_cents : 0;
-    const { data: row, error } = await deps.supabaseAdmin.from("referrals").insert({
+    const { data: row, error } = await context.supabase.from("referrals").insert({
       referrer_tenant_id: data.tenant_id,
       code: prog.code,
       referee_email: data.referee_email,
@@ -2814,7 +2814,7 @@ function createAddMockReferral(deps) {
     }).select("*").single();
     if (error) throw new Error(error.message);
     if (reward > 0) {
-      await deps.supabaseAdmin.from("referral_programs").update({ credit_available_cents: (prog.credit_available_cents ?? 0) + reward }).eq("tenant_id", data.tenant_id);
+      await context.supabase.from("referral_programs").update({ credit_available_cents: (prog.credit_available_cents ?? 0) + reward }).eq("tenant_id", data.tenant_id);
     }
     await writeAudit(deps, {
       tenant_id: data.tenant_id,
@@ -2836,9 +2836,9 @@ function createUpdateReferralStatus(deps) {
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
     await assertManage(context.supabase, data.tenant_id, userId);
-    const { data: existing } = await deps.supabaseAdmin.from("referrals").select("*").eq("id", data.referral_id).eq("referrer_tenant_id", data.tenant_id).maybeSingle();
+    const { data: existing } = await context.supabase.from("referrals").select("*").eq("id", data.referral_id).eq("referrer_tenant_id", data.tenant_id).maybeSingle();
     if (!existing) throw new Error("Referral not found");
-    const { data: prog } = await deps.supabaseAdmin.from("referral_programs").select("*").eq("tenant_id", data.tenant_id).maybeSingle();
+    const { data: prog } = await context.supabase.from("referral_programs").select("*").eq("tenant_id", data.tenant_id).maybeSingle();
     const now = (/* @__PURE__ */ new Date()).toISOString();
     const patch = { status: data.status };
     if (data.status === "signed_up" && !existing.signed_up_at) patch.signed_up_at = now;
@@ -2847,10 +2847,10 @@ function createUpdateReferralStatus(deps) {
       patch.subscribed_at = now;
       if (existing.reward_amount_cents === 0 && prog) {
         patch.reward_amount_cents = prog.reward_amount_cents;
-        await deps.supabaseAdmin.from("referral_programs").update({ credit_available_cents: (prog.credit_available_cents ?? 0) + prog.reward_amount_cents }).eq("tenant_id", data.tenant_id);
+        await context.supabase.from("referral_programs").update({ credit_available_cents: (prog.credit_available_cents ?? 0) + prog.reward_amount_cents }).eq("tenant_id", data.tenant_id);
       }
     }
-    const { error } = await deps.supabaseAdmin.from("referrals").update(patch).eq("id", data.referral_id);
+    const { error } = await context.supabase.from("referrals").update(patch).eq("id", data.referral_id);
     if (error) throw new Error(error.message);
     await writeAudit(deps, {
       tenant_id: data.tenant_id,
@@ -2884,10 +2884,10 @@ function createGetTenantUsage(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((data) => data).handler(async ({ data, context }) => {
     await assertView(context.supabase, data.tenant_id, context.userId);
     const appCode = data.app_code ?? "joabooks";
-    const { data: sub } = await deps.supabaseAdmin.from("billing_subscriptions").select("plan_code,status").eq("tenant_id", data.tenant_id).eq("app_code", appCode).maybeSingle();
+    const { data: sub } = await context.supabase.from("billing_subscriptions").select("plan_code,status").eq("tenant_id", data.tenant_id).eq("app_code", appCode).maybeSingle();
     const planCode = sub?.plan_code ?? "free";
     const limits = limitsFor(appCode, planCode);
-    const { data: pfRows } = await deps.supabaseAdmin.from("plan_features").select("feature_key,value").eq("app_code", appCode).eq("plan_code", planCode);
+    const { data: pfRows } = await context.supabase.from("plan_features").select("feature_key,value").eq("app_code", appCode).eq("plan_code", planCode);
     const featureMap = {};
     for (const r of pfRows ?? []) featureMap[r.feature_key] = r.value;
     const num = (k) => {
@@ -2914,12 +2914,12 @@ function createGetTenantUsage(deps) {
     monthStart.setUTCDate(1);
     monthStart.setUTCHours(0, 0, 0, 0);
     const [usersR, customersR, invoicesR, attachmentsR, attachmentsSizeR, appsR] = await Promise.all([
-      deps.supabaseAdmin.from("tenant_users").select("user_id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).eq("status", "active"),
-      deps.supabaseAdmin.from("parties").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).eq("is_customer", true),
-      deps.supabaseAdmin.from("invoices").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).gte("created_at", monthStart.toISOString()),
-      deps.supabaseAdmin.from("attachments").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id),
-      deps.supabaseAdmin.from("attachments").select("size").eq("tenant_id", data.tenant_id),
-      deps.supabaseAdmin.from("tenant_apps").select("app_code", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).eq("status", "active")
+      context.supabase.from("tenant_users").select("user_id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).eq("status", "active"),
+      context.supabase.from("parties").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).eq("is_customer", true),
+      context.supabase.from("invoices").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).gte("created_at", monthStart.toISOString()),
+      context.supabase.from("attachments").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id),
+      context.supabase.from("attachments").select("size").eq("tenant_id", data.tenant_id),
+      context.supabase.from("tenant_apps").select("app_code", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).eq("status", "active")
     ]);
     const storageBytes = (attachmentsSizeR.data ?? []).reduce(
       (s, r) => s + (r.size ?? 0),
@@ -2943,9 +2943,9 @@ function createGetTenantUsage(deps) {
   });
 }
 function createListActiveBundleRules(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).handler(async () => {
+  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).handler(async ({ context }) => {
     const nowIso = (/* @__PURE__ */ new Date()).toISOString();
-    const { data, error } = await deps.supabaseAdmin.from("billing_bundle_rules").select("id,name,minimum_active_apps,discount_percent,starts_at,ends_at,active").eq("active", true).order("minimum_active_apps", { ascending: false });
+    const { data, error } = await context.supabase.from("billing_bundle_rules").select("id,name,minimum_active_apps,discount_percent,starts_at,ends_at,active").eq("active", true).order("minimum_active_apps", { ascending: false });
     if (error) throw new Error(error.message);
     return (data ?? []).filter(
       (r) => (!r.starts_at || r.starts_at <= nowIso) && (!r.ends_at || r.ends_at >= nowIso)

@@ -18,8 +18,8 @@ import { z } from "zod";
 export type TeamDeps = {
   requireSupabaseAuth: any;
   supabaseAdmin: any;
-  assertCanReadTeam: (tenantId: string, userId: string) => Promise<void>;
-  assertCanWriteTeam: (tenantId: string, userId: string) => Promise<void>;
+  assertCanReadTeam: (supabase: any, tenantId: string, userId: string) => Promise<void>;
+  assertCanWriteTeam: (supabase: any, tenantId: string, userId: string) => Promise<void>;
   /** Called after a successful write, e.g. to append an audit_logs row. Optional. */
   onWrite?: (input: {
     tenantId: string;
@@ -60,9 +60,9 @@ export function createListTeamMembers(deps: TeamDeps) {
         .parse(i),
     )
     .handler(async ({ data, context }) => {
-      await deps.assertCanReadTeam(data.tenant_id, (context as any).userId);
-
       const supabase = (context as any).supabase;
+      await deps.assertCanReadTeam(supabase, data.tenant_id, (context as any).userId);
+
       let pq = supabase
         .from("parties")
         .select("id, linked_user_id, name_en, contact_email, contact_phone, active")
@@ -131,8 +131,8 @@ export function createGetTeamMember(deps: TeamDeps) {
       z.object({ tenant_id: z.string().uuid(), party_id: z.string().uuid() }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await deps.assertCanReadTeam(data.tenant_id, (context as any).userId);
       const supabase = (context as any).supabase;
+      await deps.assertCanReadTeam(supabase, data.tenant_id, (context as any).userId);
 
       const { data: party, error: pErr } = await supabase
         .from("parties")
@@ -217,8 +217,8 @@ export function createUpsertTeamMember(deps: TeamDeps) {
     )
     .handler(async ({ data, context }) => {
       const callerId = (context as any).userId as string;
-      await deps.assertCanWriteTeam(data.tenant_id, callerId);
       const supabase = (context as any).supabase;
+      await deps.assertCanWriteTeam(supabase, data.tenant_id, callerId);
 
       let partyId: string;
       let created = false;
