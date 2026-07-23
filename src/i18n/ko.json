@@ -25,7 +25,7 @@
       "security": "보안",
       "organizations": "조직",
       "users": "사용자",
-      "billing": "결제"
+      "billing": "결제 및 플랜"
     }
   },
   "bell": {
@@ -294,6 +294,7 @@
     "search_placeholder": "이름 또는 이메일 검색",
     "col_name": "이름",
     "empty": "아직 팀원이 없습니다.",
+    "load_failed": "팀원 목록을 불러오지 못했습니다.",
     "saved": "팀원 정보가 저장되었습니다",
     "invite_as_user": "사용자로 초대",
     "inviting": "초대 중…",

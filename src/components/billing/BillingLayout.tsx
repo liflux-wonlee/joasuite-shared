@@ -58,7 +58,7 @@ export function BillingLayout({ children }: { children: React.ReactNode }) {
   const nav = useNavigate();
   const path = usePathname();
 
-  const { data: perm, isLoading } = useQuery({
+  const { data: perm, isLoading, isError, error: permError } = useQuery({
     queryKey: ["billing-perm", currentTenantId],
     enabled: !!currentTenantId,
     queryFn: () => fns.canManageBillingFn({ tenant_id: currentTenantId! }),
@@ -107,6 +107,13 @@ export function BillingLayout({ children }: { children: React.ReactNode }) {
     return <div className="text-muted-foreground">{t("common.loading")}</div>;
   }
   if (isLoading) return <div className="text-muted-foreground">{t("common.loading")}</div>;
+  if (isError) {
+    return (
+      <div className="border rounded-lg p-6 text-sm text-destructive">
+        {(permError as Error)?.message || t("billing.load_failed", "Failed to load billing access. Please try again.")}
+      </div>
+    );
+  }
   if (!perm?.can_view) {
     return (
       <div className="border rounded-lg p-6 text-sm text-muted-foreground">

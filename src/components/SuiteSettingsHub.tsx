@@ -82,7 +82,7 @@ export function SuiteSettingsHub() {
     {
       to: "/app/account/billing",
       icon: Briefcase,
-      label: t("suite.tile.billing", "Plan & Billing"),
+      label: t("suite.tile.billing", "Billing & Plan"),
       description: t(
         "suite.tile.billing_desc",
         "App subscriptions, plans, invoices, and payment methods.",

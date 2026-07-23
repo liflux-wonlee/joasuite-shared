@@ -89,7 +89,7 @@ var en_default = {
       security: "Security",
       organizations: "Organizations",
       users: "Users",
-      billing: "Billing"
+      billing: "Billing & Plan"
     }
   },
   bell: {
@@ -361,6 +361,7 @@ var en_default = {
     search_placeholder: "Search name or email",
     col_name: "Name",
     empty: "No team members yet.",
+    load_failed: "Failed to load team members.",
     saved: "Team member saved",
     invite_as_user: "Invite as user",
     inviting: "Inviting\u2026",
@@ -448,7 +449,7 @@ var ko_default = {
       security: "\uBCF4\uC548",
       organizations: "\uC870\uC9C1",
       users: "\uC0AC\uC6A9\uC790",
-      billing: "\uACB0\uC81C"
+      billing: "\uACB0\uC81C \uBC0F \uD50C\uB79C"
     }
   },
   bell: {
@@ -717,6 +718,7 @@ var ko_default = {
     search_placeholder: "\uC774\uB984 \uB610\uB294 \uC774\uBA54\uC77C \uAC80\uC0C9",
     col_name: "\uC774\uB984",
     empty: "\uC544\uC9C1 \uD300\uC6D0\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    load_failed: "\uD300\uC6D0 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
     saved: "\uD300\uC6D0 \uC815\uBCF4\uAC00 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4",
     invite_as_user: "\uC0AC\uC6A9\uC790\uB85C \uCD08\uB300",
     inviting: "\uCD08\uB300 \uC911\u2026",
@@ -804,7 +806,7 @@ var zh_default = {
       security: "\u5B89\u5168",
       organizations: "\u7EC4\u7EC7",
       users: "\u7528\u6237",
-      billing: "\u8D26\u5355"
+      billing: "\u8D26\u5355\u4E0E\u5957\u9910"
     }
   },
   bell: {
@@ -1058,6 +1060,7 @@ var zh_default = {
     search_placeholder: "\u641C\u7D22\u59D3\u540D\u6216\u90AE\u7BB1",
     col_name: "\u59D3\u540D",
     empty: "\u6682\u65E0\u56E2\u961F\u6210\u5458\u3002",
+    load_failed: "\u52A0\u8F7D\u56E2\u961F\u6210\u5458\u5931\u8D25\u3002",
     saved: "\u56E2\u961F\u6210\u5458\u4FE1\u606F\u5DF2\u4FDD\u5B58",
     invite_as_user: "\u9080\u8BF7\u4E3A\u5E94\u7528\u7528\u6237",
     inviting: "\u9080\u8BF7\u4E2D\u2026",
@@ -1145,7 +1148,7 @@ var es_default = {
       security: "Seguridad",
       organizations: "Organizaciones",
       users: "Usuarios",
-      billing: "Facturaci\xF3n"
+      billing: "Facturaci\xF3n y plan"
     }
   },
   bell: {
@@ -1402,6 +1405,7 @@ var es_default = {
     search_placeholder: "Buscar por nombre o correo",
     col_name: "Nombre",
     empty: "A\xFAn no hay miembros del equipo.",
+    load_failed: "No se pudieron cargar los miembros del equipo.",
     saved: "Miembro del equipo guardado",
     invite_as_user: "Invitar como usuario",
     inviting: "Invitando\u2026",
@@ -1489,7 +1493,7 @@ var vi_default = {
       security: "B\u1EA3o m\u1EADt",
       organizations: "T\u1ED5 ch\u1EE9c",
       users: "Ng\u01B0\u1EDDi d\xF9ng",
-      billing: "Thanh to\xE1n"
+      billing: "Thanh to\xE1n & G\xF3i"
     }
   },
   bell: {
@@ -1746,6 +1750,7 @@ var vi_default = {
     search_placeholder: "T\xECm theo t\xEAn ho\u1EB7c email",
     col_name: "T\xEAn",
     empty: "Ch\u01B0a c\xF3 th\xE0nh vi\xEAn nh\xF3m n\xE0o.",
+    load_failed: "Kh\xF4ng t\u1EA3i \u0111\u01B0\u1EE3c danh s\xE1ch th\xE0nh vi\xEAn nh\xF3m.",
     saved: "\u0110\xE3 l\u01B0u th\xF4ng tin th\xE0nh vi\xEAn nh\xF3m",
     invite_as_user: "M\u1EDDi l\xE0m ng\u01B0\u1EDDi d\xF9ng",
     inviting: "\u0110ang m\u1EDDi\u2026",
@@ -2571,7 +2576,7 @@ function SuiteSettingsHub() {
     {
       to: "/app/account/billing",
       icon: Briefcase,
-      label: t("suite.tile.billing", "Plan & Billing"),
+      label: t("suite.tile.billing", "Billing & Plan"),
       description: t(
         "suite.tile.billing_desc",
         "App subscriptions, plans, invoices, and payment methods."
@@ -4114,7 +4119,7 @@ function TeamMemberForm({
     return /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("common.loading") });
   }
   return /* @__PURE__ */ jsxs("div", { className: "space-y-4", children: [
-    (isNew || linkedUserId) && /* @__PURE__ */ jsxs(FieldGroup, { title: t("team.group_basic_info", "Basic info"), children: [
+    /* @__PURE__ */ jsx(FieldGroup, { title: t("team.group_basic_info", "Basic info"), children: /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-1 gap-3 sm:grid-cols-2", children: [
       /* @__PURE__ */ jsxs("div", { children: [
         /* @__PURE__ */ jsx(Label, { children: t("team.name", "Name") }),
         /* @__PURE__ */ jsx(Input, { value: nameEn, onChange: (e) => setNameEn(e.target.value), disabled: readOnly })
@@ -4134,7 +4139,7 @@ function TeamMemberForm({
         /* @__PURE__ */ jsx(Label, { children: t("team.contact_phone", "Phone") }),
         /* @__PURE__ */ jsx(Input, { value: contactPhone, onChange: (e) => setContactPhone(e.target.value), disabled: readOnly })
       ] })
-    ] }),
+    ] }) }),
     /* @__PURE__ */ jsx(FieldGroup, { title: t("team.group_organization", "Organization"), children: /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
       /* @__PURE__ */ jsxs("div", { children: [
         /* @__PURE__ */ jsx(Label, { children: t("team.department", "Department") }),
@@ -4243,7 +4248,8 @@ function TeamListPage({
         /* @__PURE__ */ jsx("th", { className: "px-3 py-2 min-w-[100px]", children: t("team.employment_status", "Status") })
       ] }) }),
       /* @__PURE__ */ jsxs("tbody", { children: [
-        !listQ.isLoading && rows.length === 0 && /* @__PURE__ */ jsx("tr", { children: /* @__PURE__ */ jsx("td", { colSpan: 4, className: "px-3 py-6 text-center text-muted-foreground", children: t("team.empty", "No team members yet.") }) }),
+        listQ.isError && /* @__PURE__ */ jsx("tr", { children: /* @__PURE__ */ jsx("td", { colSpan: 4, className: "px-3 py-6 text-center text-destructive", children: listQ.error?.message || t("team.load_failed", "Failed to load team members.") }) }),
+        !listQ.isLoading && !listQ.isError && rows.length === 0 && /* @__PURE__ */ jsx("tr", { children: /* @__PURE__ */ jsx("td", { colSpan: 4, className: "px-3 py-6 text-center text-muted-foreground", children: t("team.empty", "No team members yet.") }) }),
         rows.map((r) => /* @__PURE__ */ jsxs(
           "tr",
           {
@@ -4355,11 +4361,11 @@ function TeamMemberView({ tenantId, partyId, onEdit }) {
       }
     ),
     /* @__PURE__ */ jsx(FieldGroup, { title: t("team.group_contact", "Contact"), children: /* @__PURE__ */ jsx(FieldRow, { label: t("team.contact_phone", "Phone"), value: e.contact_phone }) }),
-    /* @__PURE__ */ jsxs(FieldGroup, { title: t("team.group_organization", "Organization"), children: [
+    /* @__PURE__ */ jsx(FieldGroup, { title: t("team.group_organization", "Organization"), children: /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-1 gap-3 sm:grid-cols-2", children: [
       /* @__PURE__ */ jsx(FieldRow, { label: t("team.department", "Department"), value: e.department }),
       /* @__PURE__ */ jsx(FieldRow, { label: t("team.position", "Position"), value: e.position })
-    ] }),
-    /* @__PURE__ */ jsxs(FieldGroup, { title: t("team.group_employment", "Employment"), children: [
+    ] }) }),
+    /* @__PURE__ */ jsx(FieldGroup, { title: t("team.group_employment", "Employment"), children: /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-1 gap-3 sm:grid-cols-2", children: [
       /* @__PURE__ */ jsx(
         FieldRow,
         {
@@ -4375,7 +4381,7 @@ function TeamMemberView({ tenantId, partyId, onEdit }) {
         }
       ),
       /* @__PURE__ */ jsx(FieldRow, { label: t("team.hire_date", "Hire date"), value: e.hire_date })
-    ] })
+    ] }) })
   ] });
 }
 function initials(name) {
@@ -4994,7 +5000,7 @@ function BillingLayout({ children }) {
   const { Link, useNavigate, usePathname } = router;
   const nav = useNavigate();
   const path = usePathname();
-  const { data: perm, isLoading } = useQuery({
+  const { data: perm, isLoading, isError, error: permError } = useQuery({
     queryKey: ["billing-perm", currentTenantId],
     enabled: !!currentTenantId,
     queryFn: () => fns.canManageBillingFn({ tenant_id: currentTenantId })
@@ -5035,6 +5041,9 @@ function BillingLayout({ children }) {
     return /* @__PURE__ */ jsx("div", { className: "text-muted-foreground", children: t("common.loading") });
   }
   if (isLoading) return /* @__PURE__ */ jsx("div", { className: "text-muted-foreground", children: t("common.loading") });
+  if (isError) {
+    return /* @__PURE__ */ jsx("div", { className: "border rounded-lg p-6 text-sm text-destructive", children: permError?.message || t("billing.load_failed", "Failed to load billing access. Please try again.") });
+  }
   if (!perm?.can_view) {
     return /* @__PURE__ */ jsx("div", { className: "border rounded-lg p-6 text-sm text-muted-foreground", children: t("billing.no_access", "You don't have permission to view billing for this organization.") });
   }

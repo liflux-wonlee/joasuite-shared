@@ -25,7 +25,7 @@
       "security": "安全",
       "organizations": "组织",
       "users": "用户",
-      "billing": "账单"
+      "billing": "账单与套餐"
     }
   },
   "bell": {
@@ -279,6 +279,7 @@
     "search_placeholder": "搜索姓名或邮箱",
     "col_name": "姓名",
     "empty": "暂无团队成员。",
+    "load_failed": "加载团队成员失败。",
     "saved": "团队成员信息已保存",
     "invite_as_user": "邀请为应用用户",
     "inviting": "邀请中…",

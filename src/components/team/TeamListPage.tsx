@@ -106,7 +106,14 @@ export function TeamListPage({
             </tr>
           </thead>
           <tbody>
-            {!listQ.isLoading && rows.length === 0 && (
+            {listQ.isError && (
+              <tr>
+                <td colSpan={4} className="px-3 py-6 text-center text-destructive">
+                  {(listQ.error as Error)?.message || t("team.load_failed", "Failed to load team members.")}
+                </td>
+              </tr>
+            )}
+            {!listQ.isLoading && !listQ.isError && rows.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">
                   {t("team.empty", "No team members yet.")}

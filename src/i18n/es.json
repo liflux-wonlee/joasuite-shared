@@ -25,7 +25,7 @@
       "security": "Seguridad",
       "organizations": "Organizaciones",
       "users": "Usuarios",
-      "billing": "Facturación"
+      "billing": "Facturación y plan"
     }
   },
   "bell": {
@@ -282,6 +282,7 @@
     "search_placeholder": "Buscar por nombre o correo",
     "col_name": "Nombre",
     "empty": "Aún no hay miembros del equipo.",
+    "load_failed": "No se pudieron cargar los miembros del equipo.",
     "saved": "Miembro del equipo guardado",
     "invite_as_user": "Invitar como usuario",
     "inviting": "Invitando…",

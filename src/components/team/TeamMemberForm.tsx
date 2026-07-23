@@ -120,8 +120,8 @@ export function TeamMemberForm({
 
   return (
     <div className="space-y-4">
-      {(isNew || linkedUserId) && (
-        <FieldGroup title={t("team.group_basic_info", "Basic info")}>
+      <FieldGroup title={t("team.group_basic_info", "Basic info")}>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label>{t("team.name", "Name")}</Label>
             <Input value={nameEn} onChange={(e: any) => setNameEn(e.target.value)} disabled={readOnly} />
@@ -138,8 +138,8 @@ export function TeamMemberForm({
             <Label>{t("team.contact_phone", "Phone")}</Label>
             <Input value={contactPhone} onChange={(e: any) => setContactPhone(e.target.value)} disabled={readOnly} />
           </div>
-        </FieldGroup>
-      )}
+        </div>
+      </FieldGroup>
 
       <FieldGroup title={t("team.group_organization", "Organization")}>
         <div className="grid grid-cols-2 gap-3">

@@ -62,7 +62,8 @@ export function createListTeamMembers(deps: TeamDeps) {
     .handler(async ({ data, context }) => {
       await deps.assertCanReadTeam(data.tenant_id, (context as any).userId);
 
-      let pq = deps.supabaseAdmin
+      const supabase = (context as any).supabase;
+      let pq = supabase
         .from("parties")
         .select("id, linked_user_id, name_en, contact_email, contact_phone, active")
         .eq("tenant_id", data.tenant_id)
@@ -78,7 +79,7 @@ export function createListTeamMembers(deps: TeamDeps) {
       const partyIds = (parties ?? []).map((p: any) => p.id as string);
       let profiles: any[] = [];
       if (partyIds.length) {
-        const { data: profileRows, error: prErr } = await deps.supabaseAdmin
+        const { data: profileRows, error: prErr } = await supabase
           .from("employee_profiles")
           .select(
             "party_id, department_id, position_id, manager_id, employment_status, hire_date, termination_date, worker_type",
@@ -92,7 +93,7 @@ export function createListTeamMembers(deps: TeamDeps) {
       const byParty = new Map<string, any>(profiles.map((pr: any) => [pr.party_id, pr]));
       const deptIds: string[] = Array.from(new Set(profiles.map((p: any) => p.department_id).filter(Boolean)));
       const posIds: string[] = Array.from(new Set(profiles.map((p: any) => p.position_id).filter(Boolean)));
-      const { deptName, posName } = await loadDeptPosNames(deps.supabaseAdmin, data.tenant_id, deptIds, posIds);
+      const { deptName, posName } = await loadDeptPosNames(supabase, data.tenant_id, deptIds, posIds);
 
       let rows = (parties ?? []).map((p: any) => {
         const prof = byParty.get(p.id);
@@ -131,8 +132,9 @@ export function createGetTeamMember(deps: TeamDeps) {
     )
     .handler(async ({ data, context }) => {
       await deps.assertCanReadTeam(data.tenant_id, (context as any).userId);
+      const supabase = (context as any).supabase;
 
-      const { data: party, error: pErr } = await deps.supabaseAdmin
+      const { data: party, error: pErr } = await supabase
         .from("parties")
         .select("id, linked_user_id, name_en, contact_email, contact_phone, active, is_employee")
         .eq("tenant_id", data.tenant_id)
@@ -141,7 +143,7 @@ export function createGetTeamMember(deps: TeamDeps) {
       if (pErr) throw new Error(pErr.message);
       if (!party || !party.is_employee) throw new Error("Team member not found");
 
-      const { data: profile, error: prErr } = await deps.supabaseAdmin
+      const { data: profile, error: prErr } = await supabase
         .from("employee_profiles")
         .select(
           "party_id, department_id, position_id, manager_id, employment_status, hire_date, termination_date, worker_type",
@@ -152,7 +154,7 @@ export function createGetTeamMember(deps: TeamDeps) {
       if (prErr) throw new Error(prErr.message);
 
       const { deptName, posName } = await loadDeptPosNames(
-        deps.supabaseAdmin,
+        supabase,
         data.tenant_id,
         profile?.department_id ? [profile.department_id] : [],
         profile?.position_id ? [profile.position_id] : [],
@@ -216,6 +218,7 @@ export function createUpsertTeamMember(deps: TeamDeps) {
     .handler(async ({ data, context }) => {
       const callerId = (context as any).userId as string;
       await deps.assertCanWriteTeam(data.tenant_id, callerId);
+      const supabase = (context as any).supabase;
 
       let partyId: string;
       let created = false;
@@ -227,14 +230,14 @@ export function createUpsertTeamMember(deps: TeamDeps) {
         if (data.contact_email !== undefined) patch.contact_email = data.contact_email;
         if (data.contact_phone !== undefined) patch.contact_phone = data.contact_phone;
         if (Object.keys(patch).length > 0) {
-          const { error } = await deps.supabaseAdmin
+          const { error } = await supabase
             .from("parties")
             .update({ ...patch, is_employee: true })
             .eq("id", partyId)
             .eq("tenant_id", data.tenant_id);
           if (error) throw new Error(error.message);
         } else {
-          const { error } = await deps.supabaseAdmin
+          const { error } = await supabase
             .from("parties")
             .update({ is_employee: true })
             .eq("id", partyId)
@@ -242,7 +245,7 @@ export function createUpsertTeamMember(deps: TeamDeps) {
           if (error) throw new Error(error.message);
         }
       } else if (data.linked_user_id) {
-        const { data: existingParty, error: findErr } = await deps.supabaseAdmin
+        const { data: existingParty, error: findErr } = await supabase
           .from("parties")
           .select("id")
           .eq("tenant_id", data.tenant_id)
@@ -254,7 +257,7 @@ export function createUpsertTeamMember(deps: TeamDeps) {
         if (existingParty) {
           partyId = existingParty.id as string;
         } else {
-          const { data: member, error: mErr } = await deps.supabaseAdmin
+          const { data: member, error: mErr } = await supabase
             .from("tenant_users")
             .select("display_name, email")
             .eq("tenant_id", data.tenant_id)
@@ -263,7 +266,7 @@ export function createUpsertTeamMember(deps: TeamDeps) {
           if (mErr) throw new Error(mErr.message);
           if (!member) throw new Error("This person is not a member of this workspace");
 
-          const { data: newParty, error: insErr } = await deps.supabaseAdmin
+          const { data: newParty, error: insErr } = await supabase
             .from("parties")
             .insert({
               tenant_id: data.tenant_id,
@@ -280,7 +283,7 @@ export function createUpsertTeamMember(deps: TeamDeps) {
         }
       } else {
         if (!data.name_en) throw new Error("name_en is required to create a new team member");
-        const { data: newParty, error: insErr } = await deps.supabaseAdmin
+        const { data: newParty, error: insErr } = await supabase
           .from("parties")
           .insert({
             tenant_id: data.tenant_id,
@@ -296,7 +299,7 @@ export function createUpsertTeamMember(deps: TeamDeps) {
         created = true;
       }
 
-      const { data: existingProfile, error: findProfErr } = await deps.supabaseAdmin
+      const { data: existingProfile, error: findProfErr } = await supabase
         .from("employee_profiles")
         .select("id")
         .eq("tenant_id", data.tenant_id)
@@ -315,13 +318,13 @@ export function createUpsertTeamMember(deps: TeamDeps) {
       };
 
       if (existingProfile) {
-        const { error } = await deps.supabaseAdmin
+        const { error } = await supabase
           .from("employee_profiles")
           .update(profilePatch)
           .eq("id", existingProfile.id);
         if (error) throw new Error(error.message);
       } else {
-        const { error } = await deps.supabaseAdmin.from("employee_profiles").insert({
+        const { error } = await supabase.from("employee_profiles").insert({
           tenant_id: data.tenant_id,
           party_id: partyId,
           employment_status: data.employment_status ?? "active",
