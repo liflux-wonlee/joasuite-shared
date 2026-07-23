@@ -25,7 +25,7 @@
       "security": "Security",
       "organizations": "Organizations",
       "users": "Users",
-      "billing": "Billing"
+      "billing": "Billing & Plan"
     }
   },
   "bell": {
@@ -297,6 +297,7 @@
     "search_placeholder": "Search name or email",
     "col_name": "Name",
     "empty": "No team members yet.",
+    "load_failed": "Failed to load team members.",
     "saved": "Team member saved",
     "invite_as_user": "Invite as user",
     "inviting": "Inviting…",

@@ -25,7 +25,7 @@
       "security": "Bảo mật",
       "organizations": "Tổ chức",
       "users": "Người dùng",
-      "billing": "Thanh toán"
+      "billing": "Thanh toán & Gói"
     }
   },
   "bell": {
@@ -282,6 +282,7 @@
     "search_placeholder": "Tìm theo tên hoặc email",
     "col_name": "Tên",
     "empty": "Chưa có thành viên nhóm nào.",
+    "load_failed": "Không tải được danh sách thành viên nhóm.",
     "saved": "Đã lưu thông tin thành viên nhóm",
     "invite_as_user": "Mời làm người dùng",
     "inviting": "Đang mời…",

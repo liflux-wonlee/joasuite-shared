@@ -809,7 +809,8 @@ function createListTeamMembers(deps) {
     }).parse(i)
   ).handler(async ({ data, context }) => {
     await deps.assertCanReadTeam(data.tenant_id, context.userId);
-    let pq = deps.supabaseAdmin.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active").eq("tenant_id", data.tenant_id).eq("is_employee", true).order("name_en");
+    const supabase = context.supabase;
+    let pq = supabase.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active").eq("tenant_id", data.tenant_id).eq("is_employee", true).order("name_en");
     if (data.search?.trim()) {
       const s = data.search.trim().replace(/[%,()]/g, "");
       pq = pq.or(`name_en.ilike.%${s}%,contact_email.ilike.%${s}%`);
@@ -819,7 +820,7 @@ function createListTeamMembers(deps) {
     const partyIds = (parties ?? []).map((p) => p.id);
     let profiles = [];
     if (partyIds.length) {
-      const { data: profileRows, error: prErr } = await deps.supabaseAdmin.from("employee_profiles").select(
+      const { data: profileRows, error: prErr } = await supabase.from("employee_profiles").select(
         "party_id, department_id, position_id, manager_id, employment_status, hire_date, termination_date, worker_type"
       ).eq("tenant_id", data.tenant_id).in("party_id", partyIds);
       if (prErr) throw new Error(prErr.message);
@@ -828,7 +829,7 @@ function createListTeamMembers(deps) {
     const byParty = new Map(profiles.map((pr) => [pr.party_id, pr]));
     const deptIds = Array.from(new Set(profiles.map((p) => p.department_id).filter(Boolean)));
     const posIds = Array.from(new Set(profiles.map((p) => p.position_id).filter(Boolean)));
-    const { deptName, posName } = await loadDeptPosNames(deps.supabaseAdmin, data.tenant_id, deptIds, posIds);
+    const { deptName, posName } = await loadDeptPosNames(supabase, data.tenant_id, deptIds, posIds);
     let rows = (parties ?? []).map((p) => {
       const prof = byParty.get(p.id);
       return {
@@ -860,15 +861,16 @@ function createGetTeamMember(deps) {
     (i) => z.object({ tenant_id: z.string().uuid(), party_id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
     await deps.assertCanReadTeam(data.tenant_id, context.userId);
-    const { data: party, error: pErr } = await deps.supabaseAdmin.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active, is_employee").eq("tenant_id", data.tenant_id).eq("id", data.party_id).maybeSingle();
+    const supabase = context.supabase;
+    const { data: party, error: pErr } = await supabase.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active, is_employee").eq("tenant_id", data.tenant_id).eq("id", data.party_id).maybeSingle();
     if (pErr) throw new Error(pErr.message);
     if (!party || !party.is_employee) throw new Error("Team member not found");
-    const { data: profile, error: prErr } = await deps.supabaseAdmin.from("employee_profiles").select(
+    const { data: profile, error: prErr } = await supabase.from("employee_profiles").select(
       "party_id, department_id, position_id, manager_id, employment_status, hire_date, termination_date, worker_type"
     ).eq("tenant_id", data.tenant_id).eq("party_id", data.party_id).maybeSingle();
     if (prErr) throw new Error(prErr.message);
     const { deptName, posName } = await loadDeptPosNames(
-      deps.supabaseAdmin,
+      supabase,
       data.tenant_id,
       profile?.department_id ? [profile.department_id] : [],
       profile?.position_id ? [profile.position_id] : []
@@ -912,6 +914,7 @@ function createUpsertTeamMember(deps) {
   ).handler(async ({ data, context }) => {
     const callerId = context.userId;
     await deps.assertCanWriteTeam(data.tenant_id, callerId);
+    const supabase = context.supabase;
     let partyId;
     let created = false;
     if (data.party_id) {
@@ -921,22 +924,22 @@ function createUpsertTeamMember(deps) {
       if (data.contact_email !== void 0) patch.contact_email = data.contact_email;
       if (data.contact_phone !== void 0) patch.contact_phone = data.contact_phone;
       if (Object.keys(patch).length > 0) {
-        const { error } = await deps.supabaseAdmin.from("parties").update({ ...patch, is_employee: true }).eq("id", partyId).eq("tenant_id", data.tenant_id);
+        const { error } = await supabase.from("parties").update({ ...patch, is_employee: true }).eq("id", partyId).eq("tenant_id", data.tenant_id);
         if (error) throw new Error(error.message);
       } else {
-        const { error } = await deps.supabaseAdmin.from("parties").update({ is_employee: true }).eq("id", partyId).eq("tenant_id", data.tenant_id);
+        const { error } = await supabase.from("parties").update({ is_employee: true }).eq("id", partyId).eq("tenant_id", data.tenant_id);
         if (error) throw new Error(error.message);
       }
     } else if (data.linked_user_id) {
-      const { data: existingParty, error: findErr } = await deps.supabaseAdmin.from("parties").select("id").eq("tenant_id", data.tenant_id).eq("linked_user_id", data.linked_user_id).eq("is_employee", true).maybeSingle();
+      const { data: existingParty, error: findErr } = await supabase.from("parties").select("id").eq("tenant_id", data.tenant_id).eq("linked_user_id", data.linked_user_id).eq("is_employee", true).maybeSingle();
       if (findErr) throw new Error(findErr.message);
       if (existingParty) {
         partyId = existingParty.id;
       } else {
-        const { data: member, error: mErr } = await deps.supabaseAdmin.from("tenant_users").select("display_name, email").eq("tenant_id", data.tenant_id).eq("user_id", data.linked_user_id).maybeSingle();
+        const { data: member, error: mErr } = await supabase.from("tenant_users").select("display_name, email").eq("tenant_id", data.tenant_id).eq("user_id", data.linked_user_id).maybeSingle();
         if (mErr) throw new Error(mErr.message);
         if (!member) throw new Error("This person is not a member of this workspace");
-        const { data: newParty, error: insErr } = await deps.supabaseAdmin.from("parties").insert({
+        const { data: newParty, error: insErr } = await supabase.from("parties").insert({
           tenant_id: data.tenant_id,
           linked_user_id: data.linked_user_id,
           name_en: data.name_en ?? member.display_name ?? member.email ?? "Unnamed",
@@ -949,7 +952,7 @@ function createUpsertTeamMember(deps) {
       }
     } else {
       if (!data.name_en) throw new Error("name_en is required to create a new team member");
-      const { data: newParty, error: insErr } = await deps.supabaseAdmin.from("parties").insert({
+      const { data: newParty, error: insErr } = await supabase.from("parties").insert({
         tenant_id: data.tenant_id,
         name_en: data.name_en,
         contact_email: data.contact_email ?? null,
@@ -960,7 +963,7 @@ function createUpsertTeamMember(deps) {
       partyId = newParty.id;
       created = true;
     }
-    const { data: existingProfile, error: findProfErr } = await deps.supabaseAdmin.from("employee_profiles").select("id").eq("tenant_id", data.tenant_id).eq("party_id", partyId).maybeSingle();
+    const { data: existingProfile, error: findProfErr } = await supabase.from("employee_profiles").select("id").eq("tenant_id", data.tenant_id).eq("party_id", partyId).maybeSingle();
     if (findProfErr) throw new Error(findProfErr.message);
     const profilePatch = {
       department_id: data.department_id ?? null,
@@ -972,10 +975,10 @@ function createUpsertTeamMember(deps) {
       ...data.employment_status ? { employment_status: data.employment_status } : {}
     };
     if (existingProfile) {
-      const { error } = await deps.supabaseAdmin.from("employee_profiles").update(profilePatch).eq("id", existingProfile.id);
+      const { error } = await supabase.from("employee_profiles").update(profilePatch).eq("id", existingProfile.id);
       if (error) throw new Error(error.message);
     } else {
-      const { error } = await deps.supabaseAdmin.from("employee_profiles").insert({
+      const { error } = await supabase.from("employee_profiles").insert({
         tenant_id: data.tenant_id,
         party_id: partyId,
         employment_status: data.employment_status ?? "active",
@@ -2166,8 +2169,8 @@ APP_CODES.map((c) => `app_url.${c}`);
 var PLAN_CODES = ["free", "basic", "pro", "business"];
 var INTERVALS = ["month", "year"];
 var SOURCE_APP = "joasuite-core";
-async function getRoles(deps, tenantId, userId) {
-  const { data, error } = await deps.supabaseAdmin.from("user_roles").select("role").eq("tenant_id", tenantId).eq("user_id", userId);
+async function getRoles(supabase, tenantId, userId) {
+  const { data, error } = await supabase.from("user_roles").select("role").eq("tenant_id", tenantId).eq("user_id", userId);
   if (error) throw new Error(error.message);
   return (data ?? []).map((r) => r.role);
 }
@@ -2177,13 +2180,13 @@ function canManage(roles) {
 function canView(roles) {
   return canManage(roles) || roles.includes("finance_manager");
 }
-async function assertView(deps, tenantId, userId) {
-  const roles = await getRoles(deps, tenantId, userId);
+async function assertView(supabase, tenantId, userId) {
+  const roles = await getRoles(supabase, tenantId, userId);
   if (!canView(roles)) throw new Error("Forbidden: billing access not allowed for this role");
   return roles;
 }
-async function assertManage(deps, tenantId, userId) {
-  const roles = await getRoles(deps, tenantId, userId);
+async function assertManage(supabase, tenantId, userId) {
+  const roles = await getRoles(supabase, tenantId, userId);
   if (!canManage(roles)) throw new Error("Forbidden: billing management requires Owner, Super Admin, or Billing Admin");
   return roles;
 }
@@ -2204,14 +2207,14 @@ async function writeAudit(deps, opts) {
 var tenantInput = z.object({ tenant_id: z.string().uuid() });
 function createCanManageBillingFn(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => tenantInput.parse(i)).handler(async ({ data, context }) => {
-    const roles = await getRoles(deps, data.tenant_id, context.userId);
+    const roles = await getRoles(context.supabase, data.tenant_id, context.userId);
     return { can_manage: canManage(roles), can_view: canView(roles), roles };
   });
 }
 function createGetBillingOverview(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => tenantInput.parse(i)).handler(async ({ data, context }) => {
     const userId = context.userId;
-    const roles = await assertView(deps, data.tenant_id, userId);
+    const roles = await assertView(context.supabase, data.tenant_id, userId);
     const [customerQ, subsQ, pmQ, tenantAppsQ, tenantQ] = await Promise.all([
       deps.supabaseAdmin.from("billing_customers").select("*").eq("tenant_id", data.tenant_id).maybeSingle(),
       deps.supabaseAdmin.from("billing_subscriptions").select("*").eq("tenant_id", data.tenant_id),
@@ -2284,7 +2287,7 @@ function createUpdateBillingCustomer(deps) {
     }).parse(i)
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertManage(deps, data.tenant_id, userId);
+    await assertManage(context.supabase, data.tenant_id, userId);
     const { tenant_id, ...patch } = data;
     const { data: row, error } = await deps.supabaseAdmin.from("billing_customers").upsert({ tenant_id, ...patch }, { onConflict: "tenant_id" }).select().single();
     if (error) throw new Error(error.message);
@@ -2318,7 +2321,7 @@ function createChangeSubscriptionPlan(deps) {
     }).parse(i)
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertManage(deps, data.tenant_id, userId);
+    await assertManage(context.supabase, data.tenant_id, userId);
     const now = /* @__PURE__ */ new Date();
     const end = new Date(now);
     if (data.interval === "year") end.setFullYear(end.getFullYear() + 1);
@@ -2357,7 +2360,7 @@ function createCancelSubscription(deps) {
     }).parse(i)
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertManage(deps, data.tenant_id, userId);
+    await assertManage(context.supabase, data.tenant_id, userId);
     const update = data.at_period_end ? { cancel_at_period_end: true } : { cancel_at_period_end: true, status: "canceled" };
     const { data: row, error } = await deps.supabaseAdmin.from("billing_subscriptions").update(update).eq("tenant_id", data.tenant_id).eq("app_code", data.app_code).select().maybeSingle();
     if (error) throw new Error(error.message);
@@ -2378,7 +2381,7 @@ function createListBillingInvoices(deps) {
       limit: z.number().int().min(1).max(100).default(50)
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertView(deps, data.tenant_id, context.userId);
+    await assertView(context.supabase, data.tenant_id, context.userId);
     const { data: rows, error } = await deps.supabaseAdmin.from("billing_invoices").select("*").eq("tenant_id", data.tenant_id).order("issued_at", { ascending: false }).limit(data.limit);
     if (error) throw new Error(error.message);
     return rows ?? [];
@@ -2388,7 +2391,7 @@ function createGetBillingInvoice(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({ tenant_id: z.string().uuid(), id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertView(deps, data.tenant_id, context.userId);
+    await assertView(context.supabase, data.tenant_id, context.userId);
     const { data: row, error } = await deps.supabaseAdmin.from("billing_invoices").select("*").eq("tenant_id", data.tenant_id).eq("id", data.id).single();
     if (error) throw new Error(error.message);
     return row;
@@ -2399,7 +2402,7 @@ function createRetryInvoicePayment(deps) {
     (i) => z.object({ tenant_id: z.string().uuid(), id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertManage(deps, data.tenant_id, userId);
+    await assertManage(context.supabase, data.tenant_id, userId);
     await writeAudit(deps, {
       tenant_id: data.tenant_id,
       user_id: userId,
@@ -2413,7 +2416,7 @@ function createRetryInvoicePayment(deps) {
 function createSeedSampleBillingInvoices(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => tenantInput.parse(i)).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertManage(deps, data.tenant_id, userId);
+    await assertManage(context.supabase, data.tenant_id, userId);
     const { count } = await deps.supabaseAdmin.from("billing_invoices").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id);
     if ((count ?? 0) > 0) return { ok: true, inserted: 0, skipped: true };
     const now = /* @__PURE__ */ new Date();
@@ -2496,7 +2499,7 @@ function createSeedSampleBillingInvoices(deps) {
 }
 function createListBillingPaymentMethods(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => tenantInput.parse(i)).handler(async ({ data, context }) => {
-    await assertView(deps, data.tenant_id, context.userId);
+    await assertView(context.supabase, data.tenant_id, context.userId);
     const { data: rows, error } = await deps.supabaseAdmin.from("billing_payment_methods").select("*").eq("tenant_id", data.tenant_id).order("is_default", { ascending: false }).order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return rows ?? [];
@@ -2514,7 +2517,7 @@ function createAddMockPaymentMethod(deps) {
     }).parse(i)
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertManage(deps, data.tenant_id, userId);
+    await assertManage(context.supabase, data.tenant_id, userId);
     if (data.make_default) {
       await deps.supabaseAdmin.from("billing_payment_methods").update({ is_default: false }).eq("tenant_id", data.tenant_id);
     }
@@ -2536,7 +2539,7 @@ function createSetDefaultPaymentMethod(deps) {
     (i) => z.object({ tenant_id: z.string().uuid(), id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertManage(deps, data.tenant_id, userId);
+    await assertManage(context.supabase, data.tenant_id, userId);
     await deps.supabaseAdmin.from("billing_payment_methods").update({ is_default: false }).eq("tenant_id", data.tenant_id);
     const { error } = await deps.supabaseAdmin.from("billing_payment_methods").update({ is_default: true }).eq("tenant_id", data.tenant_id).eq("id", data.id);
     if (error) throw new Error(error.message);
@@ -2549,7 +2552,7 @@ function createRemovePaymentMethod(deps) {
     (i) => z.object({ tenant_id: z.string().uuid(), id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertManage(deps, data.tenant_id, userId);
+    await assertManage(context.supabase, data.tenant_id, userId);
     const { error } = await deps.supabaseAdmin.from("billing_payment_methods").delete().eq("tenant_id", data.tenant_id).eq("id", data.id);
     if (error) throw new Error(error.message);
     await writeAudit(deps, { tenant_id: data.tenant_id, user_id: userId, action: "billing.payment_method_removed", record_id: data.id });
@@ -2567,7 +2570,7 @@ function createStartTrial(deps) {
     }).parse(i)
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertManage(deps, data.tenant_id, userId);
+    await assertManage(context.supabase, data.tenant_id, userId);
     const now = /* @__PURE__ */ new Date();
     const end = new Date(now.getTime() + data.trial_days * 864e5);
     const { data: row, error } = await deps.supabaseAdmin.from("billing_subscriptions").upsert(
@@ -2607,7 +2610,7 @@ function createReactivateSubscription(deps) {
     (i) => z.object({ tenant_id: z.string().uuid(), app_code: z.enum(APP_CODES) }).parse(i)
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertManage(deps, data.tenant_id, userId);
+    await assertManage(context.supabase, data.tenant_id, userId);
     const { data: row, error } = await deps.supabaseAdmin.from("billing_subscriptions").update({ status: "active", cancel_at_period_end: false }).eq("tenant_id", data.tenant_id).eq("app_code", data.app_code).select().maybeSingle();
     if (error) throw new Error(error.message);
     await deps.supabaseAdmin.from("tenant_apps").update({ status: "active", canceled_at: null, deletion_scheduled_at: null }).eq("tenant_id", data.tenant_id).eq("app_code", data.app_code);
@@ -2625,7 +2628,7 @@ function createAddAppSubscription(deps) {
     }).parse(i)
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertManage(deps, data.tenant_id, userId);
+    await assertManage(context.supabase, data.tenant_id, userId);
     const now = /* @__PURE__ */ new Date();
     const end = new Date(now);
     if (data.interval === "year") end.setFullYear(end.getFullYear() + 1);
@@ -2666,7 +2669,7 @@ function createRemoveAppSubscription(deps) {
     (i) => z.object({ tenant_id: z.string().uuid(), app_code: z.enum(APP_CODES) }).parse(i)
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertManage(deps, data.tenant_id, userId);
+    await assertManage(context.supabase, data.tenant_id, userId);
     if (data.app_code === "joabooks") throw new Error("JoaBooks cannot be removed");
     await deps.supabaseAdmin.from("billing_subscriptions").delete().eq("tenant_id", data.tenant_id).eq("app_code", data.app_code);
     await deps.supabaseAdmin.from("tenant_apps").update({ status: "canceled", canceled_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("tenant_id", data.tenant_id).eq("app_code", data.app_code);
@@ -2684,7 +2687,7 @@ function computePromoStatus(p) {
 function createListAvailablePromotions(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => tenantInput.parse(i)).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertView(deps, data.tenant_id, userId);
+    await assertView(context.supabase, data.tenant_id, userId);
     const { data: rows, error } = await deps.supabaseAdmin.from("promotion_codes").select("*").order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return (rows ?? []).map((r) => ({ ...r, computed_status: computePromoStatus(r) }));
@@ -2693,7 +2696,7 @@ function createListAvailablePromotions(deps) {
 function createListTenantDiscounts(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => tenantInput.parse(i)).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertView(deps, data.tenant_id, userId);
+    await assertView(context.supabase, data.tenant_id, userId);
     const { data: rows, error } = await deps.supabaseAdmin.from("billing_discounts").select("*").eq("tenant_id", data.tenant_id).order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
     return rows ?? [];
@@ -2703,7 +2706,7 @@ var redeemInput = z.object({ tenant_id: z.string().uuid(), code: z.string().min(
 function createRedeemPromoCode(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => redeemInput.parse(i)).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertManage(deps, data.tenant_id, userId);
+    await assertManage(context.supabase, data.tenant_id, userId);
     const code = data.code.trim().toUpperCase();
     const { data: promo, error: pErr } = await deps.supabaseAdmin.from("promotion_codes").select("*").eq("code", code).maybeSingle();
     if (pErr) throw new Error(pErr.message);
@@ -2750,7 +2753,7 @@ function createRedeemPromoCode(deps) {
 function createRemoveTenantDiscount(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => z.object({ tenant_id: z.string().uuid(), discount_id: z.string().uuid() }).parse(i)).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertManage(deps, data.tenant_id, userId);
+    await assertManage(context.supabase, data.tenant_id, userId);
     const { error } = await deps.supabaseAdmin.from("billing_discounts").update({ status: "canceled", ends_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("tenant_id", data.tenant_id).eq("id", data.discount_id);
     if (error) throw new Error(error.message);
     await writeAudit(deps, { tenant_id: data.tenant_id, user_id: userId, action: "billing.discount_removed", record_id: data.discount_id });
@@ -2767,7 +2770,7 @@ function genReferralCode(orgName) {
 function createGetReferralProgram(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => tenantInput.parse(i)).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertView(deps, data.tenant_id, userId);
+    await assertView(context.supabase, data.tenant_id, userId);
     let { data: prog, error } = await deps.supabaseAdmin.from("referral_programs").select("*").eq("tenant_id", data.tenant_id).maybeSingle();
     if (error) throw new Error(error.message);
     if (!prog) {
@@ -2793,7 +2796,7 @@ function createAddMockReferral(deps) {
     }).parse(i)
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertManage(deps, data.tenant_id, userId);
+    await assertManage(context.supabase, data.tenant_id, userId);
     const { data: prog } = await deps.supabaseAdmin.from("referral_programs").select("*").eq("tenant_id", data.tenant_id).maybeSingle();
     if (!prog) throw new Error("Referral program not initialized");
     const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -2832,7 +2835,7 @@ function createUpdateReferralStatus(deps) {
     }).parse(i)
   ).handler(async ({ data, context }) => {
     const userId = context.userId;
-    await assertManage(deps, data.tenant_id, userId);
+    await assertManage(context.supabase, data.tenant_id, userId);
     const { data: existing } = await deps.supabaseAdmin.from("referrals").select("*").eq("id", data.referral_id).eq("referrer_tenant_id", data.tenant_id).maybeSingle();
     if (!existing) throw new Error("Referral not found");
     const { data: prog } = await deps.supabaseAdmin.from("referral_programs").select("*").eq("tenant_id", data.tenant_id).maybeSingle();
@@ -2879,7 +2882,7 @@ function limitsFor(appCode, planCode) {
 }
 function createGetTenantUsage(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((data) => data).handler(async ({ data, context }) => {
-    await assertView(deps, data.tenant_id, context.userId);
+    await assertView(context.supabase, data.tenant_id, context.userId);
     const appCode = data.app_code ?? "joabooks";
     const { data: sub } = await deps.supabaseAdmin.from("billing_subscriptions").select("plan_code,status").eq("tenant_id", data.tenant_id).eq("app_code", appCode).maybeSingle();
     const planCode = sub?.plan_code ?? "free";

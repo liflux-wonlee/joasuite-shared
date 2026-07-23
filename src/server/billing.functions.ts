@@ -22,8 +22,16 @@ export type BillingDeps = {
 
 type Role = string;
 
-async function getRoles(deps: BillingDeps, tenantId: string, userId: string): Promise<Role[]> {
-  const { data, error } = await deps.supabaseAdmin
+// Uses the caller's own RLS-scoped client (context.supabase), not
+// deps.supabaseAdmin — a self-read of the caller's own user_roles rows
+// works fine under RLS (see joahr's auth-context.tsx, which reads the same
+// table the same way) and, unlike the service-role client, never throws in
+// deployments where SUPABASE_SERVICE_ROLE_KEY isn't provisioned. That
+// service-role dependency was the actual root cause of "owner sees no
+// permission" in joahr/joaoffice/joasop: the whole billing gate hinges on
+// this one read succeeding.
+async function getRoles(supabase: any, tenantId: string, userId: string): Promise<Role[]> {
+  const { data, error } = await supabase
     .from("user_roles")
     .select("role")
     .eq("tenant_id", tenantId)
@@ -39,13 +47,13 @@ function canView(roles: Role[]) {
   return canManage(roles) || roles.includes("finance_manager");
 }
 
-async function assertView(deps: BillingDeps, tenantId: string, userId: string) {
-  const roles = await getRoles(deps, tenantId, userId);
+async function assertView(supabase: any, tenantId: string, userId: string) {
+  const roles = await getRoles(supabase, tenantId, userId);
   if (!canView(roles)) throw new Error("Forbidden: billing access not allowed for this role");
   return roles;
 }
-async function assertManage(deps: BillingDeps, tenantId: string, userId: string) {
-  const roles = await getRoles(deps, tenantId, userId);
+async function assertManage(supabase: any, tenantId: string, userId: string) {
+  const roles = await getRoles(supabase, tenantId, userId);
   if (!canManage(roles)) throw new Error("Forbidden: billing management requires Owner, Super Admin, or Billing Admin");
   return roles;
 }
@@ -85,7 +93,7 @@ export function createCanManageBillingFn(deps: BillingDeps) {
     .middleware([deps.requireSupabaseAuth])
     .inputValidator((i) => tenantInput.parse(i))
     .handler(async ({ data, context }) => {
-      const roles = await getRoles(deps, data.tenant_id, (context as any).userId);
+      const roles = await getRoles((context as any).supabase, data.tenant_id, (context as any).userId);
       return { can_manage: canManage(roles), can_view: canView(roles), roles };
     });
 }
@@ -99,7 +107,7 @@ export function createGetBillingOverview(deps: BillingDeps) {
     .inputValidator((i) => tenantInput.parse(i))
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      const roles = await assertView(deps, data.tenant_id, userId);
+      const roles = await assertView((context as any).supabase, data.tenant_id, userId);
 
       const [customerQ, subsQ, pmQ, tenantAppsQ, tenantQ] = await Promise.all([
         deps.supabaseAdmin.from("billing_customers").select("*").eq("tenant_id", data.tenant_id).maybeSingle(),
@@ -190,7 +198,7 @@ export function createUpdateBillingCustomer(deps: BillingDeps) {
     )
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertManage(deps, data.tenant_id, userId);
+      await assertManage((context as any).supabase, data.tenant_id, userId);
       const { tenant_id, ...patch } = data;
       const { data: row, error } = await deps.supabaseAdmin
         .from("billing_customers")
@@ -241,7 +249,7 @@ export function createChangeSubscriptionPlan(deps: BillingDeps) {
     )
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertManage(deps, data.tenant_id, userId);
+      await assertManage((context as any).supabase, data.tenant_id, userId);
 
       const now = new Date();
       const end = new Date(now);
@@ -291,7 +299,7 @@ export function createCancelSubscription(deps: BillingDeps) {
     )
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertManage(deps, data.tenant_id, userId);
+      await assertManage((context as any).supabase, data.tenant_id, userId);
 
       const update = data.at_period_end
         ? { cancel_at_period_end: true }
@@ -330,7 +338,7 @@ export function createListBillingInvoices(deps: BillingDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertView(deps, data.tenant_id, (context as any).userId);
+      await assertView((context as any).supabase, data.tenant_id, (context as any).userId);
       const { data: rows, error } = await deps.supabaseAdmin
         .from("billing_invoices")
         .select("*")
@@ -349,7 +357,7 @@ export function createGetBillingInvoice(deps: BillingDeps) {
       z.object({ tenant_id: z.string().uuid(), id: z.string().uuid() }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertView(deps, data.tenant_id, (context as any).userId);
+      await assertView((context as any).supabase, data.tenant_id, (context as any).userId);
       const { data: row, error } = await deps.supabaseAdmin
         .from("billing_invoices")
         .select("*")
@@ -369,7 +377,7 @@ export function createRetryInvoicePayment(deps: BillingDeps) {
     )
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertManage(deps, data.tenant_id, userId);
+      await assertManage((context as any).supabase, data.tenant_id, userId);
       // Stripe not connected yet — record the intent only.
       await writeAudit(deps, {
         tenant_id: data.tenant_id,
@@ -388,7 +396,7 @@ export function createSeedSampleBillingInvoices(deps: BillingDeps) {
     .inputValidator((i) => tenantInput.parse(i))
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertManage(deps, data.tenant_id, userId);
+      await assertManage((context as any).supabase, data.tenant_id, userId);
 
       const { count } = await deps.supabaseAdmin
         .from("billing_invoices")
@@ -452,7 +460,7 @@ export function createListBillingPaymentMethods(deps: BillingDeps) {
     .middleware([deps.requireSupabaseAuth])
     .inputValidator((i) => tenantInput.parse(i))
     .handler(async ({ data, context }) => {
-      await assertView(deps, data.tenant_id, (context as any).userId);
+      await assertView((context as any).supabase, data.tenant_id, (context as any).userId);
       const { data: rows, error } = await deps.supabaseAdmin
         .from("billing_payment_methods")
         .select("*")
@@ -479,7 +487,7 @@ export function createAddMockPaymentMethod(deps: BillingDeps) {
     )
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertManage(deps, data.tenant_id, userId);
+      await assertManage((context as any).supabase, data.tenant_id, userId);
 
       if (data.make_default) {
         await deps.supabaseAdmin
@@ -513,7 +521,7 @@ export function createSetDefaultPaymentMethod(deps: BillingDeps) {
     )
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertManage(deps, data.tenant_id, userId);
+      await assertManage((context as any).supabase, data.tenant_id, userId);
       await deps.supabaseAdmin
         .from("billing_payment_methods")
         .update({ is_default: false })
@@ -537,7 +545,7 @@ export function createRemovePaymentMethod(deps: BillingDeps) {
     )
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertManage(deps, data.tenant_id, userId);
+      await assertManage((context as any).supabase, data.tenant_id, userId);
       const { error } = await deps.supabaseAdmin
         .from("billing_payment_methods")
         .delete()
@@ -566,7 +574,7 @@ export function createStartTrial(deps: BillingDeps) {
     )
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertManage(deps, data.tenant_id, userId);
+      await assertManage((context as any).supabase, data.tenant_id, userId);
       const now = new Date();
       const end = new Date(now.getTime() + data.trial_days * 86_400_000);
       const { data: row, error } = await deps.supabaseAdmin
@@ -614,7 +622,7 @@ export function createReactivateSubscription(deps: BillingDeps) {
     )
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertManage(deps, data.tenant_id, userId);
+      await assertManage((context as any).supabase, data.tenant_id, userId);
       const { data: row, error } = await deps.supabaseAdmin
         .from("billing_subscriptions")
         .update({ status: "active", cancel_at_period_end: false })
@@ -646,7 +654,7 @@ export function createAddAppSubscription(deps: BillingDeps) {
     )
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertManage(deps, data.tenant_id, userId);
+      await assertManage((context as any).supabase, data.tenant_id, userId);
       const now = new Date();
       const end = new Date(now);
       if (data.interval === "year") end.setFullYear(end.getFullYear() + 1);
@@ -695,7 +703,7 @@ export function createRemoveAppSubscription(deps: BillingDeps) {
     )
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertManage(deps, data.tenant_id, userId);
+      await assertManage((context as any).supabase, data.tenant_id, userId);
       if (data.app_code === "joabooks") throw new Error("JoaBooks cannot be removed");
       await deps.supabaseAdmin
         .from("billing_subscriptions")
@@ -730,7 +738,7 @@ export function createListAvailablePromotions(deps: BillingDeps) {
     .inputValidator((i) => tenantInput.parse(i))
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertView(deps, data.tenant_id, userId);
+      await assertView((context as any).supabase, data.tenant_id, userId);
       const { data: rows, error } = await deps.supabaseAdmin
         .from("promotion_codes")
         .select("*")
@@ -746,7 +754,7 @@ export function createListTenantDiscounts(deps: BillingDeps) {
     .inputValidator((i) => tenantInput.parse(i))
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertView(deps, data.tenant_id, userId);
+      await assertView((context as any).supabase, data.tenant_id, userId);
       const { data: rows, error } = await deps.supabaseAdmin
         .from("billing_discounts")
         .select("*")
@@ -765,7 +773,7 @@ export function createRedeemPromoCode(deps: BillingDeps) {
     .inputValidator((i) => redeemInput.parse(i))
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertManage(deps, data.tenant_id, userId);
+      await assertManage((context as any).supabase, data.tenant_id, userId);
       const code = data.code.trim().toUpperCase();
 
       const { data: promo, error: pErr } = await deps.supabaseAdmin
@@ -840,7 +848,7 @@ export function createRemoveTenantDiscount(deps: BillingDeps) {
     .inputValidator((i) => z.object({ tenant_id: z.string().uuid(), discount_id: z.string().uuid() }).parse(i))
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertManage(deps, data.tenant_id, userId);
+      await assertManage((context as any).supabase, data.tenant_id, userId);
       const { error } = await deps.supabaseAdmin
         .from("billing_discounts")
         .update({ status: "canceled", ends_at: new Date().toISOString() })
@@ -870,7 +878,7 @@ export function createGetReferralProgram(deps: BillingDeps) {
     .inputValidator((i) => tenantInput.parse(i))
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertView(deps, data.tenant_id, userId);
+      await assertView((context as any).supabase, data.tenant_id, userId);
 
       let { data: prog, error } = await deps.supabaseAdmin
         .from("referral_programs")
@@ -917,7 +925,7 @@ export function createAddMockReferral(deps: BillingDeps) {
     )
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertManage(deps, data.tenant_id, userId);
+      await assertManage((context as any).supabase, data.tenant_id, userId);
 
       const { data: prog } = await deps.supabaseAdmin
         .from("referral_programs")
@@ -977,7 +985,7 @@ export function createUpdateReferralStatus(deps: BillingDeps) {
     )
     .handler(async ({ data, context }) => {
       const userId = (context as any).userId as string;
-      await assertManage(deps, data.tenant_id, userId);
+      await assertManage((context as any).supabase, data.tenant_id, userId);
 
       const { data: existing } = await deps.supabaseAdmin
         .from("referrals")
@@ -1058,7 +1066,7 @@ export function createGetTenantUsage(deps: BillingDeps) {
     .middleware([deps.requireSupabaseAuth])
     .inputValidator((data: { tenant_id: string; app_code?: string }) => data)
     .handler(async ({ data, context }) => {
-      await assertView(deps, data.tenant_id, (context as any).userId);
+      await assertView((context as any).supabase, data.tenant_id, (context as any).userId);
       const appCode = data.app_code ?? "joabooks";
 
       const { data: sub } = await deps.supabaseAdmin

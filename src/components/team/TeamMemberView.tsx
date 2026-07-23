@@ -64,20 +64,24 @@ export function TeamMemberView({ tenantId, partyId, onEdit }: TeamMemberViewProp
       </FieldGroup>
 
       <FieldGroup title={t("team.group_organization", "Organization")}>
-        <FieldRow label={t("team.department", "Department")} value={e.department} />
-        <FieldRow label={t("team.position", "Position")} value={e.position} />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <FieldRow label={t("team.department", "Department")} value={e.department} />
+          <FieldRow label={t("team.position", "Position")} value={e.position} />
+        </div>
       </FieldGroup>
 
       <FieldGroup title={t("team.group_employment", "Employment")}>
-        <FieldRow
-          label={t("team.worker_type", "Worker type")}
-          value={e.worker_type ? String(t(`team.worker_type_${e.worker_type}`, e.worker_type)) : null}
-        />
-        <FieldRow
-          label={t("team.employment_status", "Status")}
-          value={e.employment_status ? String(t(`team.status_${e.employment_status}`, e.employment_status)) : null}
-        />
-        <FieldRow label={t("team.hire_date", "Hire date")} value={e.hire_date} />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <FieldRow
+            label={t("team.worker_type", "Worker type")}
+            value={e.worker_type ? String(t(`team.worker_type_${e.worker_type}`, e.worker_type)) : null}
+          />
+          <FieldRow
+            label={t("team.employment_status", "Status")}
+            value={e.employment_status ? String(t(`team.status_${e.employment_status}`, e.employment_status)) : null}
+          />
+          <FieldRow label={t("team.hire_date", "Hire date")} value={e.hire_date} />
+        </div>
       </FieldGroup>
     </div>
   );
