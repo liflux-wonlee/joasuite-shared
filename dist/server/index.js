@@ -790,6 +790,22 @@ function createUpdateMyDefaultTenant(deps) {
 }
 var WORKER_TYPES = ["employee", "contractor"];
 var EMPLOYMENT_STATUSES = ["active", "on_leave", "terminated"];
+function assertTeamContext(deps, context, fnName) {
+  const problems = [];
+  if (!context) problems.push("context itself is falsy");
+  if (context && !context.supabase) problems.push("context.supabase is falsy");
+  if (context && context.supabase && typeof context.supabase.from !== "function") {
+    problems.push(`context.supabase.from is ${typeof context.supabase?.from}, not a function`);
+  }
+  if (context && context.userId === void 0) problems.push("context.userId is undefined");
+  if (typeof deps.assertCanReadTeam !== "function") problems.push("deps.assertCanReadTeam is not a function");
+  if (typeof deps.assertCanWriteTeam !== "function") problems.push("deps.assertCanWriteTeam is not a function");
+  if (problems.length) {
+    throw new Error(
+      `[team diagnostic] ${fnName}: ${problems.join("; ")}. context keys: ${context ? Object.keys(context).join(",") : "n/a"}`
+    );
+  }
+}
 async function loadDeptPosNames(supabaseAdmin, tenantId, deptIds, posIds) {
   const [{ data: depts }, { data: positions }] = await Promise.all([
     deptIds.length ? supabaseAdmin.from("departments").select("id, name").eq("tenant_id", tenantId).in("id", deptIds) : Promise.resolve({ data: [] }),
@@ -808,6 +824,7 @@ function createListTeamMembers(deps) {
       worker_type: z.enum(WORKER_TYPES).optional()
     }).parse(i)
   ).handler(async ({ data, context }) => {
+    assertTeamContext(deps, context, "createListTeamMembers");
     const supabase = context.supabase;
     await deps.assertCanReadTeam(supabase, data.tenant_id, context.userId);
     let pq = supabase.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active").eq("tenant_id", data.tenant_id).eq("is_employee", true).order("name_en");
@@ -860,6 +877,7 @@ function createGetTeamMember(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({ tenant_id: z.string().uuid(), party_id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
+    assertTeamContext(deps, context, "createGetTeamMember");
     const supabase = context.supabase;
     await deps.assertCanReadTeam(supabase, data.tenant_id, context.userId);
     const { data: party, error: pErr } = await supabase.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active, is_employee").eq("tenant_id", data.tenant_id).eq("id", data.party_id).maybeSingle();
@@ -912,6 +930,7 @@ function createUpsertTeamMember(deps) {
       worker_type: z.enum(WORKER_TYPES).default("employee")
     }).parse(i)
   ).handler(async ({ data, context }) => {
+    assertTeamContext(deps, context, "createUpsertTeamMember");
     const callerId = context.userId;
     const supabase = context.supabase;
     await deps.assertCanWriteTeam(supabase, data.tenant_id, callerId);
@@ -2365,6 +2384,10 @@ function createChangeSubscriptionPlan(deps) {
       { onConflict: "tenant_id,app_code" }
     ).select().single();
     if (error) throw new Error(error.message);
+    await context.supabase.from("tenant_apps").upsert(
+      { tenant_id: data.tenant_id, app_code: data.app_code, plan: data.plan_code, status: "active" },
+      { onConflict: "tenant_id,app_code" }
+    );
     await writeAudit(deps, {
       tenant_id: data.tenant_id,
       user_id: userId,

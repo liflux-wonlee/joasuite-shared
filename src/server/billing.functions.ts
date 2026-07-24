@@ -279,6 +279,16 @@ export function createChangeSubscriptionPlan(deps: BillingDeps) {
         .single();
       if (error) throw new Error(error.message);
 
+      // tenant_apps.plan is a denormalized copy of billing_subscriptions.plan_code,
+      // read directly by other screens (e.g. the Users/People admin detail page's
+      // per-app plan badge) that don't join billing_subscriptions. Keep it in sync
+      // here the same way createStartTrial/createAddAppSubscription already do,
+      // or those screens silently show a stale plan tier after every plan change.
+      await (context as any).supabase.from("tenant_apps").upsert(
+        { tenant_id: data.tenant_id, app_code: data.app_code, plan: data.plan_code, status: "active" },
+        { onConflict: "tenant_id,app_code" },
+      );
+
       await writeAudit(deps, {
         tenant_id: data.tenant_id,
         user_id: userId,
