@@ -20,6 +20,33 @@ export type OrgStructureDeps = {
 /** Departments may nest at most this many levels deep (1 = top-level). */
 export const MAX_DEPARTMENT_DEPTH = 4;
 
+/**
+ * Diagnostic guard, temporary: reports of "Cannot read properties of
+ * undefined (reading 'from')" on these functions in production, with no
+ * code-level cause found across multiple rounds of review (context.supabase
+ * wiring, deps binding, and the app-level gate functions all check out
+ * correct in source). This turns that opaque V8 message into one that says
+ * exactly what's missing, the next time it fires, instead of requiring a
+ * browser stack trace we've had trouble collecting. Safe to remove once the
+ * actual cause is identified.
+ */
+function assertOrgStructureContext(deps: OrgStructureDeps, context: any, fnName: string): void {
+  const problems: string[] = [];
+  if (!context) problems.push("context itself is falsy");
+  if (context && !context.supabase) problems.push("context.supabase is falsy");
+  if (context && context.supabase && typeof context.supabase.from !== "function") {
+    problems.push(`context.supabase.from is ${typeof context.supabase?.from}, not a function`);
+  }
+  if (context && context.userId === undefined) problems.push("context.userId is undefined");
+  if (typeof deps.assertCanReadOrgStructure !== "function") problems.push("deps.assertCanReadOrgStructure is not a function");
+  if (typeof deps.assertCanManageOrgStructure !== "function") problems.push("deps.assertCanManageOrgStructure is not a function");
+  if (problems.length) {
+    throw new Error(
+      `[org-structure diagnostic] ${fnName}: ${problems.join("; ")}. context keys: ${context ? Object.keys(context).join(",") : "n/a"}`,
+    );
+  }
+}
+
 type DeptRow = { id: string; parent_department_id: string | null; depth: number };
 
 async function fetchAllDepartments(supabase: any, tenantId: string): Promise<DeptRow[]> {
@@ -69,6 +96,7 @@ export function createListDepartmentsAndPositions(deps: OrgStructureDeps) {
     .middleware([deps.requireSupabaseAuth])
     .inputValidator((i: unknown) => z.object({ tenant_id: z.string().uuid() }).parse(i))
     .handler(async ({ data, context }) => {
+      assertOrgStructureContext(deps, context, "createListDepartmentsAndPositions");
       await deps.assertCanReadOrgStructure((context as any).supabase, data.tenant_id, (context as any).userId);
       const [{ data: departments, error: dErr }, { data: positions, error: pErr }] =
         await Promise.all([
@@ -104,6 +132,7 @@ export function createCreateDepartment(deps: OrgStructureDeps) {
         .parse(i),
     )
     .handler(async ({ data, context }) => {
+      assertOrgStructureContext(deps, context, "createCreateDepartment");
       await deps.assertCanManageOrgStructure((context as any).supabase, data.tenant_id, (context as any).userId);
 
       let depth = 1;
@@ -154,6 +183,7 @@ export function createUpdateDepartment(deps: OrgStructureDeps) {
         .parse(i),
     )
     .handler(async ({ data, context }) => {
+      assertOrgStructureContext(deps, context, "createUpdateDepartment");
       await deps.assertCanManageOrgStructure((context as any).supabase, data.tenant_id, (context as any).userId);
 
       const patch: Record<string, unknown> = {
@@ -219,6 +249,7 @@ export function createDeleteDepartment(deps: OrgStructureDeps) {
       z.object({ tenant_id: z.string().uuid(), id: z.string().uuid() }).parse(i),
     )
     .handler(async ({ data, context }) => {
+      assertOrgStructureContext(deps, context, "createDeleteDepartment");
       await deps.assertCanManageOrgStructure((context as any).supabase, data.tenant_id, (context as any).userId);
 
       const [{ count: childCount, error: childErr }, { count: posCount, error: posErr }] =
@@ -266,6 +297,7 @@ export function createCreatePosition(deps: OrgStructureDeps) {
         .parse(i),
     )
     .handler(async ({ data, context }) => {
+      assertOrgStructureContext(deps, context, "createCreatePosition");
       await deps.assertCanManageOrgStructure((context as any).supabase, data.tenant_id, (context as any).userId);
       const { data: pos, error } = await (context as any).supabase
         .from("positions")
@@ -290,6 +322,7 @@ export function createUpdatePosition(deps: OrgStructureDeps) {
         .parse(i),
     )
     .handler(async ({ data, context }) => {
+      assertOrgStructureContext(deps, context, "createUpdatePosition");
       await deps.assertCanManageOrgStructure((context as any).supabase, data.tenant_id, (context as any).userId);
       const { error } = await (context as any).supabase
         .from("positions")
@@ -308,6 +341,7 @@ export function createDeletePosition(deps: OrgStructureDeps) {
       z.object({ tenant_id: z.string().uuid(), id: z.string().uuid() }).parse(i),
     )
     .handler(async ({ data, context }) => {
+      assertOrgStructureContext(deps, context, "createDeletePosition");
       await deps.assertCanManageOrgStructure((context as any).supabase, data.tenant_id, (context as any).userId);
       const { error } = await (context as any).supabase
         .from("positions")
@@ -342,6 +376,7 @@ export function createGetOrgChartTree(deps: OrgStructureDeps) {
     .middleware([deps.requireSupabaseAuth])
     .inputValidator((i: unknown) => z.object({ tenant_id: z.string().uuid() }).parse(i))
     .handler(async ({ data, context }) => {
+      assertOrgStructureContext(deps, context, "createGetOrgChartTree");
       await deps.assertCanReadOrgStructure((context as any).supabase, data.tenant_id, (context as any).userId);
 
       const [{ data: departments, error: dErr }, { data: positions, error: pErr }] =
