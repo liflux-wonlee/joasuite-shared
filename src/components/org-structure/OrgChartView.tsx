@@ -255,6 +255,13 @@ export function OrgChartView({ tenantId, tree, isLoading }: OrgChartViewProps) {
   if (loading) {
     return <div className="text-sm text-muted-foreground">{t("common.loading")}</div>;
   }
+  if (!tree && q.isError) {
+    return (
+      <div className="border rounded-lg p-10 text-center text-destructive">
+        {(q.error as Error)?.message || t("team.load_failed", "Failed to load the org chart.")}
+      </div>
+    );
+  }
   if (roots.length === 0) {
     return (
       <div className="border rounded-lg p-10 text-center text-muted-foreground">
