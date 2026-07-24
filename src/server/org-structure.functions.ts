@@ -12,9 +12,9 @@ export type OrgStructureDeps = {
   requireSupabaseAuth: any;
   supabaseAdmin: any;
   /** Read-gate: any tenant member who may see the org structure. */
-  assertCanReadOrgStructure: (tenantId: string, userId: string) => Promise<void>;
+  assertCanReadOrgStructure: (supabase: any, tenantId: string, userId: string) => Promise<void>;
   /** Write-gate: who may create/edit/delete departments and positions. */
-  assertCanManageOrgStructure: (tenantId: string, userId: string) => Promise<void>;
+  assertCanManageOrgStructure: (supabase: any, tenantId: string, userId: string) => Promise<void>;
 };
 
 /** Departments may nest at most this many levels deep (1 = top-level). */
@@ -22,8 +22,8 @@ export const MAX_DEPARTMENT_DEPTH = 4;
 
 type DeptRow = { id: string; parent_department_id: string | null; depth: number };
 
-async function fetchAllDepartments(supabaseAdmin: any, tenantId: string): Promise<DeptRow[]> {
-  const { data, error } = await supabaseAdmin
+async function fetchAllDepartments(supabase: any, tenantId: string): Promise<DeptRow[]> {
+  const { data, error } = await supabase
     .from("departments")
     .select("id, parent_department_id, depth")
     .eq("tenant_id", tenantId);
@@ -69,16 +69,16 @@ export function createListDepartmentsAndPositions(deps: OrgStructureDeps) {
     .middleware([deps.requireSupabaseAuth])
     .inputValidator((i: unknown) => z.object({ tenant_id: z.string().uuid() }).parse(i))
     .handler(async ({ data, context }) => {
-      await deps.assertCanReadOrgStructure(data.tenant_id, (context as any).userId);
+      await deps.assertCanReadOrgStructure((context as any).supabase, data.tenant_id, (context as any).userId);
       const [{ data: departments, error: dErr }, { data: positions, error: pErr }] =
         await Promise.all([
-          deps.supabaseAdmin
+          (context as any).supabase
             .from("departments")
             .select("id, name, code, parent_department_id, depth")
             .eq("tenant_id", data.tenant_id)
             .order("depth")
             .order("name"),
-          deps.supabaseAdmin
+          (context as any).supabase
             .from("positions")
             .select("id, name, department_id")
             .eq("tenant_id", data.tenant_id)
@@ -104,11 +104,11 @@ export function createCreateDepartment(deps: OrgStructureDeps) {
         .parse(i),
     )
     .handler(async ({ data, context }) => {
-      await deps.assertCanManageOrgStructure(data.tenant_id, (context as any).userId);
+      await deps.assertCanManageOrgStructure((context as any).supabase, data.tenant_id, (context as any).userId);
 
       let depth = 1;
       if (data.parent_department_id) {
-        const { data: parent, error: parentErr } = await deps.supabaseAdmin
+        const { data: parent, error: parentErr } = await (context as any).supabase
           .from("departments")
           .select("id, depth")
           .eq("tenant_id", data.tenant_id)
@@ -122,7 +122,7 @@ export function createCreateDepartment(deps: OrgStructureDeps) {
         }
       }
 
-      const { data: dept, error } = await deps.supabaseAdmin
+      const { data: dept, error } = await (context as any).supabase
         .from("departments")
         .insert({
           tenant_id: data.tenant_id,
@@ -154,7 +154,7 @@ export function createUpdateDepartment(deps: OrgStructureDeps) {
         .parse(i),
     )
     .handler(async ({ data, context }) => {
-      await deps.assertCanManageOrgStructure(data.tenant_id, (context as any).userId);
+      await deps.assertCanManageOrgStructure((context as any).supabase, data.tenant_id, (context as any).userId);
 
       const patch: Record<string, unknown> = {
         name: data.name,
@@ -165,7 +165,7 @@ export function createUpdateDepartment(deps: OrgStructureDeps) {
         if (data.parent_department_id === data.id) {
           throw new Error("A department cannot be its own parent");
         }
-        const all = await fetchAllDepartments(deps.supabaseAdmin, data.tenant_id);
+        const all = await fetchAllDepartments((context as any).supabase, data.tenant_id);
         const current = all.find((d) => d.id === data.id);
         if (!current) throw new Error("Department not found");
 
@@ -192,7 +192,7 @@ export function createUpdateDepartment(deps: OrgStructureDeps) {
         if (depthDelta !== 0 && descendants.length > 0) {
           await Promise.all(
             descendants.map((d) =>
-              deps.supabaseAdmin
+              (context as any).supabase
                 .from("departments")
                 .update({ depth: d.depth + depthDelta })
                 .eq("id", d.id)
@@ -202,7 +202,7 @@ export function createUpdateDepartment(deps: OrgStructureDeps) {
         }
       }
 
-      const { error } = await deps.supabaseAdmin
+      const { error } = await (context as any).supabase
         .from("departments")
         .update(patch)
         .eq("id", data.id)
@@ -219,16 +219,16 @@ export function createDeleteDepartment(deps: OrgStructureDeps) {
       z.object({ tenant_id: z.string().uuid(), id: z.string().uuid() }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await deps.assertCanManageOrgStructure(data.tenant_id, (context as any).userId);
+      await deps.assertCanManageOrgStructure((context as any).supabase, data.tenant_id, (context as any).userId);
 
       const [{ count: childCount, error: childErr }, { count: posCount, error: posErr }] =
         await Promise.all([
-          deps.supabaseAdmin
+          (context as any).supabase
             .from("departments")
             .select("id", { count: "exact", head: true })
             .eq("tenant_id", data.tenant_id)
             .eq("parent_department_id", data.id),
-          deps.supabaseAdmin
+          (context as any).supabase
             .from("positions")
             .select("id", { count: "exact", head: true })
             .eq("tenant_id", data.tenant_id)
@@ -243,7 +243,7 @@ export function createDeleteDepartment(deps: OrgStructureDeps) {
         throw new Error("Move or delete this department's positions first");
       }
 
-      const { error } = await deps.supabaseAdmin
+      const { error } = await (context as any).supabase
         .from("departments")
         .delete()
         .eq("id", data.id)
@@ -266,8 +266,8 @@ export function createCreatePosition(deps: OrgStructureDeps) {
         .parse(i),
     )
     .handler(async ({ data, context }) => {
-      await deps.assertCanManageOrgStructure(data.tenant_id, (context as any).userId);
-      const { data: pos, error } = await deps.supabaseAdmin
+      await deps.assertCanManageOrgStructure((context as any).supabase, data.tenant_id, (context as any).userId);
+      const { data: pos, error } = await (context as any).supabase
         .from("positions")
         .insert({ tenant_id: data.tenant_id, department_id: data.department_id, name: data.name })
         .select("id")
@@ -290,8 +290,8 @@ export function createUpdatePosition(deps: OrgStructureDeps) {
         .parse(i),
     )
     .handler(async ({ data, context }) => {
-      await deps.assertCanManageOrgStructure(data.tenant_id, (context as any).userId);
-      const { error } = await deps.supabaseAdmin
+      await deps.assertCanManageOrgStructure((context as any).supabase, data.tenant_id, (context as any).userId);
+      const { error } = await (context as any).supabase
         .from("positions")
         .update({ name: data.name })
         .eq("id", data.id)
@@ -308,8 +308,8 @@ export function createDeletePosition(deps: OrgStructureDeps) {
       z.object({ tenant_id: z.string().uuid(), id: z.string().uuid() }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await deps.assertCanManageOrgStructure(data.tenant_id, (context as any).userId);
-      const { error } = await deps.supabaseAdmin
+      await deps.assertCanManageOrgStructure((context as any).supabase, data.tenant_id, (context as any).userId);
+      const { error } = await (context as any).supabase
         .from("positions")
         .delete()
         .eq("id", data.id)
@@ -342,15 +342,15 @@ export function createGetOrgChartTree(deps: OrgStructureDeps) {
     .middleware([deps.requireSupabaseAuth])
     .inputValidator((i: unknown) => z.object({ tenant_id: z.string().uuid() }).parse(i))
     .handler(async ({ data, context }) => {
-      await deps.assertCanReadOrgStructure(data.tenant_id, (context as any).userId);
+      await deps.assertCanReadOrgStructure((context as any).supabase, data.tenant_id, (context as any).userId);
 
       const [{ data: departments, error: dErr }, { data: positions, error: pErr }] =
         await Promise.all([
-          deps.supabaseAdmin
+          (context as any).supabase
             .from("departments")
             .select("id, name, parent_department_id, depth")
             .eq("tenant_id", data.tenant_id),
-          deps.supabaseAdmin
+          (context as any).supabase
             .from("positions")
             .select("id, name, department_id")
             .eq("tenant_id", data.tenant_id),
@@ -358,7 +358,7 @@ export function createGetOrgChartTree(deps: OrgStructureDeps) {
       if (dErr) throw new Error(dErr.message);
       if (pErr) throw new Error(pErr.message);
 
-      const { data: profiles, error: profErr } = await deps.supabaseAdmin
+      const { data: profiles, error: profErr } = await (context as any).supabase
         .from("employee_profiles")
         .select("party_id, department_id, position_id, worker_type, employment_status")
         .eq("tenant_id", data.tenant_id)
@@ -369,7 +369,7 @@ export function createGetOrgChartTree(deps: OrgStructureDeps) {
       const partyIds = (profiles ?? []).map((p: any) => p.party_id as string);
       let parties: any[] = [];
       if (partyIds.length) {
-        const { data: partyRows, error: partyErr } = await deps.supabaseAdmin
+        const { data: partyRows, error: partyErr } = await (context as any).supabase
           .from("parties")
           .select("id, name_en")
           .eq("tenant_id", data.tenant_id)

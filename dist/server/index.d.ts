@@ -362,9 +362,9 @@ type OrgStructureDeps = {
     requireSupabaseAuth: any;
     supabaseAdmin: any;
     /** Read-gate: any tenant member who may see the org structure. */
-    assertCanReadOrgStructure: (tenantId: string, userId: string) => Promise<void>;
+    assertCanReadOrgStructure: (supabase: any, tenantId: string, userId: string) => Promise<void>;
     /** Write-gate: who may create/edit/delete departments and positions. */
-    assertCanManageOrgStructure: (tenantId: string, userId: string) => Promise<void>;
+    assertCanManageOrgStructure: (supabase: any, tenantId: string, userId: string) => Promise<void>;
 };
 /** Departments may nest at most this many levels deep (1 = top-level). */
 declare const MAX_DEPARTMENT_DEPTH = 4;
