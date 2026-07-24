@@ -4403,15 +4403,26 @@ function PositionNode({ position, vacantLabel }) {
     /* @__PURE__ */ jsx("ul", { children: position.people.length > 0 ? position.people.map((person) => /* @__PURE__ */ jsx("li", { children: /* @__PURE__ */ jsx(PersonCard, { person, positionName: position.name }) }, person.party_id)) : /* @__PURE__ */ jsx("li", { children: /* @__PURE__ */ jsx("div", { className: "org-chart-box org-chart-vacant", children: vacantLabel }) }) })
   ] });
 }
-function DepartmentNode({ dept, vacantLabel }) {
+var DEPT_HUES = [210, 340, 150, 25, 275, 190, 45, 355];
+function deptColors(hue, depth) {
+  const level = Math.max(0, depth - 1);
+  const lightness = Math.min(95, 87 + level * 3);
+  const saturation = Math.max(30, 60 - level * 6);
+  const borderLightness = Math.max(55, lightness - 30);
+  return {
+    background: `hsl(${hue} ${saturation}% ${lightness}%)`,
+    borderColor: `hsl(${hue} ${saturation}% ${borderLightness}%)`
+  };
+}
+function DepartmentNode({ dept, vacantLabel, hue }) {
   const hasChildren = dept.children.length > 0 || dept.positions.length > 0;
   return /* @__PURE__ */ jsxs("li", { children: [
-    /* @__PURE__ */ jsxs("div", { className: "org-chart-box org-chart-dept", children: [
+    /* @__PURE__ */ jsxs("div", { className: "org-chart-box org-chart-dept", style: deptColors(hue, dept.depth), children: [
       /* @__PURE__ */ jsx(Building2, { className: "h-3.5 w-3.5 shrink-0" }),
       /* @__PURE__ */ jsx("span", { children: dept.name })
     ] }),
     hasChildren && /* @__PURE__ */ jsxs("ul", { children: [
-      dept.children.map((c) => /* @__PURE__ */ jsx(DepartmentNode, { dept: c, vacantLabel }, c.id)),
+      dept.children.map((c) => /* @__PURE__ */ jsx(DepartmentNode, { dept: c, vacantLabel, hue }, c.id)),
       dept.positions.map((p) => /* @__PURE__ */ jsx(PositionNode, { position: p, vacantLabel }, p.id))
     ] })
   ] });
@@ -4456,9 +4467,19 @@ var ORG_CHART_CSS = `
 .org-chart-tree li:only-child::before {
   display: none;
 }
-.org-chart-tree > li:first-child::before,
-.org-chart-tree > li:last-child::after {
-  border: 0 none;
+.org-chart-tree li:only-child {
+  padding-top: 0;
+}
+/* Root departments have no shared parent box, so they must never draw a
+   connector to their siblings \u2014 without this, 2+ top-level departments got
+   a phantom horizontal bar (with corner hooks sticking out past the
+   outermost boxes) as if they reported to something above them. */
+.org-chart-tree > li {
+  padding-top: 0;
+}
+.org-chart-tree > li::before,
+.org-chart-tree > li::after {
+  display: none;
 }
 .org-chart-tree li:last-child::before {
   border-right: 2px solid var(--border, #d4d4d8);
@@ -4551,7 +4572,7 @@ function OrgChartView({ tenantId, tree, isLoading }) {
   }
   return /* @__PURE__ */ jsxs("div", { className: "overflow-x-auto py-6", children: [
     /* @__PURE__ */ jsx("style", { children: ORG_CHART_CSS }),
-    /* @__PURE__ */ jsx("ul", { className: "org-chart-tree", children: roots.map((d) => /* @__PURE__ */ jsx(DepartmentNode, { dept: d, vacantLabel }, d.id)) })
+    /* @__PURE__ */ jsx("ul", { className: "org-chart-tree", children: roots.map((d, i) => /* @__PURE__ */ jsx(DepartmentNode, { dept: d, vacantLabel, hue: DEPT_HUES[i % DEPT_HUES.length] }, d.id)) })
   ] });
 }
 var ANY_PARENT = "__top_level__";

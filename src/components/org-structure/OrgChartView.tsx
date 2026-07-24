@@ -63,18 +63,37 @@ function PositionNode({ position, vacantLabel }: { position: OrgChartPositionT; 
   );
 }
 
-function DepartmentNode({ dept, vacantLabel }: { dept: OrgChartDepartmentT; vacantLabel: string }) {
+/**
+ * Fixed palette (one hue per root department, cycling if there are more
+ * roots than colors) — every descendant reuses its root's hue and simply
+ * gets lighter/less saturated the deeper it nests, so a whole branch reads
+ * as "the same family" of pastel rather than a rainbow of unrelated boxes.
+ */
+const DEPT_HUES = [210, 340, 150, 25, 275, 190, 45, 355];
+
+function deptColors(hue: number, depth: number) {
+  const level = Math.max(0, depth - 1);
+  const lightness = Math.min(95, 87 + level * 3);
+  const saturation = Math.max(30, 60 - level * 6);
+  const borderLightness = Math.max(55, lightness - 30);
+  return {
+    background: `hsl(${hue} ${saturation}% ${lightness}%)`,
+    borderColor: `hsl(${hue} ${saturation}% ${borderLightness}%)`,
+  };
+}
+
+function DepartmentNode({ dept, vacantLabel, hue }: { dept: OrgChartDepartmentT; vacantLabel: string; hue: number }) {
   const hasChildren = dept.children.length > 0 || dept.positions.length > 0;
   return (
     <li>
-      <div className="org-chart-box org-chart-dept">
+      <div className="org-chart-box org-chart-dept" style={deptColors(hue, dept.depth)}>
         <Building2 className="h-3.5 w-3.5 shrink-0" />
         <span>{dept.name}</span>
       </div>
       {hasChildren && (
         <ul>
           {dept.children.map((c) => (
-            <DepartmentNode key={c.id} dept={c} vacantLabel={vacantLabel} />
+            <DepartmentNode key={c.id} dept={c} vacantLabel={vacantLabel} hue={hue} />
           ))}
           {dept.positions.map((p) => (
             <PositionNode key={p.id} position={p} vacantLabel={vacantLabel} />
@@ -125,9 +144,19 @@ const ORG_CHART_CSS = `
 .org-chart-tree li:only-child::before {
   display: none;
 }
-.org-chart-tree > li:first-child::before,
-.org-chart-tree > li:last-child::after {
-  border: 0 none;
+.org-chart-tree li:only-child {
+  padding-top: 0;
+}
+/* Root departments have no shared parent box, so they must never draw a
+   connector to their siblings — without this, 2+ top-level departments got
+   a phantom horizontal bar (with corner hooks sticking out past the
+   outermost boxes) as if they reported to something above them. */
+.org-chart-tree > li {
+  padding-top: 0;
+}
+.org-chart-tree > li::before,
+.org-chart-tree > li::after {
+  display: none;
 }
 .org-chart-tree li:last-child::before {
   border-right: 2px solid var(--border, #d4d4d8);
@@ -238,8 +267,8 @@ export function OrgChartView({ tenantId, tree, isLoading }: OrgChartViewProps) {
     <div className="overflow-x-auto py-6">
       <style>{ORG_CHART_CSS}</style>
       <ul className="org-chart-tree">
-        {roots.map((d) => (
-          <DepartmentNode key={d.id} dept={d} vacantLabel={vacantLabel} />
+        {roots.map((d, i) => (
+          <DepartmentNode key={d.id} dept={d} vacantLabel={vacantLabel} hue={DEPT_HUES[i % DEPT_HUES.length]} />
         ))}
       </ul>
     </div>
