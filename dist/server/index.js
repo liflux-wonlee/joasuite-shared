@@ -993,6 +993,22 @@ function createUpsertTeamMember(deps) {
   });
 }
 var MAX_DEPARTMENT_DEPTH = 4;
+function assertOrgStructureContext(deps, context, fnName) {
+  const problems = [];
+  if (!context) problems.push("context itself is falsy");
+  if (context && !context.supabase) problems.push("context.supabase is falsy");
+  if (context && context.supabase && typeof context.supabase.from !== "function") {
+    problems.push(`context.supabase.from is ${typeof context.supabase?.from}, not a function`);
+  }
+  if (context && context.userId === void 0) problems.push("context.userId is undefined");
+  if (typeof deps.assertCanReadOrgStructure !== "function") problems.push("deps.assertCanReadOrgStructure is not a function");
+  if (typeof deps.assertCanManageOrgStructure !== "function") problems.push("deps.assertCanManageOrgStructure is not a function");
+  if (problems.length) {
+    throw new Error(
+      `[org-structure diagnostic] ${fnName}: ${problems.join("; ")}. context keys: ${context ? Object.keys(context).join(",") : "n/a"}`
+    );
+  }
+}
 async function fetchAllDepartments(supabase, tenantId) {
   const { data, error } = await supabase.from("departments").select("id, parent_department_id, depth").eq("tenant_id", tenantId);
   if (error) throw new Error(error.message);
@@ -1029,6 +1045,7 @@ function collectDescendants(all, id) {
 }
 function createListDepartmentsAndPositions(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => z.object({ tenant_id: z.string().uuid() }).parse(i)).handler(async ({ data, context }) => {
+    assertOrgStructureContext(deps, context, "createListDepartmentsAndPositions");
     await deps.assertCanReadOrgStructure(context.supabase, data.tenant_id, context.userId);
     const [{ data: departments, error: dErr }, { data: positions, error: pErr }] = await Promise.all([
       context.supabase.from("departments").select("id, name, code, parent_department_id, depth").eq("tenant_id", data.tenant_id).order("depth").order("name"),
@@ -1048,6 +1065,7 @@ function createCreateDepartment(deps) {
       parent_department_id: z.string().uuid().optional().nullable()
     }).parse(i)
   ).handler(async ({ data, context }) => {
+    assertOrgStructureContext(deps, context, "createCreateDepartment");
     await deps.assertCanManageOrgStructure(context.supabase, data.tenant_id, context.userId);
     let depth = 1;
     if (data.parent_department_id) {
@@ -1081,6 +1099,7 @@ function createUpdateDepartment(deps) {
       parent_department_id: z.string().uuid().optional().nullable()
     }).parse(i)
   ).handler(async ({ data, context }) => {
+    assertOrgStructureContext(deps, context, "createUpdateDepartment");
     await deps.assertCanManageOrgStructure(context.supabase, data.tenant_id, context.userId);
     const patch = {
       name: data.name,
@@ -1127,6 +1146,7 @@ function createDeleteDepartment(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({ tenant_id: z.string().uuid(), id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
+    assertOrgStructureContext(deps, context, "createDeleteDepartment");
     await deps.assertCanManageOrgStructure(context.supabase, data.tenant_id, context.userId);
     const [{ count: childCount, error: childErr }, { count: posCount, error: posErr }] = await Promise.all([
       context.supabase.from("departments").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).eq("parent_department_id", data.id),
@@ -1153,6 +1173,7 @@ function createCreatePosition(deps) {
       name: z.string().min(1).max(120)
     }).parse(i)
   ).handler(async ({ data, context }) => {
+    assertOrgStructureContext(deps, context, "createCreatePosition");
     await deps.assertCanManageOrgStructure(context.supabase, data.tenant_id, context.userId);
     const { data: pos, error } = await context.supabase.from("positions").insert({ tenant_id: data.tenant_id, department_id: data.department_id, name: data.name }).select("id").single();
     if (error) throw new Error(error.message);
@@ -1167,6 +1188,7 @@ function createUpdatePosition(deps) {
       name: z.string().min(1).max(120)
     }).parse(i)
   ).handler(async ({ data, context }) => {
+    assertOrgStructureContext(deps, context, "createUpdatePosition");
     await deps.assertCanManageOrgStructure(context.supabase, data.tenant_id, context.userId);
     const { error } = await context.supabase.from("positions").update({ name: data.name }).eq("id", data.id).eq("tenant_id", data.tenant_id);
     if (error) throw new Error(error.message);
@@ -1177,6 +1199,7 @@ function createDeletePosition(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({ tenant_id: z.string().uuid(), id: z.string().uuid() }).parse(i)
   ).handler(async ({ data, context }) => {
+    assertOrgStructureContext(deps, context, "createDeletePosition");
     await deps.assertCanManageOrgStructure(context.supabase, data.tenant_id, context.userId);
     const { error } = await context.supabase.from("positions").delete().eq("id", data.id).eq("tenant_id", data.tenant_id);
     if (error) throw new Error(error.message);
@@ -1185,6 +1208,7 @@ function createDeletePosition(deps) {
 }
 function createGetOrgChartTree(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => z.object({ tenant_id: z.string().uuid() }).parse(i)).handler(async ({ data, context }) => {
+    assertOrgStructureContext(deps, context, "createGetOrgChartTree");
     await deps.assertCanReadOrgStructure(context.supabase, data.tenant_id, context.userId);
     const [{ data: departments, error: dErr }, { data: positions, error: pErr }] = await Promise.all([
       context.supabase.from("departments").select("id, name, parent_department_id, depth").eq("tenant_id", data.tenant_id),
