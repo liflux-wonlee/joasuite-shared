@@ -282,8 +282,8 @@ declare function createUpdateMyDefaultTenant(deps: AccountDeps): _tanstack_start
 type TeamDeps = {
     requireSupabaseAuth: any;
     supabaseAdmin: any;
-    assertCanReadTeam: (tenantId: string, userId: string) => Promise<void>;
-    assertCanWriteTeam: (tenantId: string, userId: string) => Promise<void>;
+    assertCanReadTeam: (supabase: any, tenantId: string, userId: string) => Promise<void>;
+    assertCanWriteTeam: (supabase: any, tenantId: string, userId: string) => Promise<void>;
     /** Called after a successful write, e.g. to append an audit_logs row. Optional. */
     onWrite?: (input: {
         tenantId: string;
