@@ -4567,6 +4567,9 @@ function OrgChartView({ tenantId, tree, isLoading }) {
   if (loading) {
     return /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("common.loading") });
   }
+  if (!tree && q.isError) {
+    return /* @__PURE__ */ jsx("div", { className: "border rounded-lg p-10 text-center text-destructive", children: q.error?.message || t("team.load_failed", "Failed to load the org chart.") });
+  }
   if (roots.length === 0) {
     return /* @__PURE__ */ jsx("div", { className: "border rounded-lg p-10 text-center text-muted-foreground", children: t("team.org_chart_empty", "No departments yet \u2014 add one to see the org chart.") });
   }
@@ -4750,7 +4753,8 @@ function OrgStructureSettingsPage({ tenantId }) {
     ) }),
     view === "chart" ? /* @__PURE__ */ jsx(OrgChartView, { tenantId }) : /* @__PURE__ */ jsxs(Fragment, { children: [
       orgQ.isLoading && /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("common.loading") }),
-      !orgQ.isLoading && departments.length === 0 && /* @__PURE__ */ jsx("div", { className: "border rounded-lg p-10 text-center text-muted-foreground", children: t("team.no_departments", "No departments yet.") }),
+      orgQ.isError && /* @__PURE__ */ jsx("div", { className: "border rounded-lg p-10 text-center text-destructive", children: orgQ.error?.message || t("team.load_failed", "Failed to load departments.") }),
+      !orgQ.isLoading && !orgQ.isError && departments.length === 0 && /* @__PURE__ */ jsx("div", { className: "border rounded-lg p-10 text-center text-muted-foreground", children: t("team.no_departments", "No departments yet.") }),
       /* @__PURE__ */ jsx("div", { className: "space-y-3", children: orderedDepartments.map((d) => /* @__PURE__ */ jsxs(
         "div",
         {

@@ -215,7 +215,13 @@ export function OrgStructureSettingsPage({ tenantId }: { tenantId: string }) {
         <>
           {orgQ.isLoading && <div className="text-sm text-muted-foreground">{t("common.loading")}</div>}
 
-          {!orgQ.isLoading && departments.length === 0 && (
+          {orgQ.isError && (
+            <div className="border rounded-lg p-10 text-center text-destructive">
+              {(orgQ.error as Error)?.message || t("team.load_failed", "Failed to load departments.")}
+            </div>
+          )}
+
+          {!orgQ.isLoading && !orgQ.isError && departments.length === 0 && (
             <div className="border rounded-lg p-10 text-center text-muted-foreground">
               {t("team.no_departments", "No departments yet.")}
             </div>
