@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { ensureAuthContext } from "./resolve-auth";
 
 /**
  * Shared Team (Employee/Contractor) module — basic identity + org-placement
@@ -32,32 +33,6 @@ export type TeamDeps = {
 const WORKER_TYPES = ["employee", "contractor"] as const;
 const EMPLOYMENT_STATUSES = ["active", "on_leave", "terminated"] as const;
 
-/**
- * Diagnostic guard, temporary: matches the one added to
- * org-structure.functions.ts in the same round -- that file's guard never
- * fired because this sibling file (the one "create Team Member" actually
- * calls, via assertCanWriteTeam's own .from("user_roles")) was missed.
- * Turns an opaque V8 "Cannot read properties of undefined (reading
- * 'from')" into one naming exactly what's missing. Remove once the actual
- * cause is identified.
- */
-function assertTeamContext(deps: TeamDeps, context: any, fnName: string): void {
-  const problems: string[] = [];
-  if (!context) problems.push("context itself is falsy");
-  if (context && !context.supabase) problems.push("context.supabase is falsy");
-  if (context && context.supabase && typeof context.supabase.from !== "function") {
-    problems.push(`context.supabase.from is ${typeof context.supabase?.from}, not a function`);
-  }
-  if (context && context.userId === undefined) problems.push("context.userId is undefined");
-  if (typeof deps.assertCanReadTeam !== "function") problems.push("deps.assertCanReadTeam is not a function");
-  if (typeof deps.assertCanWriteTeam !== "function") problems.push("deps.assertCanWriteTeam is not a function");
-  if (problems.length) {
-    throw new Error(
-      `[team diagnostic] ${fnName}: ${problems.join("; ")}. context keys: ${context ? Object.keys(context).join(",") : "n/a"}`,
-    );
-  }
-}
-
 async function loadDeptPosNames(supabaseAdmin: any, tenantId: string, deptIds: string[], posIds: string[]) {
   const [{ data: depts }, { data: positions }] = await Promise.all([
     deptIds.length
@@ -86,9 +61,8 @@ export function createListTeamMembers(deps: TeamDeps) {
         .parse(i),
     )
     .handler(async ({ data, context }) => {
-      assertTeamContext(deps, context, "createListTeamMembers");
-      const supabase = (context as any).supabase;
-      await deps.assertCanReadTeam(supabase, data.tenant_id, (context as any).userId);
+      const { supabase, userId } = await ensureAuthContext(context);
+      await deps.assertCanReadTeam(supabase, data.tenant_id, userId);
 
       let pq = supabase
         .from("parties")
@@ -158,9 +132,8 @@ export function createGetTeamMember(deps: TeamDeps) {
       z.object({ tenant_id: z.string().uuid(), party_id: z.string().uuid() }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      assertTeamContext(deps, context, "createGetTeamMember");
-      const supabase = (context as any).supabase;
-      await deps.assertCanReadTeam(supabase, data.tenant_id, (context as any).userId);
+      const { supabase, userId } = await ensureAuthContext(context);
+      await deps.assertCanReadTeam(supabase, data.tenant_id, userId);
 
       const { data: party, error: pErr } = await supabase
         .from("parties")
@@ -244,9 +217,7 @@ export function createUpsertTeamMember(deps: TeamDeps) {
         .parse(i),
     )
     .handler(async ({ data, context }) => {
-      assertTeamContext(deps, context, "createUpsertTeamMember");
-      const callerId = (context as any).userId as string;
-      const supabase = (context as any).supabase;
+      const { supabase, userId: callerId } = await ensureAuthContext(context);
       await deps.assertCanWriteTeam(supabase, data.tenant_id, callerId);
 
       let partyId: string;

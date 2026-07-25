@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { ensureAuthContext } from "./resolve-auth";
 
 type SendEmail = (input: { to: string; subject: string; html: string }) => Promise<any>;
 
@@ -228,7 +229,7 @@ export function createListManageableTenants(deps: AccountDeps) {
   return createServerFn({ method: "POST" })
     .middleware([deps.requireSupabaseAuth])
     .handler(async ({ context }) => {
-      const userId = (context as any).userId as string;
+      const userId = (await ensureAuthContext(context)).userId;
       const ids = await getCallerManageableTenantIds(deps.supabaseAdmin, userId);
       if (ids.length === 0) return [];
       const { data, error } = await deps.supabaseAdmin
@@ -247,7 +248,7 @@ export function createListManageableUsers(deps: AccountDeps) {
   return createServerFn({ method: "POST" })
     .middleware([deps.requireSupabaseAuth])
     .handler(async ({ context }) => {
-      const userId = (context as any).userId as string;
+      const userId = (await ensureAuthContext(context)).userId;
       const supabaseAdmin = deps.supabaseAdmin;
       const tenantIds = await getCallerManageableTenantIds(supabaseAdmin, userId);
       if (tenantIds.length === 0) return { tenants: [], users: [] };
@@ -420,7 +421,7 @@ export function createInviteUserToWorkspaces(deps: AccountDeps) {
         .parse(i),
     )
     .handler(async ({ data, context }) => {
-      const callerId = (context as any).userId as string;
+      const callerId = (await ensureAuthContext(context)).userId;
       const supabaseAdmin = deps.supabaseAdmin;
       for (const a of data.assignments) {
         await assertCallerManagesTenant(supabaseAdmin, a.tenant_id, callerId);
@@ -539,7 +540,7 @@ export function createSetUserAppRoles(deps: AccountDeps) {
         .parse(i),
     )
     .handler(async ({ data, context }) => {
-      const callerId = (context as any).userId as string;
+      const callerId = (await ensureAuthContext(context)).userId;
       const supabaseAdmin = deps.supabaseAdmin;
       await assertCallerManagesTenant(supabaseAdmin, data.tenant_id, callerId);
       if (data.roles.includes("owner" as any)) {
@@ -578,7 +579,7 @@ export function createAccountResendInvitation(deps: AccountDeps) {
     .middleware([deps.requireSupabaseAuth])
     .inputValidator((i) => z.object({ user_id: z.string().uuid() }).parse(i))
     .handler(async ({ data, context }) => {
-      const callerId = (context as any).userId as string;
+      const callerId = (await ensureAuthContext(context)).userId;
       const supabaseAdmin = deps.supabaseAdmin;
       const sharedTenantIds = await assertCallerCanManageUser(supabaseAdmin, callerId, data.user_id);
       const { email, display_name } = await getTargetEmail(supabaseAdmin, data.user_id);
@@ -611,7 +612,7 @@ export function createAccountSendPasswordReset(deps: AccountDeps) {
     .middleware([deps.requireSupabaseAuth])
     .inputValidator((i) => z.object({ user_id: z.string().uuid() }).parse(i))
     .handler(async ({ data, context }) => {
-      const callerId = (context as any).userId as string;
+      const callerId = (await ensureAuthContext(context)).userId;
       const supabaseAdmin = deps.supabaseAdmin;
       await assertCallerCanManageUser(supabaseAdmin, callerId, data.user_id);
       const { email, display_name } = await getTargetEmail(supabaseAdmin, data.user_id);
@@ -652,7 +653,7 @@ export function createAccountUpdateUserProfile(deps: AccountDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      const callerId = (context as any).userId as string;
+      const callerId = (await ensureAuthContext(context)).userId;
       const supabaseAdmin = deps.supabaseAdmin;
       const sharedTenantIds = await assertCallerCanManageUser(supabaseAdmin, callerId, data.user_id);
       const patch: { display_name: string; email?: string; position?: string | null } = { display_name: data.display_name };
@@ -680,7 +681,7 @@ export function createGetMyProfile(deps: AccountDeps) {
   return createServerFn({ method: "POST" })
     .middleware([deps.requireSupabaseAuth])
     .handler(async ({ context }) => {
-      const userId = (context as any).userId as string;
+      const userId = (await ensureAuthContext(context)).userId;
       const { data, error } = await deps.supabaseAdmin
         .from("profiles")
         .select("id, default_tenant_id, timezone")
@@ -701,7 +702,7 @@ export function createUpdateMyTimezone(deps: AccountDeps) {
       z.object({ timezone: z.string().min(1).max(100).nullable() }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      const userId = (context as any).userId as string;
+      const userId = (await ensureAuthContext(context)).userId;
       // Validate IANA zone
       if (data.timezone) {
         try { new Intl.DateTimeFormat("en-US", { timeZone: data.timezone }); }
@@ -722,7 +723,7 @@ export function createUpdateMyDefaultTenant(deps: AccountDeps) {
       z.object({ tenant_id: z.string().uuid().nullable() }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      const userId = (context as any).userId as string;
+      const userId = (await ensureAuthContext(context)).userId;
       const supabaseAdmin = deps.supabaseAdmin;
       if (data.tenant_id) {
         // ensure caller is a member of that tenant
