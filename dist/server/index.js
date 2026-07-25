@@ -1,7 +1,5 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { getRequest } from '@tanstack/react-start/server';
-import { createClient } from '@supabase/supabase-js';
 
 // src/server/suite.functions.ts
 var TenantInput = z.object({ tenantId: z.string().uuid() });
@@ -290,46 +288,12 @@ function createMarkAllNotificationsRead(deps) {
     return { ok: true };
   });
 }
-async function resolveSupabaseAuthDirect() {
-  const SUPABASE_URL = process.env.SUPABASE_URL;
-  const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
-  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-    const missing = [
-      !SUPABASE_URL ? "SUPABASE_URL" : null,
-      !SUPABASE_PUBLISHABLE_KEY ? "SUPABASE_PUBLISHABLE_KEY" : null
-    ].filter(Boolean);
-    throw new Error(
-      `Missing Supabase environment variable(s): ${missing.join(", ")}. Connect Supabase in Lovable Cloud.`
-    );
-  }
-  const request = getRequest();
-  if (!request?.headers) throw new Error("Unauthorized: No request headers available");
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader) throw new Error("Unauthorized: No authorization header provided");
-  if (!authHeader.startsWith("Bearer ")) throw new Error("Unauthorized: Only Bearer tokens are supported");
-  const token = authHeader.replace("Bearer ", "");
-  if (!token) throw new Error("Unauthorized: No token provided");
-  const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-    auth: { storage: void 0, persistSession: false, autoRefreshToken: false }
-  });
-  const { data, error } = await supabase.auth.getClaims(token);
-  if (error || !data?.claims) throw new Error("Unauthorized: Invalid token");
-  if (!data.claims.sub) throw new Error("Unauthorized: No user ID found in token");
-  return { supabase, userId: data.claims.sub, claims: data.claims };
-}
-async function ensureAuthContext(context) {
-  if (context && context.supabase && context.userId !== void 0 && context.userId !== null) {
-    return { supabase: context.supabase, userId: context.userId, claims: context.claims };
-  }
-  return resolveSupabaseAuthDirect();
-}
 
-// src/server/account.functions.ts
+// src/server/account.server.ts
 function resolveAppBaseUrl(deps) {
   return (process.env.APP_BASE_URL || deps.appBaseUrl).replace(/\/$/, "");
 }
-var APP_ROLES = [
+var ACCOUNT_APP_ROLES = [
   "owner",
   "super_admin",
   "admin",
@@ -349,8 +313,6 @@ var APP_ROLES = [
   "sop_reviewer",
   "sop_operator"
 ];
-var AppRole = z.enum(APP_ROLES);
-var Portal = z.enum(["internal", "vendor", "approver", "customer"]);
 async function getCallerManageableTenantIds(supabaseAdmin, userId) {
   const { data, error } = await supabaseAdmin.from("user_roles").select("tenant_id, role").eq("user_id", userId).in("role", ["owner", "super_admin"]);
   if (error) throw new Error(error.message);
@@ -375,6 +337,31 @@ async function getCallerOwnerTenantIds(supabaseAdmin, userId) {
   const { data, error } = await supabaseAdmin.from("user_roles").select("tenant_id").eq("user_id", userId).eq("role", "owner");
   if (error) throw new Error(error.message);
   return Array.from(new Set((data ?? []).map((r) => r.tenant_id)));
+}
+async function assertAppsSubscribed(supabaseAdmin, tenantId, appCodes) {
+  if (appCodes.length === 0) return;
+  const { data, error } = await supabaseAdmin.from("tenant_apps").select("app_code").eq("tenant_id", tenantId).eq("status", "active").in("app_code", appCodes);
+  if (error) throw new Error(error.message);
+  const active = new Set((data ?? []).map((r) => r.app_code));
+  const missing = appCodes.filter((c) => !active.has(c));
+  if (missing.length > 0) {
+    throw new Error(`Apps not subscribed for this workspace: ${missing.join(", ")}`);
+  }
+}
+async function assertCallerCanManageUser(supabaseAdmin, callerId, targetUserId) {
+  const tenantIds = await getCallerManageableTenantIds(supabaseAdmin, callerId);
+  if (tenantIds.length === 0) throw new Error("Forbidden: no manageable workspaces");
+  const { data, error } = await supabaseAdmin.from("tenant_users").select("tenant_id").eq("user_id", targetUserId).in("tenant_id", tenantIds);
+  if (error) throw new Error(error.message);
+  const shared = (data ?? []).map((r) => r.tenant_id);
+  if (shared.length === 0) throw new Error("Forbidden: target user is not in any of your workspaces");
+  return shared;
+}
+async function getTargetEmail(supabaseAdmin, targetUserId) {
+  const { data, error } = await supabaseAdmin.from("tenant_users").select("email, display_name").eq("user_id", targetUserId).limit(1).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data?.email) throw new Error("User has no email on file");
+  return { email: data.email, display_name: data.display_name ?? null };
 }
 async function findOrInviteUserForAccount(deps, email, displayName, primaryTenantId) {
   const { data: existing, error } = await deps.supabaseAdmin.auth.admin.listUsers({
@@ -426,405 +413,309 @@ async function sendMultiOrgInviteEmail(deps, opts) {
     </div>`;
   return deps.sendEmail({ to: opts.email, subject, html });
 }
-var AppAssignment = z.object({
-  app_code: z.string().min(1).max(64),
-  roles: z.array(AppRole).min(1)
-});
-async function assertAppsSubscribed(supabaseAdmin, tenantId, appCodes) {
-  if (appCodes.length === 0) return;
-  const { data, error } = await supabaseAdmin.from("tenant_apps").select("app_code").eq("tenant_id", tenantId).eq("status", "active").in("app_code", appCodes);
+async function listManageableTenantsServer(context, deps) {
+  const ids = await getCallerManageableTenantIds(deps.supabaseAdmin, context.userId);
+  if (ids.length === 0) return [];
+  const { data, error } = await deps.supabaseAdmin.from("tenants").select("id, name, slug, plan").in("id", ids).order("name");
   if (error) throw new Error(error.message);
-  const active = new Set((data ?? []).map((r) => r.app_code));
-  const missing = appCodes.filter((c) => !active.has(c));
-  if (missing.length > 0) {
-    throw new Error(`Apps not subscribed for this workspace: ${missing.join(", ")}`);
+  return data ?? [];
+}
+async function listManageableUsersServer(context, deps) {
+  const supabaseAdmin = deps.supabaseAdmin;
+  const tenantIds = await getCallerManageableTenantIds(supabaseAdmin, context.userId);
+  if (tenantIds.length === 0) return { tenants: [], users: [], caller_owner_tenant_ids: [] };
+  const [{ data: tenants }, { data: members }, { data: roleRows }, { data: appRows }] = await Promise.all([
+    supabaseAdmin.from("tenants").select("id, name, slug").in("id", tenantIds).order("name"),
+    supabaseAdmin.from("tenant_users").select("tenant_id, user_id, portal, status, display_name, email, position, joined_at, created_at").in("tenant_id", tenantIds),
+    supabaseAdmin.from("user_roles").select("tenant_id, user_id, role, app_code").in("tenant_id", tenantIds),
+    supabaseAdmin.from("tenant_apps").select("tenant_id, app_code, status, plan").in("tenant_id", tenantIds).eq("status", "active")
+  ]);
+  const rolesByCell = /* @__PURE__ */ new Map();
+  (roleRows ?? []).forEach((r) => {
+    const k = `${r.tenant_id}|${r.user_id}|${r.app_code ?? deps.appCode}`;
+    const arr = rolesByCell.get(k) ?? [];
+    arr.push(r.role);
+    rolesByCell.set(k, arr);
+  });
+  const appsByTenant = /* @__PURE__ */ new Map();
+  const planByTenantApp = /* @__PURE__ */ new Map();
+  (appRows ?? []).forEach((r) => {
+    const arr = appsByTenant.get(r.tenant_id) ?? [];
+    arr.push(r.app_code);
+    appsByTenant.set(r.tenant_id, arr);
+    planByTenantApp.set(`${r.tenant_id}|${r.app_code}`, r.plan ?? null);
+  });
+  const lastSignInByUid = /* @__PURE__ */ new Map();
+  const authCreatedByUid = /* @__PURE__ */ new Map();
+  try {
+    for (let page = 1; page <= 20; page++) {
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+      if (error) break;
+      (data?.users ?? []).forEach((u) => {
+        lastSignInByUid.set(u.id, u.last_sign_in_at ?? null);
+        authCreatedByUid.set(u.id, u.created_at ?? null);
+      });
+      if (!data?.users || data.users.length < 200) break;
+    }
+  } catch {
   }
-}
-async function assertCallerCanManageUser(supabaseAdmin, callerId, targetUserId) {
-  const tenantIds = await getCallerManageableTenantIds(supabaseAdmin, callerId);
-  if (tenantIds.length === 0) throw new Error("Forbidden: no manageable workspaces");
-  const { data, error } = await supabaseAdmin.from("tenant_users").select("tenant_id").eq("user_id", targetUserId).in("tenant_id", tenantIds);
-  if (error) throw new Error(error.message);
-  const shared = (data ?? []).map((r) => r.tenant_id);
-  if (shared.length === 0) throw new Error("Forbidden: target user is not in any of your workspaces");
-  return shared;
-}
-async function getTargetEmail(supabaseAdmin, targetUserId) {
-  const { data, error } = await supabaseAdmin.from("tenant_users").select("email, display_name").eq("user_id", targetUserId).limit(1).maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data?.email) throw new Error("User has no email on file");
-  return { email: data.email, display_name: data.display_name ?? null };
-}
-function createListManageableTenants(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).handler(async ({ context }) => {
-    const userId = (await ensureAuthContext(context)).userId;
-    const ids = await getCallerManageableTenantIds(deps.supabaseAdmin, userId);
-    if (ids.length === 0) return [];
-    const { data, error } = await deps.supabaseAdmin.from("tenants").select("id, name, slug, plan").in("id", ids).order("name");
-    if (error) throw new Error(error.message);
-    return data ?? [];
-  });
-}
-function createListManageableUsers(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).handler(async ({ context }) => {
-    const userId = (await ensureAuthContext(context)).userId;
-    const supabaseAdmin = deps.supabaseAdmin;
-    const tenantIds = await getCallerManageableTenantIds(supabaseAdmin, userId);
-    if (tenantIds.length === 0) return { tenants: [], users: [] };
-    const [{ data: tenants }, { data: members }, { data: roleRows }, { data: appRows }] = await Promise.all([
-      supabaseAdmin.from("tenants").select("id, name, slug").in("id", tenantIds).order("name"),
-      supabaseAdmin.from("tenant_users").select("tenant_id, user_id, portal, status, display_name, email, position, joined_at, created_at").in("tenant_id", tenantIds),
-      supabaseAdmin.from("user_roles").select("tenant_id, user_id, role, app_code").in("tenant_id", tenantIds),
-      supabaseAdmin.from("tenant_apps").select("tenant_id, app_code, status, plan").in("tenant_id", tenantIds).eq("status", "active")
-    ]);
-    const rolesByCell = /* @__PURE__ */ new Map();
-    (roleRows ?? []).forEach((r) => {
-      const k = `${r.tenant_id}|${r.user_id}|${r.app_code ?? deps.appCode}`;
-      const arr = rolesByCell.get(k) ?? [];
-      arr.push(r.role);
-      rolesByCell.set(k, arr);
-    });
-    const appsByTenant = /* @__PURE__ */ new Map();
-    const planByTenantApp = /* @__PURE__ */ new Map();
-    (appRows ?? []).forEach((r) => {
-      const arr = appsByTenant.get(r.tenant_id) ?? [];
-      arr.push(r.app_code);
-      appsByTenant.set(r.tenant_id, arr);
-      planByTenantApp.set(`${r.tenant_id}|${r.app_code}`, r.plan ?? null);
-    });
-    const lastSignInByUid = /* @__PURE__ */ new Map();
-    const authCreatedByUid = /* @__PURE__ */ new Map();
-    try {
-      for (let page = 1; page <= 20; page++) {
-        const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
-        if (error) break;
-        (data?.users ?? []).forEach((u) => {
-          lastSignInByUid.set(u.id, u.last_sign_in_at ?? null);
-          authCreatedByUid.set(u.id, u.created_at ?? null);
-        });
-        if (!data?.users || data.users.length < 200) break;
-      }
-    } catch {
-    }
-    const usersByUid = /* @__PURE__ */ new Map();
-    (members ?? []).filter((m) => m.portal === "internal").forEach((m) => {
-      const uid = m.user_id;
-      const tid = m.tenant_id;
-      const joined = m.joined_at ?? m.created_at ?? null;
-      const pos = m.position ?? null;
-      let row = usersByUid.get(uid);
-      if (!row) {
-        row = {
-          user_id: uid,
-          email: m.email ?? null,
-          display_name: m.display_name ?? null,
-          position: pos,
-          joined_at: joined,
-          last_sign_in_at: lastSignInByUid.get(uid) ?? null,
-          assignments: {}
-        };
-        usersByUid.set(uid, row);
-      } else {
-        if (!row.email && m.email) row.email = m.email;
-        if (!row.display_name && m.display_name) row.display_name = m.display_name;
-        if (!row.position && pos) row.position = pos;
-        if (joined && (!row.joined_at || joined < row.joined_at)) row.joined_at = joined;
-      }
-      const apps = {};
-      const tenantApps = appsByTenant.get(tid) ?? [];
-      const codes = new Set(tenantApps);
-      (roleRows ?? []).filter((r) => r.tenant_id === tid && r.user_id === uid).forEach((r) => codes.add(r.app_code ?? deps.appCode));
-      codes.forEach((code) => {
-        apps[code] = { roles: rolesByCell.get(`${tid}|${uid}|${code}`) ?? [] };
-      });
-      row.assignments[tid] = {
-        tenant_id: tid,
-        portal: m.portal ?? "internal",
-        status: m.status ?? "active",
-        joined_at: joined,
+  const usersByUid = /* @__PURE__ */ new Map();
+  (members ?? []).filter((m) => m.portal === "internal").forEach((m) => {
+    const uid = m.user_id;
+    const tid = m.tenant_id;
+    const joined = m.joined_at ?? m.created_at ?? null;
+    const pos = m.position ?? null;
+    let row = usersByUid.get(uid);
+    if (!row) {
+      row = {
+        user_id: uid,
+        email: m.email ?? null,
+        display_name: m.display_name ?? null,
         position: pos,
-        apps
+        joined_at: joined,
+        last_sign_in_at: lastSignInByUid.get(uid) ?? null,
+        assignments: {}
       };
+      usersByUid.set(uid, row);
+    } else {
+      if (!row.email && m.email) row.email = m.email;
+      if (!row.display_name && m.display_name) row.display_name = m.display_name;
+      if (!row.position && pos) row.position = pos;
+      if (joined && (!row.joined_at || joined < row.joined_at)) row.joined_at = joined;
+    }
+    const apps = {};
+    const tenantApps = appsByTenant.get(tid) ?? [];
+    const codes = new Set(tenantApps);
+    (roleRows ?? []).filter((r) => r.tenant_id === tid && r.user_id === uid).forEach((r) => codes.add(r.app_code ?? deps.appCode));
+    codes.forEach((code) => {
+      apps[code] = { roles: rolesByCell.get(`${tid}|${uid}|${code}`) ?? [] };
     });
-    usersByUid.forEach((row) => {
-      if (!row.joined_at) row.joined_at = authCreatedByUid.get(row.user_id) ?? null;
-    });
-    const users = Array.from(usersByUid.values()).sort(
-      (a, b) => (a.email ?? "").localeCompare(b.email ?? "")
-    );
-    const tenantsWithApps = (tenants ?? []).map((t) => {
-      const codes = appsByTenant.get(t.id) ?? [];
-      return {
-        ...t,
-        app_codes: codes,
-        app_plans: Object.fromEntries(
-          codes.map((c) => [c, planByTenantApp.get(`${t.id}|${c}`) ?? null])
-        )
-      };
-    });
-    return {
-      tenants: tenantsWithApps,
-      users,
-      caller_owner_tenant_ids: await getCallerOwnerTenantIds(supabaseAdmin, userId)
+    row.assignments[tid] = {
+      tenant_id: tid,
+      portal: m.portal ?? "internal",
+      status: m.status ?? "active",
+      joined_at: joined,
+      position: pos,
+      apps
     };
   });
-}
-function createInviteUserToWorkspaces(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({
-      email: z.string().email(),
-      display_name: z.string().min(1).max(120),
-      position: z.string().max(120).optional(),
-      primary_tenant_id: z.string().uuid().optional(),
-      assignments: z.array(
-        z.object({
-          tenant_id: z.string().uuid(),
-          portal: Portal.default("internal"),
-          apps: z.array(AppAssignment).default([])
-        })
-      ).min(1)
-    }).parse(i)
-  ).handler(async ({ data, context }) => {
-    const callerId = (await ensureAuthContext(context)).userId;
-    const supabaseAdmin = deps.supabaseAdmin;
-    for (const a of data.assignments) {
-      await assertCallerManagesTenant(supabaseAdmin, a.tenant_id, callerId);
-      const wantsOwner = a.apps.some((ap) => ap.roles.includes("owner"));
-      if (wantsOwner) {
-        const isOwner = await callerIsOwner(supabaseAdmin, a.tenant_id, callerId);
-        if (!isOwner) {
-          throw new Error("Only an Owner can grant the Owner role to another user.");
-        }
-      }
-      if (a.apps.length > 0) {
-        await assertAppsSubscribed(
-          supabaseAdmin,
-          a.tenant_id,
-          a.apps.map((x) => x.app_code)
-        );
-      }
-    }
-    const primaryTenantId = data.primary_tenant_id && data.assignments.some((a) => a.tenant_id === data.primary_tenant_id) ? data.primary_tenant_id : data.assignments[0].tenant_id;
-    const invited = await findOrInviteUserForAccount(
-      deps,
-      data.email,
-      data.display_name,
-      primaryTenantId
-    );
-    const { data: tenants } = await supabaseAdmin.from("tenants").select("id, name").in(
-      "id",
-      data.assignments.map((a) => a.tenant_id)
-    );
-    const nameById = /* @__PURE__ */ new Map();
-    (tenants ?? []).forEach((t) => nameById.set(t.id, t.name ?? ""));
-    const addedTenants = [];
-    for (const a of data.assignments) {
-      const { error: muErr } = await supabaseAdmin.from("tenant_users").upsert(
-        {
-          tenant_id: a.tenant_id,
-          user_id: invited.user.id,
-          portal: a.portal,
-          status: "active",
-          display_name: data.display_name,
-          email: invited.user.email ?? data.email,
-          position: data.position ?? null,
-          invited_at: (/* @__PURE__ */ new Date()).toISOString()
-        },
-        { onConflict: "tenant_id,user_id" }
-      );
-      if (muErr) throw new Error(muErr.message);
-      const rows = a.apps.flatMap(
-        (ap) => ap.roles.map((r) => ({
-          tenant_id: a.tenant_id,
-          user_id: invited.user.id,
-          role: r,
-          app_code: ap.app_code
-        }))
-      );
-      if (rows.length > 0) {
-        const { error: rErr } = await supabaseAdmin.from("user_roles").upsert(rows, { onConflict: "tenant_id,user_id,role,app_code" });
-        if (rErr) throw new Error(rErr.message);
-      }
-      addedTenants.push(nameById.get(a.tenant_id) ?? "");
-    }
-    const primaryName = nameById.get(primaryTenantId) ?? addedTenants[0] ?? null;
-    let emailResult = null;
-    if (invited.created) {
-      emailResult = await sendMultiOrgInviteEmail(deps, {
-        email: data.email,
-        display_name: data.display_name,
-        created: invited.created,
-        actionLink: invited.actionLink,
-        tenantNames: addedTenants.filter(Boolean),
-        primaryTenantName: primaryName
-      });
-    }
+  usersByUid.forEach((row) => {
+    if (!row.joined_at) row.joined_at = authCreatedByUid.get(row.user_id) ?? null;
+  });
+  const users = Array.from(usersByUid.values()).sort((a, b) => (a.email ?? "").localeCompare(b.email ?? ""));
+  const tenantsWithApps = (tenants ?? []).map((t) => {
+    const codes = appsByTenant.get(t.id) ?? [];
     return {
-      user_id: invited.user.id,
-      created: invited.created,
-      tenants_added: addedTenants.length,
-      primary_tenant_id: primaryTenantId,
-      email: emailResult
+      ...t,
+      app_codes: codes,
+      app_plans: Object.fromEntries(codes.map((c) => [c, planByTenantApp.get(`${t.id}|${c}`) ?? null]))
     };
   });
+  return {
+    tenants: tenantsWithApps,
+    users,
+    caller_owner_tenant_ids: await getCallerOwnerTenantIds(supabaseAdmin, context.userId)
+  };
 }
-function createSetUserAppRoles(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({
-      tenant_id: z.string().uuid(),
-      user_id: z.string().uuid(),
-      app_code: z.string().min(1).max(64),
-      roles: z.array(AppRole).default([])
-    }).parse(i)
-  ).handler(async ({ data, context }) => {
-    const callerId = (await ensureAuthContext(context)).userId;
-    const supabaseAdmin = deps.supabaseAdmin;
-    await assertCallerManagesTenant(supabaseAdmin, data.tenant_id, callerId);
-    if (data.roles.includes("owner")) {
-      const isOwner = await callerIsOwner(supabaseAdmin, data.tenant_id, callerId);
-      if (!isOwner && data.user_id !== callerId) {
+async function inviteUserToWorkspacesServer(input, context, deps) {
+  const supabaseAdmin = deps.supabaseAdmin;
+  const callerId = context.userId;
+  for (const a of input.assignments) {
+    await assertCallerManagesTenant(supabaseAdmin, a.tenant_id, callerId);
+    const wantsOwner = a.apps.some((ap) => ap.roles.includes("owner"));
+    if (wantsOwner) {
+      const isOwner = await callerIsOwner(supabaseAdmin, a.tenant_id, callerId);
+      if (!isOwner) {
         throw new Error("Only an Owner can grant the Owner role to another user.");
       }
     }
-    if (data.roles.length > 0) {
-      await assertAppsSubscribed(supabaseAdmin, data.tenant_id, [data.app_code]);
+    if (a.apps.length > 0) {
+      await assertAppsSubscribed(
+        supabaseAdmin,
+        a.tenant_id,
+        a.apps.map((x) => x.app_code)
+      );
     }
-    const { error: delErr } = await supabaseAdmin.from("user_roles").delete().eq("tenant_id", data.tenant_id).eq("user_id", data.user_id).eq("app_code", data.app_code);
-    if (delErr) throw new Error(delErr.message);
-    if (data.roles.length > 0) {
-      const rows = data.roles.map((r) => ({
-        tenant_id: data.tenant_id,
-        user_id: data.user_id,
+  }
+  const primaryTenantId = input.primary_tenant_id && input.assignments.some((a) => a.tenant_id === input.primary_tenant_id) ? input.primary_tenant_id : input.assignments[0].tenant_id;
+  const invited = await findOrInviteUserForAccount(deps, input.email, input.display_name, primaryTenantId);
+  const { data: tenants } = await supabaseAdmin.from("tenants").select("id, name").in(
+    "id",
+    input.assignments.map((a) => a.tenant_id)
+  );
+  const nameById = /* @__PURE__ */ new Map();
+  (tenants ?? []).forEach((t) => nameById.set(t.id, t.name ?? ""));
+  const addedTenants = [];
+  for (const a of input.assignments) {
+    const { error: muErr } = await supabaseAdmin.from("tenant_users").upsert(
+      {
+        tenant_id: a.tenant_id,
+        user_id: invited.user.id,
+        portal: a.portal,
+        status: "active",
+        display_name: input.display_name,
+        email: invited.user.email ?? input.email,
+        position: input.position ?? null,
+        invited_at: (/* @__PURE__ */ new Date()).toISOString()
+      },
+      { onConflict: "tenant_id,user_id" }
+    );
+    if (muErr) throw new Error(muErr.message);
+    const rows = a.apps.flatMap(
+      (ap) => ap.roles.map((r) => ({
+        tenant_id: a.tenant_id,
+        user_id: invited.user.id,
         role: r,
-        app_code: data.app_code
-      }));
-      const { error: insErr } = await supabaseAdmin.from("user_roles").insert(rows);
-      if (insErr) throw new Error(insErr.message);
+        app_code: ap.app_code
+      }))
+    );
+    if (rows.length > 0) {
+      const { error: rErr } = await supabaseAdmin.from("user_roles").upsert(rows, { onConflict: "tenant_id,user_id,role,app_code" });
+      if (rErr) throw new Error(rErr.message);
     }
-    return { ok: true };
-  });
-}
-function createAccountResendInvitation(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => z.object({ user_id: z.string().uuid() }).parse(i)).handler(async ({ data, context }) => {
-    const callerId = (await ensureAuthContext(context)).userId;
-    const supabaseAdmin = deps.supabaseAdmin;
-    const sharedTenantIds = await assertCallerCanManageUser(supabaseAdmin, callerId, data.user_id);
-    const { email, display_name } = await getTargetEmail(supabaseAdmin, data.user_id);
-    const { data: tenants } = await supabaseAdmin.from("tenants").select("name").in("id", sharedTenantIds);
-    const tenantNames = (tenants ?? []).map((t) => t.name ?? "").filter(Boolean);
-    const { data: link, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
-      type: "recovery",
-      email,
-      options: { redirectTo: `${resolveAppBaseUrl(deps)}/reset-password` }
+    addedTenants.push(nameById.get(a.tenant_id) ?? "");
+  }
+  const primaryName = nameById.get(primaryTenantId) ?? addedTenants[0] ?? null;
+  let emailResult = null;
+  if (invited.created) {
+    emailResult = await sendMultiOrgInviteEmail(deps, {
+      email: input.email,
+      display_name: input.display_name,
+      created: invited.created,
+      actionLink: invited.actionLink,
+      tenantNames: addedTenants.filter(Boolean),
+      primaryTenantName: primaryName
     });
-    if (linkErr) throw new Error(linkErr.message);
-    const result = await sendMultiOrgInviteEmail(deps, {
-      email,
-      display_name: display_name ?? void 0,
-      created: false,
-      actionLink: link?.properties?.action_link ?? null,
-      tenantNames
+  }
+  return {
+    user_id: invited.user.id,
+    created: invited.created,
+    tenants_added: addedTenants.length,
+    primary_tenant_id: primaryTenantId,
+    email: emailResult
+  };
+}
+async function setUserAppRolesServer(input, context, deps) {
+  const supabaseAdmin = deps.supabaseAdmin;
+  const callerId = context.userId;
+  await assertCallerManagesTenant(supabaseAdmin, input.tenant_id, callerId);
+  if (input.roles.includes("owner")) {
+    const isOwner = await callerIsOwner(supabaseAdmin, input.tenant_id, callerId);
+    if (!isOwner && input.user_id !== callerId) {
+      throw new Error("Only an Owner can grant the Owner role to another user.");
+    }
+  }
+  if (input.roles.length > 0) {
+    await assertAppsSubscribed(supabaseAdmin, input.tenant_id, [input.app_code]);
+  }
+  const { error: delErr } = await supabaseAdmin.from("user_roles").delete().eq("tenant_id", input.tenant_id).eq("user_id", input.user_id).eq("app_code", input.app_code);
+  if (delErr) throw new Error(delErr.message);
+  if (input.roles.length > 0) {
+    const rows = input.roles.map((r) => ({
+      tenant_id: input.tenant_id,
+      user_id: input.user_id,
+      role: r,
+      app_code: input.app_code
+    }));
+    const { error: insErr } = await supabaseAdmin.from("user_roles").insert(rows);
+    if (insErr) throw new Error(insErr.message);
+  }
+  return { ok: true };
+}
+async function accountResendInvitationServer(input, context, deps) {
+  const supabaseAdmin = deps.supabaseAdmin;
+  const sharedTenantIds = await assertCallerCanManageUser(supabaseAdmin, context.userId, input.user_id);
+  const { email, display_name } = await getTargetEmail(supabaseAdmin, input.user_id);
+  const { data: tenants } = await supabaseAdmin.from("tenants").select("name").in("id", sharedTenantIds);
+  const tenantNames = (tenants ?? []).map((t) => t.name ?? "").filter(Boolean);
+  const { data: link, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+    type: "recovery",
+    email,
+    options: { redirectTo: `${resolveAppBaseUrl(deps)}/reset-password` }
+  });
+  if (linkErr) throw new Error(linkErr.message);
+  const result = await sendMultiOrgInviteEmail(deps, {
+    email,
+    display_name: display_name ?? void 0,
+    created: false,
+    actionLink: link?.properties?.action_link ?? null,
+    tenantNames
+  });
+  return { ok: true, email: result };
+}
+async function accountSendPasswordResetServer(input, context, deps) {
+  const supabaseAdmin = deps.supabaseAdmin;
+  await assertCallerCanManageUser(supabaseAdmin, context.userId, input.user_id);
+  const { email, display_name } = await getTargetEmail(supabaseAdmin, input.user_id);
+  const { data: link, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+    type: "recovery",
+    email,
+    options: { redirectTo: `${resolveAppBaseUrl(deps)}/reset-password` }
+  });
+  if (linkErr) throw new Error(linkErr.message);
+  const url = link?.properties?.action_link ?? "";
+  const subject = `Reset your ${deps.appName} password`;
+  const html = `
+      <div style="font-family:Inter,Arial,sans-serif;max-width:540px;margin:0 auto;padding:24px;color:#1a1f36">
+        <h2 style="margin:0 0 12px 0">${deps.appName}</h2>
+        <p>Hi${display_name ? " " + display_name : ""},</p>
+        <p>A password reset was requested for your ${deps.appName} account.</p>
+        <p style="margin:24px 0">
+          <a href="${url}" style="background:#2647c2;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;display:inline-block">Reset password</a>
+        </p>
+        <p style="color:#677084;font-size:13px">If you didn't expect this, you can ignore this email.</p>
+      </div>`;
+  const result = await deps.sendEmail({ to: email, subject, html });
+  return { ok: true, email: result };
+}
+async function accountUpdateUserProfileServer(input, context, deps) {
+  const supabaseAdmin = deps.supabaseAdmin;
+  const sharedTenantIds = await assertCallerCanManageUser(supabaseAdmin, context.userId, input.user_id);
+  const patch = {
+    display_name: input.display_name
+  };
+  if (input.email) patch.email = input.email;
+  if (input.position !== void 0) patch.position = input.position;
+  const { error } = await supabaseAdmin.from("tenant_users").update(patch).eq("user_id", input.user_id).in("tenant_id", sharedTenantIds);
+  if (error) throw new Error(error.message);
+  if (input.email) {
+    const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(input.user_id, {
+      email: input.email
     });
-    return { ok: true, email: result };
-  });
+    if (authErr) throw new Error(authErr.message);
+  }
+  return { ok: true };
 }
-function createAccountSendPasswordReset(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => z.object({ user_id: z.string().uuid() }).parse(i)).handler(async ({ data, context }) => {
-    const callerId = (await ensureAuthContext(context)).userId;
-    const supabaseAdmin = deps.supabaseAdmin;
-    await assertCallerCanManageUser(supabaseAdmin, callerId, data.user_id);
-    const { email, display_name } = await getTargetEmail(supabaseAdmin, data.user_id);
-    const { data: link, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
-      type: "recovery",
-      email,
-      options: { redirectTo: `${resolveAppBaseUrl(deps)}/reset-password` }
-    });
-    if (linkErr) throw new Error(linkErr.message);
-    const url = link?.properties?.action_link ?? "";
-    const subject = `Reset your ${deps.appName} password`;
-    const html = `
-        <div style="font-family:Inter,Arial,sans-serif;max-width:540px;margin:0 auto;padding:24px;color:#1a1f36">
-          <h2 style="margin:0 0 12px 0">${deps.appName}</h2>
-          <p>Hi${display_name ? " " + display_name : ""},</p>
-          <p>A password reset was requested for your ${deps.appName} account.</p>
-          <p style="margin:24px 0">
-            <a href="${url}" style="background:#2647c2;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;display:inline-block">Reset password</a>
-          </p>
-          <p style="color:#677084;font-size:13px">If you didn't expect this, you can ignore this email.</p>
-        </div>`;
-    const result = await deps.sendEmail({ to: email, subject, html });
-    return { ok: true, email: result };
-  });
+async function getMyProfileServer(context, deps) {
+  const { data, error } = await deps.supabaseAdmin.from("profiles").select("id, default_tenant_id, timezone").eq("id", context.userId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return {
+    default_tenant_id: data?.default_tenant_id ?? null,
+    timezone: data?.timezone ?? null
+  };
 }
-function createAccountUpdateUserProfile(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({
-      user_id: z.string().uuid(),
-      display_name: z.string().min(1).max(120),
-      email: z.string().email().optional(),
-      position: z.string().max(120).nullable().optional()
-    }).parse(i)
-  ).handler(async ({ data, context }) => {
-    const callerId = (await ensureAuthContext(context)).userId;
-    const supabaseAdmin = deps.supabaseAdmin;
-    const sharedTenantIds = await assertCallerCanManageUser(supabaseAdmin, callerId, data.user_id);
-    const patch = { display_name: data.display_name };
-    if (data.email) patch.email = data.email;
-    if (data.position !== void 0) patch.position = data.position;
-    const { error } = await supabaseAdmin.from("tenant_users").update(patch).eq("user_id", data.user_id).in("tenant_id", sharedTenantIds);
-    if (error) throw new Error(error.message);
-    if (data.email) {
-      const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
-        email: data.email
-      });
-      if (authErr) throw new Error(authErr.message);
+async function updateMyTimezoneServer(input, context, deps) {
+  if (input.timezone) {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: input.timezone });
+    } catch {
+      throw new Error("Invalid timezone");
     }
-    return { ok: true };
-  });
+  }
+  const { error } = await deps.supabaseAdmin.from("profiles").upsert({ id: context.userId, timezone: input.timezone }, { onConflict: "id" });
+  if (error) throw new Error(error.message);
+  return { ok: true };
 }
-function createGetMyProfile(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).handler(async ({ context }) => {
-    const userId = (await ensureAuthContext(context)).userId;
-    const { data, error } = await deps.supabaseAdmin.from("profiles").select("id, default_tenant_id, timezone").eq("id", userId).maybeSingle();
-    if (error) throw new Error(error.message);
-    return {
-      default_tenant_id: data?.default_tenant_id ?? null,
-      timezone: data?.timezone ?? null
-    };
-  });
-}
-function createUpdateMyTimezone(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({ timezone: z.string().min(1).max(100).nullable() }).parse(i)
-  ).handler(async ({ data, context }) => {
-    const userId = (await ensureAuthContext(context)).userId;
-    if (data.timezone) {
-      try {
-        new Intl.DateTimeFormat("en-US", { timeZone: data.timezone });
-      } catch {
-        throw new Error("Invalid timezone");
-      }
-    }
-    const { error } = await deps.supabaseAdmin.from("profiles").upsert({ id: userId, timezone: data.timezone }, { onConflict: "id" });
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
-}
-function createUpdateMyDefaultTenant(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({ tenant_id: z.string().uuid().nullable() }).parse(i)
-  ).handler(async ({ data, context }) => {
-    const userId = (await ensureAuthContext(context)).userId;
-    const supabaseAdmin = deps.supabaseAdmin;
-    if (data.tenant_id) {
-      const { data: m, error: mErr } = await supabaseAdmin.from("tenant_users").select("tenant_id").eq("tenant_id", data.tenant_id).eq("user_id", userId).eq("status", "active").maybeSingle();
-      if (mErr) throw new Error(mErr.message);
-      if (!m) throw new Error("Not a member of that workspace");
-    }
-    const { error } = await supabaseAdmin.from("profiles").upsert({ id: userId, default_tenant_id: data.tenant_id }, { onConflict: "id" });
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
+async function updateMyDefaultTenantServer(input, context, deps) {
+  const supabaseAdmin = deps.supabaseAdmin;
+  if (input.tenant_id) {
+    const { data: m, error: mErr } = await supabaseAdmin.from("tenant_users").select("tenant_id").eq("tenant_id", input.tenant_id).eq("user_id", context.userId).eq("status", "active").maybeSingle();
+    if (mErr) throw new Error(mErr.message);
+    if (!m) throw new Error("Not a member of that workspace");
+  }
+  const { error } = await supabaseAdmin.from("profiles").upsert({ id: context.userId, default_tenant_id: input.tenant_id }, { onConflict: "id" });
+  if (error) throw new Error(error.message);
+  return { ok: true };
 }
 
 // src/server/team.server.ts
@@ -1211,7 +1102,7 @@ async function getOrgChartTreeServer(input, context, deps) {
 function resolveAppBaseUrl2(deps) {
   return (process.env.APP_BASE_URL || deps.appBaseUrl).replace(/\/$/, "");
 }
-var APP_ROLES2 = [
+var APP_ROLES = [
   "owner",
   "super_admin",
   "admin",
@@ -1231,7 +1122,7 @@ var APP_ROLES2 = [
   "sop_reviewer",
   "sop_operator"
 ];
-var AppRole2 = z.enum(APP_ROLES2);
+var AppRole = z.enum(APP_ROLES);
 async function assertOwnerOrAdmin2(supabaseAdmin, appCode, tenantId, userId) {
   const { data, error } = await supabaseAdmin.from("user_roles").select("role, app_code").eq("tenant_id", tenantId).eq("user_id", userId);
   if (error) throw new Error(error.message);
@@ -1401,7 +1292,7 @@ function createInviteTenantUser(deps) {
       display_name: z.string().min(1, "Name is required").max(120),
       position: z.string().max(120).optional(),
       portal: z.enum(["internal", "vendor", "approver", "customer"]).default("internal"),
-      roles: z.array(AppRole2).default([]),
+      roles: z.array(AppRole).default([]),
       party_id: z.string().uuid().optional()
     }).parse(i)
   ).handler(async ({ data, context }) => {
@@ -1530,7 +1421,7 @@ function createUpdateTenantUserRoles(deps) {
     (i) => z.object({
       tenant_id: z.string().uuid(),
       user_id: z.string().uuid(),
-      roles: z.array(AppRole2),
+      roles: z.array(AppRole),
       app_code: z.string().min(1).max(64).optional()
     }).parse(i)
   ).handler(async ({ data, context }) => {
@@ -2924,6 +2815,6 @@ function createListActiveBundleRules(deps) {
   });
 }
 
-export { APP_CODES as BILLING_APP_CODES, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, MAX_DEPARTMENT_DEPTH, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDepartmentServer, createGetBillingInvoice, createGetBillingOverview, createGetMyProfile, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createHasEverHadMembership, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createPositionServer, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createSetUserAppRoles, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, deleteDepartmentServer, deletePositionServer, getOrgChartTreeServer, getTeamMemberServer, listDepartmentsAndPositionsServer, listTeamMembersServer, resolveScopedTenantIds, updateDepartmentServer, updatePositionServer, upsertTeamMemberServer };
+export { ACCOUNT_APP_ROLES, APP_CODES as BILLING_APP_CODES, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, MAX_DEPARTMENT_DEPTH, accountResendInvitationServer, accountSendPasswordResetServer, accountUpdateUserProfileServer, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDepartmentServer, createGetBillingInvoice, createGetBillingOverview, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createHasEverHadMembership, createInvitePartyContact, createInviteTenantUser, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createPositionServer, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, deleteDepartmentServer, deletePositionServer, getMyProfileServer, getOrgChartTreeServer, getTeamMemberServer, inviteUserToWorkspacesServer, listDepartmentsAndPositionsServer, listManageableTenantsServer, listManageableUsersServer, listTeamMembersServer, resolveScopedTenantIds, setUserAppRolesServer, updateDepartmentServer, updateMyDefaultTenantServer, updateMyTimezoneServer, updatePositionServer, upsertTeamMemberServer };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

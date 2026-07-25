@@ -159,15 +159,49 @@ declare function createMarkAllNotificationsRead(deps: Deps): _tanstack_start_cli
     ok: true;
 }>>;
 
-type SendEmail$1 = (input: {
+/**
+ * Shared Account module (Users-page tenant/user management + self-profile)
+ * — plain business-logic functions, deliberately NOT wrapped in
+ * `createServerFn()` here.
+ *
+ * Same root cause and fix as team.server.ts (see that file's doc comment
+ * for the full history): a `createServerFn()` call living inside this
+ * package's pre-compiled dist can lose `context.userId` at the handler,
+ * because it's this package's own build step processing the call rather
+ * than each consuming app's TanStack Start/router-plugin Vite build.
+ * Confirmed broken here too via a real report on joaoffice/joasop's Users
+ * page ("You don't own or super-admin any organizations yet." even for
+ * actual owners) and independently re-fixed by Lovable in joasop
+ * (`src/lib/account.server.ts` + local createServerFn wrappers in
+ * `src/lib/account.functions.ts`, mirroring the team fix).
+ *
+ * So the split is the same as team.server.ts: this file owns the actual
+ * Supabase queries and authorization logic (the part that's genuinely
+ * identical across apps and worth sharing); each consuming app's own
+ * `account.functions.ts` supplies a thin
+ * `createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
+ * .inputValidator(...).handler(({data, context}) => xServer(data, context
+ * as never, deps))` wrapper living in its own source, so the
+ * createServerFn() boundary is always app-local.
+ *
+ * Unlike team.server.ts's read/write gates, `AccountDeps` here stays
+ * dependency-injected (supabaseAdmin/sendEmail/appBaseUrl/appName/appCode)
+ * because those genuinely vary per app — same shape as the old
+ * createServerFn-factory version's `AccountDeps`, minus
+ * `requireSupabaseAuth` (which now lives only in each app's local
+ * wrapper's `.middleware([...])` call, not in deps).
+ */
+type AccountContext = {
+    userId: string;
+};
+type SendEmailFn = (input: {
     to: string;
     subject: string;
     html: string;
 }) => Promise<any>;
 type AccountDeps = {
-    requireSupabaseAuth: any;
     supabaseAdmin: any;
-    sendEmail: SendEmail$1;
+    sendEmail: SendEmailFn;
     /** Fallback base URL used to build invite/reset links when APP_BASE_URL is unset, e.g. "https://books.joasuite.com". */
     appBaseUrl: string;
     /** Display name used in transactional emails, e.g. "JoaBooks". */
@@ -175,12 +209,47 @@ type AccountDeps = {
     /** Canonical app_code, used as the fallback when a user_roles/app_code row predates multi-app support, e.g. "joabooks". */
     appCode: string;
 };
-declare function createListManageableTenants(deps: AccountDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], undefined, Promise<any>>;
-declare function createListManageableUsers(deps: AccountDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], undefined, Promise<{
-    tenants: [];
-    users: [];
-    caller_owner_tenant_ids?: undefined;
-} | {
+declare const ACCOUNT_APP_ROLES: readonly ["owner", "super_admin", "admin", "billing_admin", "finance_ap", "finance_ar", "finance_manager", "accountant", "approver", "vendor", "customer", "hr_manager", "manager", "employee", "sop_admin", "sop_author", "sop_reviewer", "sop_operator"];
+type AccountAppRole = (typeof ACCOUNT_APP_ROLES)[number];
+type AccountPortal = "internal" | "vendor" | "approver" | "customer";
+type AppAssignmentInput = {
+    app_code: string;
+    roles: AccountAppRole[];
+};
+type InviteUserToWorkspacesInput = {
+    email: string;
+    display_name: string;
+    position?: string;
+    primary_tenant_id?: string;
+    assignments: Array<{
+        tenant_id: string;
+        portal: AccountPortal;
+        apps: AppAssignmentInput[];
+    }>;
+};
+type SetUserAppRolesInput = {
+    tenant_id: string;
+    user_id: string;
+    app_code: string;
+    roles: AccountAppRole[];
+};
+type AccountUserIdInput = {
+    user_id: string;
+};
+type AccountUpdateUserProfileInput = {
+    user_id: string;
+    display_name: string;
+    email?: string;
+    position?: string | null;
+};
+type UpdateMyTimezoneInput = {
+    timezone: string | null;
+};
+type UpdateMyDefaultTenantInput = {
+    tenant_id: string | null;
+};
+declare function listManageableTenantsServer(context: AccountContext, deps: AccountDeps): Promise<any>;
+declare function listManageableUsersServer(context: AccountContext, deps: AccountDeps): Promise<{
     tenants: any;
     users: {
         user_id: string;
@@ -201,69 +270,38 @@ declare function createListManageableUsers(deps: AccountDeps): _tanstack_start_c
         }>;
     }[];
     caller_owner_tenant_ids: string[];
-}>>;
-declare function createInviteUserToWorkspaces(deps: AccountDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    email: string;
-    display_name: string;
-    assignments: {
-        tenant_id: string;
-        portal: "approver" | "internal" | "vendor" | "customer";
-        apps: {
-            app_code: string;
-            roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "billing_admin" | "vendor" | "customer" | "hr_manager" | "manager" | "employee")[];
-        }[];
-    }[];
-    position?: string | undefined;
-    primary_tenant_id?: string | undefined;
-}, Promise<{
+}>;
+declare function inviteUserToWorkspacesServer(input: InviteUserToWorkspacesInput, context: AccountContext, deps: AccountDeps): Promise<{
     user_id: any;
     created: boolean;
     tenants_added: number;
-    primary_tenant_id: any;
+    primary_tenant_id: string;
     email: any;
-}>>;
-declare function createSetUserAppRoles(deps: AccountDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-    user_id: string;
-    app_code: string;
-    roles: ("owner" | "super_admin" | "admin" | "finance_manager" | "finance_ap" | "finance_ar" | "accountant" | "approver" | "sop_admin" | "sop_author" | "sop_reviewer" | "sop_operator" | "billing_admin" | "vendor" | "customer" | "hr_manager" | "manager" | "employee")[];
-}, Promise<{
-    ok: true;
-}>>;
-declare function createAccountResendInvitation(deps: AccountDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    user_id: string;
-}, Promise<{
-    ok: true;
+}>;
+declare function setUserAppRolesServer(input: SetUserAppRolesInput, context: AccountContext, deps: AccountDeps): Promise<{
+    ok: boolean;
+}>;
+declare function accountResendInvitationServer(input: AccountUserIdInput, context: AccountContext, deps: AccountDeps): Promise<{
+    ok: boolean;
     email: any;
-}>>;
-declare function createAccountSendPasswordReset(deps: AccountDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    user_id: string;
-}, Promise<{
-    ok: true;
+}>;
+declare function accountSendPasswordResetServer(input: AccountUserIdInput, context: AccountContext, deps: AccountDeps): Promise<{
+    ok: boolean;
     email: any;
-}>>;
-declare function createAccountUpdateUserProfile(deps: AccountDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    user_id: string;
-    display_name: string;
-    email?: string | undefined;
-    position?: string | null | undefined;
-}, Promise<{
-    ok: true;
-}>>;
-declare function createGetMyProfile(deps: AccountDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], undefined, Promise<{
+}>;
+declare function accountUpdateUserProfileServer(input: AccountUpdateUserProfileInput, context: AccountContext, deps: AccountDeps): Promise<{
+    ok: boolean;
+}>;
+declare function getMyProfileServer(context: AccountContext, deps: AccountDeps): Promise<{
     default_tenant_id: string | null;
     timezone: string | null;
-}>>;
-declare function createUpdateMyTimezone(deps: AccountDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    timezone: string | null;
-}, Promise<{
-    ok: true;
-}>>;
-declare function createUpdateMyDefaultTenant(deps: AccountDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string | null;
-}, Promise<{
-    ok: true;
-}>>;
+}>;
+declare function updateMyTimezoneServer(input: UpdateMyTimezoneInput, context: AccountContext, deps: AccountDeps): Promise<{
+    ok: boolean;
+}>;
+declare function updateMyDefaultTenantServer(input: UpdateMyDefaultTenantInput, context: AccountContext, deps: AccountDeps): Promise<{
+    ok: boolean;
+}>;
 
 /**
  * Shared Team (Employee/Contractor) + org-structure (Departments/Positions/
@@ -969,4 +1007,4 @@ declare function createGetTenantUsage(deps: BillingDeps): _tanstack_start_client
 }>>;
 declare function createListActiveBundleRules(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], undefined, Promise<any>>;
 
-export { type AccountDeps, type AdminDeps, type AppCatalogEntry, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, type BillingDeps, type BillingInterval, type PlanCode as BillingPlanCode, type CreateDepartmentInput, type CreatePositionInput, type DeleteDepartmentInput, type DeletePositionInput, type ListTeamMembersInput, MAX_DEPARTMENT_DEPTH, type MergePartiesDeps, type OrgChartDepartment, type OrgChartPerson, type OrgChartPosition, type OrgStructureDeps, type PartyRefTable, type SuiteHomeData, type TeamContext, type TeamMemberInput, type TenantAppRow, type TenantInput, type UpdateDepartmentInput, type UpdatePositionInput, type UpsertTeamMemberInput, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDepartmentServer, createGetBillingInvoice, createGetBillingOverview, createGetMyProfile, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createHasEverHadMembership, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createPositionServer, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createSetUserAppRoles, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, deleteDepartmentServer, deletePositionServer, getOrgChartTreeServer, getTeamMemberServer, listDepartmentsAndPositionsServer, listTeamMembersServer, resolveScopedTenantIds, updateDepartmentServer, updatePositionServer, upsertTeamMemberServer };
+export { ACCOUNT_APP_ROLES, type AccountAppRole, type AccountContext, type AccountDeps, type AccountPortal, type AccountUpdateUserProfileInput, type AccountUserIdInput, type AdminDeps, type AppAssignmentInput, type AppCatalogEntry, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, type BillingDeps, type BillingInterval, type PlanCode as BillingPlanCode, type CreateDepartmentInput, type CreatePositionInput, type DeleteDepartmentInput, type DeletePositionInput, type InviteUserToWorkspacesInput, type ListTeamMembersInput, MAX_DEPARTMENT_DEPTH, type MergePartiesDeps, type OrgChartDepartment, type OrgChartPerson, type OrgChartPosition, type OrgStructureDeps, type PartyRefTable, type SendEmailFn, type SetUserAppRolesInput, type SuiteHomeData, type TeamContext, type TeamMemberInput, type TenantAppRow, type TenantInput, type UpdateDepartmentInput, type UpdateMyDefaultTenantInput, type UpdateMyTimezoneInput, type UpdatePositionInput, type UpsertTeamMemberInput, accountResendInvitationServer, accountSendPasswordResetServer, accountUpdateUserProfileServer, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDepartmentServer, createGetBillingInvoice, createGetBillingOverview, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createHasEverHadMembership, createInvitePartyContact, createInviteTenantUser, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createPositionServer, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, deleteDepartmentServer, deletePositionServer, getMyProfileServer, getOrgChartTreeServer, getTeamMemberServer, inviteUserToWorkspacesServer, listDepartmentsAndPositionsServer, listManageableTenantsServer, listManageableUsersServer, listTeamMembersServer, resolveScopedTenantIds, setUserAppRolesServer, updateDepartmentServer, updateMyDefaultTenantServer, updateMyTimezoneServer, updatePositionServer, upsertTeamMemberServer };

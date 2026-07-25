@@ -22,10 +22,12 @@
  * each app's own `party-references.ts` (JoaBooks: src/lib/party-references.ts).
  *
  * Exception — team.server.ts (Team Members + Departments/Positions/OrgChart)
- * exports plain business-logic functions, NOT createServerFn() factories.
+ * and account.server.ts (Users-page tenant/user management + self-profile)
+ * export plain business-logic functions, NOT createServerFn() factories.
  * The createServerFn() boundary for these must be defined in each app's own
- * source (its own team.functions.ts), not inside this package's pre-compiled
- * dist — see team.server.ts's own doc comment for why. Usage:
+ * source (its own team.functions.ts / account.functions.ts), not inside
+ * this package's pre-compiled dist — see each file's own doc comment for
+ * why. Usage:
  *
  *   import { createServerFn } from "@tanstack/react-start";
  *   import { listTeamMembersServer, type ListTeamMembersInput } from "@joasuite/shared-ui/server";
@@ -58,18 +60,30 @@ export {
 } from "./notifications.functions";
 
 export {
-  createListManageableTenants,
-  createListManageableUsers,
-  createInviteUserToWorkspaces,
-  createSetUserAppRoles,
-  createAccountResendInvitation,
-  createAccountSendPasswordReset,
-  createAccountUpdateUserProfile,
-  createGetMyProfile,
-  createUpdateMyTimezone,
-  createUpdateMyDefaultTenant,
+  listManageableTenantsServer,
+  listManageableUsersServer,
+  inviteUserToWorkspacesServer,
+  setUserAppRolesServer,
+  accountResendInvitationServer,
+  accountSendPasswordResetServer,
+  accountUpdateUserProfileServer,
+  getMyProfileServer,
+  updateMyTimezoneServer,
+  updateMyDefaultTenantServer,
+  ACCOUNT_APP_ROLES,
+  type AccountContext,
   type AccountDeps,
-} from "./account.functions";
+  type SendEmailFn,
+  type AccountAppRole,
+  type AccountPortal,
+  type AppAssignmentInput,
+  type InviteUserToWorkspacesInput,
+  type SetUserAppRolesInput,
+  type AccountUserIdInput,
+  type AccountUpdateUserProfileInput,
+  type UpdateMyTimezoneInput,
+  type UpdateMyDefaultTenantInput,
+} from "./account.server";
 
 export {
   listTeamMembersServer,
