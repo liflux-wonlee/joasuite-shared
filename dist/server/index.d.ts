@@ -266,43 +266,108 @@ declare function createUpdateMyDefaultTenant(deps: AccountDeps): _tanstack_start
 }>>;
 
 /**
- * Shared Team (Employee/Contractor) module — basic identity + org-placement
- * fields ONLY (name, contact, department, position, manager, employment
- * status/dates, worker_type). Backed entirely by the shared core tables
- * `public.parties` (is_employee = true) and `public.employee_profiles`.
+ * Shared Team (Employee/Contractor) + org-structure (Departments/Positions/
+ * OrgChart) module — plain business-logic functions, deliberately NOT
+ * wrapped in `createServerFn()` here.
  *
- * Deliberately excludes every HR-confidential field (compensation,
- * contracts, emergency contact, performance reviews, leave/timesheet
- * records) — those remain app-owned (e.g. JoaOffice's
- * `office.employee_hr_records` / `office.employee_pto_balances`, gated by
- * their own role checks). This module must never import from, or grow a
- * dependency on, any app-specific HR schema — every JoaSuite app except
- * the future JoaHR app is expected to embed this same Team module as-is.
+ * History: this used to export `createServerFn().middleware([...])`-wrapped
+ * factories directly (`createListTeamMembers(deps)` etc., taking
+ * `deps.requireSupabaseAuth`). In production, `context.supabase`/
+ * `context.userId` injected by that per-function `.middleware()` composition
+ * would sometimes arrive at the handler as an empty object -- confirmed via
+ * a temporary diagnostic guard that fired with genuinely empty context,
+ * despite the middleware wiring and gate functions all checking out correct
+ * in source across multiple rounds of review. The one thing that reliably
+ * fixed it (confirmed independently in joasop, then replicated in joaoffice
+ * and joahr) was moving the `createServerFn()` call itself into each app's
+ * own source tree, where that app's own TanStack Start/router-plugin build
+ * step processes it directly, instead of inside this package's pre-compiled
+ * npm dist output.
+ *
+ * So the split now is: this file owns the actual Supabase queries and
+ * authorization logic (the part that's genuinely identical across apps and
+ * worth sharing); each consuming app's own `team.functions.ts` supplies a
+ * thin `createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
+ * .inputValidator(...).handler(({data, context}) => xServer(data, context
+ * as never, deps))` wrapper living in its own source, so the createServerFn
+ * boundary is always app-local.
+ *
+ * Team member read/write gates are hardcoded (not dependency-injected) --
+ * per the original design intent, these must NOT diverge per app. Departments/
+ * positions/org-chart authorization DOES vary per app (e.g. JoaSOP gates on
+ * its own sop_admin/sop_author/sop_reviewer roles plus an active JoaSOP
+ * subscription; JoaHR uses its own assertJoahrRole), so those take an
+ * `OrgStructureDeps` gate pair injected by the caller.
  */
-type TeamDeps = {
-    requireSupabaseAuth: any;
-    supabaseAdmin: any;
-    assertCanReadTeam: (supabase: any, tenantId: string, userId: string) => Promise<void>;
-    assertCanWriteTeam: (supabase: any, tenantId: string, userId: string) => Promise<void>;
-    /** Called after a successful write, e.g. to append an audit_logs row. Optional. */
-    onWrite?: (input: {
-        tenantId: string;
-        userId: string;
-        partyId: string;
-        created: boolean;
-    }) => Promise<void>;
+type TeamContext = {
+    supabase: any;
+    userId: string;
 };
-declare function createListTeamMembers(deps: TeamDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+type OrgStructureDeps = {
+    /** Read-gate: any tenant member who may see the org structure. */
+    assertCanReadOrgStructure: (supabase: any, tenantId: string, userId: string) => Promise<void>;
+    /** Write-gate: who may create/edit/delete departments and positions. */
+    assertCanManageOrgStructure: (supabase: any, tenantId: string, userId: string) => Promise<void>;
+};
+declare const MAX_DEPARTMENT_DEPTH = 4;
+type ListTeamMembersInput = {
     tenant_id: string;
-    search?: string | undefined;
-    worker_type?: "employee" | "contractor" | undefined;
-}, Promise<{
-    rows: any;
-}>>;
-declare function createGetTeamMember(deps: TeamDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    search?: string;
+    worker_type?: "employee" | "contractor";
+};
+type TeamMemberInput = {
     tenant_id: string;
     party_id: string;
-}, Promise<{
+};
+type UpsertTeamMemberInput = {
+    tenant_id: string;
+    party_id?: string;
+    linked_user_id?: string;
+    name_en?: string;
+    contact_email?: string | null;
+    contact_phone?: string | null;
+    department_id?: string | null;
+    position_id?: string | null;
+    manager_id?: string | null;
+    employment_status?: "active" | "on_leave" | "terminated";
+    hire_date?: string | null;
+    termination_date?: string | null;
+    worker_type: "employee" | "contractor";
+};
+type TenantInput = {
+    tenant_id: string;
+};
+type CreateDepartmentInput = {
+    tenant_id: string;
+    name: string;
+    code?: string | null;
+    parent_department_id?: string | null;
+};
+type UpdateDepartmentInput = CreateDepartmentInput & {
+    id: string;
+};
+type DeleteDepartmentInput = {
+    tenant_id: string;
+    id: string;
+};
+type CreatePositionInput = {
+    tenant_id: string;
+    department_id: string;
+    name: string;
+};
+type UpdatePositionInput = {
+    tenant_id: string;
+    id: string;
+    name: string;
+};
+type DeletePositionInput = {
+    tenant_id: string;
+    id: string;
+};
+declare function listTeamMembersServer(input: ListTeamMembersInput, context: TeamContext): Promise<{
+    rows: any;
+}>;
+declare function getTeamMemberServer(input: TeamMemberInput, context: TeamContext): Promise<{
     party_id: any;
     linked_user_id: any;
     name_en: any;
@@ -318,105 +383,39 @@ declare function createGetTeamMember(deps: TeamDeps): _tanstack_start_client_cor
     hire_date: any;
     termination_date: any;
     worker_type: any;
-}>>;
+}>;
 /**
- * Create-or-update a Team member. Accepts EITHER an existing `party_id`
- * (the common case for apps managing employees/contractors that have no
- * login — e.g. JoaOffice) OR a `linked_user_id` (the common case for
- * resolving/creating the Team record tied to an existing tenant login —
- * e.g. JoaSOP's Team page), OR neither for a brand-new Team member created
- * from scratch (name/contact fields required in that case).
- *
- * Always leaves both a `parties` row (is_employee = true) and a matching
- * `employee_profiles` row in place — this is the fix for the historical gap
- * where creating a party alone (e.g. via a Parties/Vendors admin screen)
- * never created the accompanying employee_profiles row.
+ * `appCode`, if given, is stamped onto `parties.source_app`/
+ * `employee_profiles.source_app` (both nullable) so multi-app records can be
+ * traced back to whichever app created/last wrote them. Purely informational
+ * — omit it and the columns are simply left null.
  */
-declare function createUpsertTeamMember(deps: TeamDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-    worker_type: "employee" | "contractor";
-    party_id?: string | undefined;
-    linked_user_id?: string | undefined;
-    name_en?: string | undefined;
-    contact_email?: string | null | undefined;
-    contact_phone?: string | null | undefined;
-    department_id?: string | null | undefined;
-    position_id?: string | null | undefined;
-    manager_id?: string | null | undefined;
-    employment_status?: "active" | "on_leave" | "terminated" | undefined;
-    hire_date?: string | null | undefined;
-    termination_date?: string | null | undefined;
-}, Promise<{
+declare function upsertTeamMemberServer(input: UpsertTeamMemberInput, context: TeamContext, appCode?: string): Promise<{
     party_id: string;
     created: boolean;
-}>>;
-
-/**
- * Departments/positions are shared JoaSuite core tables (used by every app
- * that manages an Employee/Contractor Directory entry). Authorization is
- * intentionally injected rather than hardcoded here, since "who may edit
- * org structure" differs per app (e.g. JoaSOP's `sop_admin` vs JoaOffice's
- * `admin`/`hr_manager`) — see docs/joasuite-app-integration-contract.md.
- */
-type OrgStructureDeps = {
-    requireSupabaseAuth: any;
-    supabaseAdmin: any;
-    /** Read-gate: any tenant member who may see the org structure. */
-    assertCanReadOrgStructure: (supabase: any, tenantId: string, userId: string) => Promise<void>;
-    /** Write-gate: who may create/edit/delete departments and positions. */
-    assertCanManageOrgStructure: (supabase: any, tenantId: string, userId: string) => Promise<void>;
-};
-/** Departments may nest at most this many levels deep (1 = top-level). */
-declare const MAX_DEPARTMENT_DEPTH = 4;
-declare function createListDepartmentsAndPositions(deps: OrgStructureDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-}, Promise<{
+}>;
+declare function listDepartmentsAndPositionsServer(input: TenantInput, context: TeamContext, deps: OrgStructureDeps): Promise<{
     departments: any;
     positions: any;
-}>>;
-declare function createCreateDepartment(deps: OrgStructureDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-    name: string;
-    code?: string | null | undefined;
-    parent_department_id?: string | null | undefined;
-}, Promise<{
+}>;
+declare function createDepartmentServer(input: CreateDepartmentInput, context: TeamContext, deps: OrgStructureDeps): Promise<{
     id: any;
-}>>;
-declare function createUpdateDepartment(deps: OrgStructureDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-    id: string;
-    name: string;
-    code?: string | null | undefined;
-    parent_department_id?: string | null | undefined;
-}, Promise<{
-    ok: true;
-}>>;
-declare function createDeleteDepartment(deps: OrgStructureDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-    id: string;
-}, Promise<{
-    ok: true;
-}>>;
-declare function createCreatePosition(deps: OrgStructureDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-    department_id: string;
-    name: string;
-}, Promise<{
+}>;
+declare function updateDepartmentServer(input: UpdateDepartmentInput, context: TeamContext, deps: OrgStructureDeps): Promise<{
+    ok: boolean;
+}>;
+declare function deleteDepartmentServer(input: DeleteDepartmentInput, context: TeamContext, deps: OrgStructureDeps): Promise<{
+    ok: boolean;
+}>;
+declare function createPositionServer(input: CreatePositionInput, context: TeamContext, deps: OrgStructureDeps): Promise<{
     id: any;
-}>>;
-declare function createUpdatePosition(deps: OrgStructureDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-    id: string;
-    name: string;
-}, Promise<{
-    ok: true;
-}>>;
-declare function createDeletePosition(deps: OrgStructureDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-    id: string;
-}, Promise<{
-    ok: true;
-}>>;
+}>;
+declare function updatePositionServer(input: UpdatePositionInput, context: TeamContext, deps: OrgStructureDeps): Promise<{
+    ok: boolean;
+}>;
+declare function deletePositionServer(input: DeletePositionInput, context: TeamContext, deps: OrgStructureDeps): Promise<{
+    ok: boolean;
+}>;
 type OrgChartPerson = {
     party_id: string;
     name: string;
@@ -434,19 +433,9 @@ type OrgChartDepartment = {
     positions: OrgChartPosition[];
     children: OrgChartDepartment[];
 };
-/**
- * Builds the department/position tree for the visual org chart: each
- * department nests its child departments (up to MAX_DEPARTMENT_DEPTH) and
- * its own positions, each position lists the active team members currently
- * holding it. People with no department/position assignment don't have a
- * natural place in a structural chart and are omitted (they still show up
- * in the Team Members list).
- */
-declare function createGetOrgChartTree(deps: OrgStructureDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-}, Promise<{
+declare function getOrgChartTreeServer(input: TenantInput, context: TeamContext, deps: OrgStructureDeps): Promise<{
     roots: OrgChartDepartment[];
-}>>;
+}>;
 
 type SendEmail = (input: {
     to: string;
@@ -980,4 +969,4 @@ declare function createGetTenantUsage(deps: BillingDeps): _tanstack_start_client
 }>>;
 declare function createListActiveBundleRules(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], undefined, Promise<any>>;
 
-export { type AccountDeps, type AdminDeps, type AppCatalogEntry, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, type BillingDeps, type BillingInterval, type PlanCode as BillingPlanCode, MAX_DEPARTMENT_DEPTH, type MergePartiesDeps, type OrgChartDepartment, type OrgChartPerson, type OrgChartPosition, type OrgStructureDeps, type PartyRefTable, type SuiteHomeData, type TeamDeps, type TenantAppRow, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createCreateDepartment, createCreatePosition, createDeleteDepartment, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDeletePosition, createGetBillingInvoice, createGetBillingOverview, createGetMyProfile, createGetOrgChartTree, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTeamMember, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createHasEverHadMembership, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListDepartmentsAndPositions, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTeamMembers, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createSetUserAppRoles, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateDepartment, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdatePosition, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, createUpsertTeamMember, resolveScopedTenantIds };
+export { type AccountDeps, type AdminDeps, type AppCatalogEntry, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, type BillingDeps, type BillingInterval, type PlanCode as BillingPlanCode, type CreateDepartmentInput, type CreatePositionInput, type DeleteDepartmentInput, type DeletePositionInput, type ListTeamMembersInput, MAX_DEPARTMENT_DEPTH, type MergePartiesDeps, type OrgChartDepartment, type OrgChartPerson, type OrgChartPosition, type OrgStructureDeps, type PartyRefTable, type SuiteHomeData, type TeamContext, type TeamMemberInput, type TenantAppRow, type TenantInput, type UpdateDepartmentInput, type UpdatePositionInput, type UpsertTeamMemberInput, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDepartmentServer, createGetBillingInvoice, createGetBillingOverview, createGetMyProfile, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createHasEverHadMembership, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createPositionServer, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createSetUserAppRoles, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, deleteDepartmentServer, deletePositionServer, getOrgChartTreeServer, getTeamMemberServer, listDepartmentsAndPositionsServer, listTeamMembersServer, resolveScopedTenantIds, updateDepartmentServer, updatePositionServer, upsertTeamMemberServer };

@@ -20,6 +20,21 @@
  *
  * mergeParties additionally needs partyDocRefTables/partyChildTables — see
  * each app's own `party-references.ts` (JoaBooks: src/lib/party-references.ts).
+ *
+ * Exception — team.server.ts (Team Members + Departments/Positions/OrgChart)
+ * exports plain business-logic functions, NOT createServerFn() factories.
+ * The createServerFn() boundary for these must be defined in each app's own
+ * source (its own team.functions.ts), not inside this package's pre-compiled
+ * dist — see team.server.ts's own doc comment for why. Usage:
+ *
+ *   import { createServerFn } from "@tanstack/react-start";
+ *   import { listTeamMembersServer, type ListTeamMembersInput } from "@joasuite/shared-ui/server";
+ *   import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+ *
+ *   export const listTeamMembers = createServerFn({ method: "POST" })
+ *     .middleware([requireSupabaseAuth])
+ *     .inputValidator((i) => z.object({...}).parse(i) satisfies ListTeamMembersInput)
+ *     .handler(({ data, context }) => listTeamMembersServer(data, context as never));
  */
 
 export type { AppCode } from "../constants";
@@ -57,27 +72,34 @@ export {
 } from "./account.functions";
 
 export {
-  createListTeamMembers,
-  createGetTeamMember,
-  createUpsertTeamMember,
-  type TeamDeps,
-} from "./team.functions";
-
-export {
-  createListDepartmentsAndPositions,
-  createCreateDepartment,
-  createUpdateDepartment,
-  createDeleteDepartment,
-  createCreatePosition,
-  createUpdatePosition,
-  createDeletePosition,
-  createGetOrgChartTree,
+  listTeamMembersServer,
+  getTeamMemberServer,
+  upsertTeamMemberServer,
+  listDepartmentsAndPositionsServer,
+  createDepartmentServer,
+  updateDepartmentServer,
+  deleteDepartmentServer,
+  createPositionServer,
+  updatePositionServer,
+  deletePositionServer,
+  getOrgChartTreeServer,
   MAX_DEPARTMENT_DEPTH,
+  type TeamContext,
   type OrgStructureDeps,
+  type ListTeamMembersInput,
+  type TeamMemberInput,
+  type UpsertTeamMemberInput,
+  type TenantInput,
+  type CreateDepartmentInput,
+  type UpdateDepartmentInput,
+  type DeleteDepartmentInput,
+  type CreatePositionInput,
+  type UpdatePositionInput,
+  type DeletePositionInput,
   type OrgChartDepartment,
   type OrgChartPosition,
   type OrgChartPerson,
-} from "./org-structure.functions";
+} from "./team.server";
 
 export {
   createGetTenantSettings,
