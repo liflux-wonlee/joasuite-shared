@@ -173,7 +173,7 @@ export function OrgStructureSettingsPage({ tenantId }: { tenantId: string }) {
   const canAddSubDepartment = (d: Department) => d.depth < 4;
 
   return (
-    <div className="py-6 space-y-4 max-w-2xl">
+    <div className="py-6 space-y-4 max-w-2xl mx-auto">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
           <Building2 className="h-5 w-5" />

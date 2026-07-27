@@ -4714,7 +4714,7 @@ function OrgStructureSettingsPage({ tenantId }) {
   const positions = orgQ.data?.positions ?? [];
   const orderedDepartments = buildDeptTree(departments);
   const canAddSubDepartment = (d) => d.depth < 4;
-  return /* @__PURE__ */ jsxs("div", { className: "py-6 space-y-4 max-w-2xl", children: [
+  return /* @__PURE__ */ jsxs("div", { className: "py-6 space-y-4 max-w-2xl mx-auto", children: [
     /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between gap-3 flex-wrap", children: [
       /* @__PURE__ */ jsxs("h1", { className: "text-2xl font-semibold tracking-tight flex items-center gap-2", children: [
         /* @__PURE__ */ jsx(Building2, { className: "h-5 w-5" }),
