@@ -288,10 +288,12 @@ function createMarkAllNotificationsRead(deps) {
     return { ok: true };
   });
 }
+
+// src/server/account.server.ts
 function resolveAppBaseUrl(deps) {
   return (process.env.APP_BASE_URL || deps.appBaseUrl).replace(/\/$/, "");
 }
-var APP_ROLES = [
+var ACCOUNT_APP_ROLES = [
   "owner",
   "super_admin",
   "admin",
@@ -311,8 +313,6 @@ var APP_ROLES = [
   "sop_reviewer",
   "sop_operator"
 ];
-var AppRole = z.enum(APP_ROLES);
-var Portal = z.enum(["internal", "vendor", "approver", "customer"]);
 async function getCallerManageableTenantIds(supabaseAdmin, userId) {
   const { data, error } = await supabaseAdmin.from("user_roles").select("tenant_id, role").eq("user_id", userId).in("role", ["owner", "super_admin"]);
   if (error) throw new Error(error.message);
@@ -337,6 +337,31 @@ async function getCallerOwnerTenantIds(supabaseAdmin, userId) {
   const { data, error } = await supabaseAdmin.from("user_roles").select("tenant_id").eq("user_id", userId).eq("role", "owner");
   if (error) throw new Error(error.message);
   return Array.from(new Set((data ?? []).map((r) => r.tenant_id)));
+}
+async function assertAppsSubscribed(supabaseAdmin, tenantId, appCodes) {
+  if (appCodes.length === 0) return;
+  const { data, error } = await supabaseAdmin.from("tenant_apps").select("app_code").eq("tenant_id", tenantId).eq("status", "active").in("app_code", appCodes);
+  if (error) throw new Error(error.message);
+  const active = new Set((data ?? []).map((r) => r.app_code));
+  const missing = appCodes.filter((c) => !active.has(c));
+  if (missing.length > 0) {
+    throw new Error(`Apps not subscribed for this workspace: ${missing.join(", ")}`);
+  }
+}
+async function assertCallerCanManageUser(supabaseAdmin, callerId, targetUserId) {
+  const tenantIds = await getCallerManageableTenantIds(supabaseAdmin, callerId);
+  if (tenantIds.length === 0) throw new Error("Forbidden: no manageable workspaces");
+  const { data, error } = await supabaseAdmin.from("tenant_users").select("tenant_id").eq("user_id", targetUserId).in("tenant_id", tenantIds);
+  if (error) throw new Error(error.message);
+  const shared = (data ?? []).map((r) => r.tenant_id);
+  if (shared.length === 0) throw new Error("Forbidden: target user is not in any of your workspaces");
+  return shared;
+}
+async function getTargetEmail(supabaseAdmin, targetUserId) {
+  const { data, error } = await supabaseAdmin.from("tenant_users").select("email, display_name").eq("user_id", targetUserId).limit(1).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data?.email) throw new Error("User has no email on file");
+  return { email: data.email, display_name: data.display_name ?? null };
 }
 async function findOrInviteUserForAccount(deps, email, displayName, primaryTenantId) {
   const { data: existing, error } = await deps.supabaseAdmin.auth.admin.listUsers({
@@ -388,645 +413,340 @@ async function sendMultiOrgInviteEmail(deps, opts) {
     </div>`;
   return deps.sendEmail({ to: opts.email, subject, html });
 }
-var AppAssignment = z.object({
-  app_code: z.string().min(1).max(64),
-  roles: z.array(AppRole).min(1)
-});
-async function assertAppsSubscribed(supabaseAdmin, tenantId, appCodes) {
-  if (appCodes.length === 0) return;
-  const { data, error } = await supabaseAdmin.from("tenant_apps").select("app_code").eq("tenant_id", tenantId).eq("status", "active").in("app_code", appCodes);
+async function listManageableTenantsServer(context, deps) {
+  const ids = await getCallerManageableTenantIds(deps.supabaseAdmin, context.userId);
+  if (ids.length === 0) return [];
+  const { data, error } = await deps.supabaseAdmin.from("tenants").select("id, name, slug, plan").in("id", ids).order("name");
   if (error) throw new Error(error.message);
-  const active = new Set((data ?? []).map((r) => r.app_code));
-  const missing = appCodes.filter((c) => !active.has(c));
-  if (missing.length > 0) {
-    throw new Error(`Apps not subscribed for this workspace: ${missing.join(", ")}`);
+  return data ?? [];
+}
+async function listManageableUsersServer(context, deps) {
+  const supabaseAdmin = deps.supabaseAdmin;
+  const tenantIds = await getCallerManageableTenantIds(supabaseAdmin, context.userId);
+  if (tenantIds.length === 0) return { tenants: [], users: [], caller_owner_tenant_ids: [] };
+  const [{ data: tenants }, { data: members }, { data: roleRows }, { data: appRows }] = await Promise.all([
+    supabaseAdmin.from("tenants").select("id, name, slug").in("id", tenantIds).order("name"),
+    supabaseAdmin.from("tenant_users").select("tenant_id, user_id, portal, status, display_name, email, position, joined_at, created_at").in("tenant_id", tenantIds),
+    supabaseAdmin.from("user_roles").select("tenant_id, user_id, role, app_code").in("tenant_id", tenantIds),
+    supabaseAdmin.from("tenant_apps").select("tenant_id, app_code, status, plan").in("tenant_id", tenantIds).eq("status", "active")
+  ]);
+  const rolesByCell = /* @__PURE__ */ new Map();
+  (roleRows ?? []).forEach((r) => {
+    const k = `${r.tenant_id}|${r.user_id}|${r.app_code ?? deps.appCode}`;
+    const arr = rolesByCell.get(k) ?? [];
+    arr.push(r.role);
+    rolesByCell.set(k, arr);
+  });
+  const appsByTenant = /* @__PURE__ */ new Map();
+  const planByTenantApp = /* @__PURE__ */ new Map();
+  (appRows ?? []).forEach((r) => {
+    const arr = appsByTenant.get(r.tenant_id) ?? [];
+    arr.push(r.app_code);
+    appsByTenant.set(r.tenant_id, arr);
+    planByTenantApp.set(`${r.tenant_id}|${r.app_code}`, r.plan ?? null);
+  });
+  const lastSignInByUid = /* @__PURE__ */ new Map();
+  const authCreatedByUid = /* @__PURE__ */ new Map();
+  try {
+    for (let page = 1; page <= 20; page++) {
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+      if (error) break;
+      (data?.users ?? []).forEach((u) => {
+        lastSignInByUid.set(u.id, u.last_sign_in_at ?? null);
+        authCreatedByUid.set(u.id, u.created_at ?? null);
+      });
+      if (!data?.users || data.users.length < 200) break;
+    }
+  } catch {
   }
-}
-async function assertCallerCanManageUser(supabaseAdmin, callerId, targetUserId) {
-  const tenantIds = await getCallerManageableTenantIds(supabaseAdmin, callerId);
-  if (tenantIds.length === 0) throw new Error("Forbidden: no manageable workspaces");
-  const { data, error } = await supabaseAdmin.from("tenant_users").select("tenant_id").eq("user_id", targetUserId).in("tenant_id", tenantIds);
-  if (error) throw new Error(error.message);
-  const shared = (data ?? []).map((r) => r.tenant_id);
-  if (shared.length === 0) throw new Error("Forbidden: target user is not in any of your workspaces");
-  return shared;
-}
-async function getTargetEmail(supabaseAdmin, targetUserId) {
-  const { data, error } = await supabaseAdmin.from("tenant_users").select("email, display_name").eq("user_id", targetUserId).limit(1).maybeSingle();
-  if (error) throw new Error(error.message);
-  if (!data?.email) throw new Error("User has no email on file");
-  return { email: data.email, display_name: data.display_name ?? null };
-}
-function createListManageableTenants(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).handler(async ({ context }) => {
-    const userId = context.userId;
-    const ids = await getCallerManageableTenantIds(deps.supabaseAdmin, userId);
-    if (ids.length === 0) return [];
-    const { data, error } = await deps.supabaseAdmin.from("tenants").select("id, name, slug, plan").in("id", ids).order("name");
-    if (error) throw new Error(error.message);
-    return data ?? [];
-  });
-}
-function createListManageableUsers(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).handler(async ({ context }) => {
-    const userId = context.userId;
-    const supabaseAdmin = deps.supabaseAdmin;
-    const tenantIds = await getCallerManageableTenantIds(supabaseAdmin, userId);
-    if (tenantIds.length === 0) return { tenants: [], users: [] };
-    const [{ data: tenants }, { data: members }, { data: roleRows }, { data: appRows }] = await Promise.all([
-      supabaseAdmin.from("tenants").select("id, name, slug").in("id", tenantIds).order("name"),
-      supabaseAdmin.from("tenant_users").select("tenant_id, user_id, portal, status, display_name, email, position, joined_at, created_at").in("tenant_id", tenantIds),
-      supabaseAdmin.from("user_roles").select("tenant_id, user_id, role, app_code").in("tenant_id", tenantIds),
-      supabaseAdmin.from("tenant_apps").select("tenant_id, app_code, status, plan").in("tenant_id", tenantIds).eq("status", "active")
-    ]);
-    const rolesByCell = /* @__PURE__ */ new Map();
-    (roleRows ?? []).forEach((r) => {
-      const k = `${r.tenant_id}|${r.user_id}|${r.app_code ?? deps.appCode}`;
-      const arr = rolesByCell.get(k) ?? [];
-      arr.push(r.role);
-      rolesByCell.set(k, arr);
-    });
-    const appsByTenant = /* @__PURE__ */ new Map();
-    const planByTenantApp = /* @__PURE__ */ new Map();
-    (appRows ?? []).forEach((r) => {
-      const arr = appsByTenant.get(r.tenant_id) ?? [];
-      arr.push(r.app_code);
-      appsByTenant.set(r.tenant_id, arr);
-      planByTenantApp.set(`${r.tenant_id}|${r.app_code}`, r.plan ?? null);
-    });
-    const lastSignInByUid = /* @__PURE__ */ new Map();
-    const authCreatedByUid = /* @__PURE__ */ new Map();
-    try {
-      for (let page = 1; page <= 20; page++) {
-        const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
-        if (error) break;
-        (data?.users ?? []).forEach((u) => {
-          lastSignInByUid.set(u.id, u.last_sign_in_at ?? null);
-          authCreatedByUid.set(u.id, u.created_at ?? null);
-        });
-        if (!data?.users || data.users.length < 200) break;
-      }
-    } catch {
-    }
-    const usersByUid = /* @__PURE__ */ new Map();
-    (members ?? []).filter((m) => m.portal === "internal").forEach((m) => {
-      const uid = m.user_id;
-      const tid = m.tenant_id;
-      const joined = m.joined_at ?? m.created_at ?? null;
-      const pos = m.position ?? null;
-      let row = usersByUid.get(uid);
-      if (!row) {
-        row = {
-          user_id: uid,
-          email: m.email ?? null,
-          display_name: m.display_name ?? null,
-          position: pos,
-          joined_at: joined,
-          last_sign_in_at: lastSignInByUid.get(uid) ?? null,
-          assignments: {}
-        };
-        usersByUid.set(uid, row);
-      } else {
-        if (!row.email && m.email) row.email = m.email;
-        if (!row.display_name && m.display_name) row.display_name = m.display_name;
-        if (!row.position && pos) row.position = pos;
-        if (joined && (!row.joined_at || joined < row.joined_at)) row.joined_at = joined;
-      }
-      const apps = {};
-      const tenantApps = appsByTenant.get(tid) ?? [];
-      const codes = new Set(tenantApps);
-      (roleRows ?? []).filter((r) => r.tenant_id === tid && r.user_id === uid).forEach((r) => codes.add(r.app_code ?? deps.appCode));
-      codes.forEach((code) => {
-        apps[code] = { roles: rolesByCell.get(`${tid}|${uid}|${code}`) ?? [] };
-      });
-      row.assignments[tid] = {
-        tenant_id: tid,
-        portal: m.portal ?? "internal",
-        status: m.status ?? "active",
-        joined_at: joined,
+  const usersByUid = /* @__PURE__ */ new Map();
+  (members ?? []).filter((m) => m.portal === "internal").forEach((m) => {
+    const uid = m.user_id;
+    const tid = m.tenant_id;
+    const joined = m.joined_at ?? m.created_at ?? null;
+    const pos = m.position ?? null;
+    let row = usersByUid.get(uid);
+    if (!row) {
+      row = {
+        user_id: uid,
+        email: m.email ?? null,
+        display_name: m.display_name ?? null,
         position: pos,
-        apps
+        joined_at: joined,
+        last_sign_in_at: lastSignInByUid.get(uid) ?? null,
+        assignments: {}
       };
+      usersByUid.set(uid, row);
+    } else {
+      if (!row.email && m.email) row.email = m.email;
+      if (!row.display_name && m.display_name) row.display_name = m.display_name;
+      if (!row.position && pos) row.position = pos;
+      if (joined && (!row.joined_at || joined < row.joined_at)) row.joined_at = joined;
+    }
+    const apps = {};
+    const tenantApps = appsByTenant.get(tid) ?? [];
+    const codes = new Set(tenantApps);
+    (roleRows ?? []).filter((r) => r.tenant_id === tid && r.user_id === uid).forEach((r) => codes.add(r.app_code ?? deps.appCode));
+    codes.forEach((code) => {
+      apps[code] = { roles: rolesByCell.get(`${tid}|${uid}|${code}`) ?? [] };
     });
-    usersByUid.forEach((row) => {
-      if (!row.joined_at) row.joined_at = authCreatedByUid.get(row.user_id) ?? null;
-    });
-    const users = Array.from(usersByUid.values()).sort(
-      (a, b) => (a.email ?? "").localeCompare(b.email ?? "")
-    );
-    const tenantsWithApps = (tenants ?? []).map((t) => {
-      const codes = appsByTenant.get(t.id) ?? [];
-      return {
-        ...t,
-        app_codes: codes,
-        app_plans: Object.fromEntries(
-          codes.map((c) => [c, planByTenantApp.get(`${t.id}|${c}`) ?? null])
-        )
-      };
-    });
-    return {
-      tenants: tenantsWithApps,
-      users,
-      caller_owner_tenant_ids: await getCallerOwnerTenantIds(supabaseAdmin, userId)
+    row.assignments[tid] = {
+      tenant_id: tid,
+      portal: m.portal ?? "internal",
+      status: m.status ?? "active",
+      joined_at: joined,
+      position: pos,
+      apps
     };
   });
-}
-function createInviteUserToWorkspaces(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({
-      email: z.string().email(),
-      display_name: z.string().min(1).max(120),
-      position: z.string().max(120).optional(),
-      primary_tenant_id: z.string().uuid().optional(),
-      assignments: z.array(
-        z.object({
-          tenant_id: z.string().uuid(),
-          portal: Portal.default("internal"),
-          apps: z.array(AppAssignment).default([])
-        })
-      ).min(1)
-    }).parse(i)
-  ).handler(async ({ data, context }) => {
-    const callerId = context.userId;
-    const supabaseAdmin = deps.supabaseAdmin;
-    for (const a of data.assignments) {
-      await assertCallerManagesTenant(supabaseAdmin, a.tenant_id, callerId);
-      const wantsOwner = a.apps.some((ap) => ap.roles.includes("owner"));
-      if (wantsOwner) {
-        const isOwner = await callerIsOwner(supabaseAdmin, a.tenant_id, callerId);
-        if (!isOwner) {
-          throw new Error("Only an Owner can grant the Owner role to another user.");
-        }
-      }
-      if (a.apps.length > 0) {
-        await assertAppsSubscribed(
-          supabaseAdmin,
-          a.tenant_id,
-          a.apps.map((x) => x.app_code)
-        );
-      }
-    }
-    const primaryTenantId = data.primary_tenant_id && data.assignments.some((a) => a.tenant_id === data.primary_tenant_id) ? data.primary_tenant_id : data.assignments[0].tenant_id;
-    const invited = await findOrInviteUserForAccount(
-      deps,
-      data.email,
-      data.display_name,
-      primaryTenantId
-    );
-    const { data: tenants } = await supabaseAdmin.from("tenants").select("id, name").in(
-      "id",
-      data.assignments.map((a) => a.tenant_id)
-    );
-    const nameById = /* @__PURE__ */ new Map();
-    (tenants ?? []).forEach((t) => nameById.set(t.id, t.name ?? ""));
-    const addedTenants = [];
-    for (const a of data.assignments) {
-      const { error: muErr } = await supabaseAdmin.from("tenant_users").upsert(
-        {
-          tenant_id: a.tenant_id,
-          user_id: invited.user.id,
-          portal: a.portal,
-          status: "active",
-          display_name: data.display_name,
-          email: invited.user.email ?? data.email,
-          position: data.position ?? null,
-          invited_at: (/* @__PURE__ */ new Date()).toISOString()
-        },
-        { onConflict: "tenant_id,user_id" }
-      );
-      if (muErr) throw new Error(muErr.message);
-      const rows = a.apps.flatMap(
-        (ap) => ap.roles.map((r) => ({
-          tenant_id: a.tenant_id,
-          user_id: invited.user.id,
-          role: r,
-          app_code: ap.app_code
-        }))
-      );
-      if (rows.length > 0) {
-        const { error: rErr } = await supabaseAdmin.from("user_roles").upsert(rows, { onConflict: "tenant_id,user_id,role,app_code" });
-        if (rErr) throw new Error(rErr.message);
-      }
-      addedTenants.push(nameById.get(a.tenant_id) ?? "");
-    }
-    const primaryName = nameById.get(primaryTenantId) ?? addedTenants[0] ?? null;
-    let emailResult = null;
-    if (invited.created) {
-      emailResult = await sendMultiOrgInviteEmail(deps, {
-        email: data.email,
-        display_name: data.display_name,
-        created: invited.created,
-        actionLink: invited.actionLink,
-        tenantNames: addedTenants.filter(Boolean),
-        primaryTenantName: primaryName
-      });
-    }
+  usersByUid.forEach((row) => {
+    if (!row.joined_at) row.joined_at = authCreatedByUid.get(row.user_id) ?? null;
+  });
+  const users = Array.from(usersByUid.values()).sort((a, b) => (a.email ?? "").localeCompare(b.email ?? ""));
+  const tenantsWithApps = (tenants ?? []).map((t) => {
+    const codes = appsByTenant.get(t.id) ?? [];
     return {
-      user_id: invited.user.id,
-      created: invited.created,
-      tenants_added: addedTenants.length,
-      primary_tenant_id: primaryTenantId,
-      email: emailResult
+      ...t,
+      app_codes: codes,
+      app_plans: Object.fromEntries(codes.map((c) => [c, planByTenantApp.get(`${t.id}|${c}`) ?? null]))
     };
   });
+  return {
+    tenants: tenantsWithApps,
+    users,
+    caller_owner_tenant_ids: await getCallerOwnerTenantIds(supabaseAdmin, context.userId)
+  };
 }
-function createSetUserAppRoles(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({
-      tenant_id: z.string().uuid(),
-      user_id: z.string().uuid(),
-      app_code: z.string().min(1).max(64),
-      roles: z.array(AppRole).default([])
-    }).parse(i)
-  ).handler(async ({ data, context }) => {
-    const callerId = context.userId;
-    const supabaseAdmin = deps.supabaseAdmin;
-    await assertCallerManagesTenant(supabaseAdmin, data.tenant_id, callerId);
-    if (data.roles.includes("owner")) {
-      const isOwner = await callerIsOwner(supabaseAdmin, data.tenant_id, callerId);
-      if (!isOwner && data.user_id !== callerId) {
+async function inviteUserToWorkspacesServer(input, context, deps) {
+  const supabaseAdmin = deps.supabaseAdmin;
+  const callerId = context.userId;
+  for (const a of input.assignments) {
+    await assertCallerManagesTenant(supabaseAdmin, a.tenant_id, callerId);
+    const wantsOwner = a.apps.some((ap) => ap.roles.includes("owner"));
+    if (wantsOwner) {
+      const isOwner = await callerIsOwner(supabaseAdmin, a.tenant_id, callerId);
+      if (!isOwner) {
         throw new Error("Only an Owner can grant the Owner role to another user.");
       }
     }
-    if (data.roles.length > 0) {
-      await assertAppsSubscribed(supabaseAdmin, data.tenant_id, [data.app_code]);
+    if (a.apps.length > 0) {
+      await assertAppsSubscribed(
+        supabaseAdmin,
+        a.tenant_id,
+        a.apps.map((x) => x.app_code)
+      );
     }
-    const { error: delErr } = await supabaseAdmin.from("user_roles").delete().eq("tenant_id", data.tenant_id).eq("user_id", data.user_id).eq("app_code", data.app_code);
-    if (delErr) throw new Error(delErr.message);
-    if (data.roles.length > 0) {
-      const rows = data.roles.map((r) => ({
-        tenant_id: data.tenant_id,
-        user_id: data.user_id,
-        role: r,
-        app_code: data.app_code
-      }));
-      const { error: insErr } = await supabaseAdmin.from("user_roles").insert(rows);
-      if (insErr) throw new Error(insErr.message);
-    }
-    return { ok: true };
-  });
-}
-function createAccountResendInvitation(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => z.object({ user_id: z.string().uuid() }).parse(i)).handler(async ({ data, context }) => {
-    const callerId = context.userId;
-    const supabaseAdmin = deps.supabaseAdmin;
-    const sharedTenantIds = await assertCallerCanManageUser(supabaseAdmin, callerId, data.user_id);
-    const { email, display_name } = await getTargetEmail(supabaseAdmin, data.user_id);
-    const { data: tenants } = await supabaseAdmin.from("tenants").select("name").in("id", sharedTenantIds);
-    const tenantNames = (tenants ?? []).map((t) => t.name ?? "").filter(Boolean);
-    const { data: link, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
-      type: "recovery",
-      email,
-      options: { redirectTo: `${resolveAppBaseUrl(deps)}/reset-password` }
-    });
-    if (linkErr) throw new Error(linkErr.message);
-    const result = await sendMultiOrgInviteEmail(deps, {
-      email,
-      display_name: display_name ?? void 0,
-      created: false,
-      actionLink: link?.properties?.action_link ?? null,
-      tenantNames
-    });
-    return { ok: true, email: result };
-  });
-}
-function createAccountSendPasswordReset(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => z.object({ user_id: z.string().uuid() }).parse(i)).handler(async ({ data, context }) => {
-    const callerId = context.userId;
-    const supabaseAdmin = deps.supabaseAdmin;
-    await assertCallerCanManageUser(supabaseAdmin, callerId, data.user_id);
-    const { email, display_name } = await getTargetEmail(supabaseAdmin, data.user_id);
-    const { data: link, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
-      type: "recovery",
-      email,
-      options: { redirectTo: `${resolveAppBaseUrl(deps)}/reset-password` }
-    });
-    if (linkErr) throw new Error(linkErr.message);
-    const url = link?.properties?.action_link ?? "";
-    const subject = `Reset your ${deps.appName} password`;
-    const html = `
-        <div style="font-family:Inter,Arial,sans-serif;max-width:540px;margin:0 auto;padding:24px;color:#1a1f36">
-          <h2 style="margin:0 0 12px 0">${deps.appName}</h2>
-          <p>Hi${display_name ? " " + display_name : ""},</p>
-          <p>A password reset was requested for your ${deps.appName} account.</p>
-          <p style="margin:24px 0">
-            <a href="${url}" style="background:#2647c2;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;display:inline-block">Reset password</a>
-          </p>
-          <p style="color:#677084;font-size:13px">If you didn't expect this, you can ignore this email.</p>
-        </div>`;
-    const result = await deps.sendEmail({ to: email, subject, html });
-    return { ok: true, email: result };
-  });
-}
-function createAccountUpdateUserProfile(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({
-      user_id: z.string().uuid(),
-      display_name: z.string().min(1).max(120),
-      email: z.string().email().optional(),
-      position: z.string().max(120).nullable().optional()
-    }).parse(i)
-  ).handler(async ({ data, context }) => {
-    const callerId = context.userId;
-    const supabaseAdmin = deps.supabaseAdmin;
-    const sharedTenantIds = await assertCallerCanManageUser(supabaseAdmin, callerId, data.user_id);
-    const patch = { display_name: data.display_name };
-    if (data.email) patch.email = data.email;
-    if (data.position !== void 0) patch.position = data.position;
-    const { error } = await supabaseAdmin.from("tenant_users").update(patch).eq("user_id", data.user_id).in("tenant_id", sharedTenantIds);
-    if (error) throw new Error(error.message);
-    if (data.email) {
-      const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, {
-        email: data.email
-      });
-      if (authErr) throw new Error(authErr.message);
-    }
-    return { ok: true };
-  });
-}
-function createGetMyProfile(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).handler(async ({ context }) => {
-    const userId = context.userId;
-    const { data, error } = await deps.supabaseAdmin.from("profiles").select("id, default_tenant_id, timezone").eq("id", userId).maybeSingle();
-    if (error) throw new Error(error.message);
-    return {
-      default_tenant_id: data?.default_tenant_id ?? null,
-      timezone: data?.timezone ?? null
-    };
-  });
-}
-function createUpdateMyTimezone(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({ timezone: z.string().min(1).max(100).nullable() }).parse(i)
-  ).handler(async ({ data, context }) => {
-    const userId = context.userId;
-    if (data.timezone) {
-      try {
-        new Intl.DateTimeFormat("en-US", { timeZone: data.timezone });
-      } catch {
-        throw new Error("Invalid timezone");
-      }
-    }
-    const { error } = await deps.supabaseAdmin.from("profiles").upsert({ id: userId, timezone: data.timezone }, { onConflict: "id" });
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
-}
-function createUpdateMyDefaultTenant(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({ tenant_id: z.string().uuid().nullable() }).parse(i)
-  ).handler(async ({ data, context }) => {
-    const userId = context.userId;
-    const supabaseAdmin = deps.supabaseAdmin;
-    if (data.tenant_id) {
-      const { data: m, error: mErr } = await supabaseAdmin.from("tenant_users").select("tenant_id").eq("tenant_id", data.tenant_id).eq("user_id", userId).eq("status", "active").maybeSingle();
-      if (mErr) throw new Error(mErr.message);
-      if (!m) throw new Error("Not a member of that workspace");
-    }
-    const { error } = await supabaseAdmin.from("profiles").upsert({ id: userId, default_tenant_id: data.tenant_id }, { onConflict: "id" });
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
-}
-var WORKER_TYPES = ["employee", "contractor"];
-var EMPLOYMENT_STATUSES = ["active", "on_leave", "terminated"];
-function assertTeamContext(deps, context, fnName) {
-  const problems = [];
-  if (!context) problems.push("context itself is falsy");
-  if (context && !context.supabase) problems.push("context.supabase is falsy");
-  if (context && context.supabase && typeof context.supabase.from !== "function") {
-    problems.push(`context.supabase.from is ${typeof context.supabase?.from}, not a function`);
   }
-  if (context && context.userId === void 0) problems.push("context.userId is undefined");
-  if (typeof deps.assertCanReadTeam !== "function") problems.push("deps.assertCanReadTeam is not a function");
-  if (typeof deps.assertCanWriteTeam !== "function") problems.push("deps.assertCanWriteTeam is not a function");
-  if (problems.length) {
-    throw new Error(
-      `[team diagnostic] ${fnName}: ${problems.join("; ")}. context keys: ${context ? Object.keys(context).join(",") : "n/a"}`
+  const primaryTenantId = input.primary_tenant_id && input.assignments.some((a) => a.tenant_id === input.primary_tenant_id) ? input.primary_tenant_id : input.assignments[0].tenant_id;
+  const invited = await findOrInviteUserForAccount(deps, input.email, input.display_name, primaryTenantId);
+  const { data: tenants } = await supabaseAdmin.from("tenants").select("id, name").in(
+    "id",
+    input.assignments.map((a) => a.tenant_id)
+  );
+  const nameById = /* @__PURE__ */ new Map();
+  (tenants ?? []).forEach((t) => nameById.set(t.id, t.name ?? ""));
+  const addedTenants = [];
+  for (const a of input.assignments) {
+    const { error: muErr } = await supabaseAdmin.from("tenant_users").upsert(
+      {
+        tenant_id: a.tenant_id,
+        user_id: invited.user.id,
+        portal: a.portal,
+        status: "active",
+        display_name: input.display_name,
+        email: invited.user.email ?? input.email,
+        position: input.position ?? null,
+        invited_at: (/* @__PURE__ */ new Date()).toISOString()
+      },
+      { onConflict: "tenant_id,user_id" }
     );
+    if (muErr) throw new Error(muErr.message);
+    const rows = a.apps.flatMap(
+      (ap) => ap.roles.map((r) => ({
+        tenant_id: a.tenant_id,
+        user_id: invited.user.id,
+        role: r,
+        app_code: ap.app_code
+      }))
+    );
+    if (rows.length > 0) {
+      const { error: rErr } = await supabaseAdmin.from("user_roles").upsert(rows, { onConflict: "tenant_id,user_id,role,app_code" });
+      if (rErr) throw new Error(rErr.message);
+    }
+    addedTenants.push(nameById.get(a.tenant_id) ?? "");
+  }
+  const primaryName = nameById.get(primaryTenantId) ?? addedTenants[0] ?? null;
+  let emailResult = null;
+  if (invited.created) {
+    emailResult = await sendMultiOrgInviteEmail(deps, {
+      email: input.email,
+      display_name: input.display_name,
+      created: invited.created,
+      actionLink: invited.actionLink,
+      tenantNames: addedTenants.filter(Boolean),
+      primaryTenantName: primaryName
+    });
+  }
+  return {
+    user_id: invited.user.id,
+    created: invited.created,
+    tenants_added: addedTenants.length,
+    primary_tenant_id: primaryTenantId,
+    email: emailResult
+  };
+}
+async function setUserAppRolesServer(input, context, deps) {
+  const supabaseAdmin = deps.supabaseAdmin;
+  const callerId = context.userId;
+  await assertCallerManagesTenant(supabaseAdmin, input.tenant_id, callerId);
+  if (input.roles.includes("owner")) {
+    const isOwner = await callerIsOwner(supabaseAdmin, input.tenant_id, callerId);
+    if (!isOwner && input.user_id !== callerId) {
+      throw new Error("Only an Owner can grant the Owner role to another user.");
+    }
+  }
+  if (input.roles.length > 0) {
+    await assertAppsSubscribed(supabaseAdmin, input.tenant_id, [input.app_code]);
+  }
+  const { error: delErr } = await supabaseAdmin.from("user_roles").delete().eq("tenant_id", input.tenant_id).eq("user_id", input.user_id).eq("app_code", input.app_code);
+  if (delErr) throw new Error(delErr.message);
+  if (input.roles.length > 0) {
+    const rows = input.roles.map((r) => ({
+      tenant_id: input.tenant_id,
+      user_id: input.user_id,
+      role: r,
+      app_code: input.app_code
+    }));
+    const { error: insErr } = await supabaseAdmin.from("user_roles").insert(rows);
+    if (insErr) throw new Error(insErr.message);
+  }
+  return { ok: true };
+}
+async function accountResendInvitationServer(input, context, deps) {
+  const supabaseAdmin = deps.supabaseAdmin;
+  const sharedTenantIds = await assertCallerCanManageUser(supabaseAdmin, context.userId, input.user_id);
+  const { email, display_name } = await getTargetEmail(supabaseAdmin, input.user_id);
+  const { data: tenants } = await supabaseAdmin.from("tenants").select("name").in("id", sharedTenantIds);
+  const tenantNames = (tenants ?? []).map((t) => t.name ?? "").filter(Boolean);
+  const { data: link, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+    type: "recovery",
+    email,
+    options: { redirectTo: `${resolveAppBaseUrl(deps)}/reset-password` }
+  });
+  if (linkErr) throw new Error(linkErr.message);
+  const result = await sendMultiOrgInviteEmail(deps, {
+    email,
+    display_name: display_name ?? void 0,
+    created: false,
+    actionLink: link?.properties?.action_link ?? null,
+    tenantNames
+  });
+  return { ok: true, email: result };
+}
+async function accountSendPasswordResetServer(input, context, deps) {
+  const supabaseAdmin = deps.supabaseAdmin;
+  await assertCallerCanManageUser(supabaseAdmin, context.userId, input.user_id);
+  const { email, display_name } = await getTargetEmail(supabaseAdmin, input.user_id);
+  const { data: link, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+    type: "recovery",
+    email,
+    options: { redirectTo: `${resolveAppBaseUrl(deps)}/reset-password` }
+  });
+  if (linkErr) throw new Error(linkErr.message);
+  const url = link?.properties?.action_link ?? "";
+  const subject = `Reset your ${deps.appName} password`;
+  const html = `
+      <div style="font-family:Inter,Arial,sans-serif;max-width:540px;margin:0 auto;padding:24px;color:#1a1f36">
+        <h2 style="margin:0 0 12px 0">${deps.appName}</h2>
+        <p>Hi${display_name ? " " + display_name : ""},</p>
+        <p>A password reset was requested for your ${deps.appName} account.</p>
+        <p style="margin:24px 0">
+          <a href="${url}" style="background:#2647c2;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;display:inline-block">Reset password</a>
+        </p>
+        <p style="color:#677084;font-size:13px">If you didn't expect this, you can ignore this email.</p>
+      </div>`;
+  const result = await deps.sendEmail({ to: email, subject, html });
+  return { ok: true, email: result };
+}
+async function accountUpdateUserProfileServer(input, context, deps) {
+  const supabaseAdmin = deps.supabaseAdmin;
+  const sharedTenantIds = await assertCallerCanManageUser(supabaseAdmin, context.userId, input.user_id);
+  const patch = {
+    display_name: input.display_name
+  };
+  if (input.email) patch.email = input.email;
+  if (input.position !== void 0) patch.position = input.position;
+  const { error } = await supabaseAdmin.from("tenant_users").update(patch).eq("user_id", input.user_id).in("tenant_id", sharedTenantIds);
+  if (error) throw new Error(error.message);
+  if (input.email) {
+    const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(input.user_id, {
+      email: input.email
+    });
+    if (authErr) throw new Error(authErr.message);
+  }
+  return { ok: true };
+}
+async function getMyProfileServer(context, deps) {
+  const { data, error } = await deps.supabaseAdmin.from("profiles").select("id, default_tenant_id, timezone").eq("id", context.userId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return {
+    default_tenant_id: data?.default_tenant_id ?? null,
+    timezone: data?.timezone ?? null
+  };
+}
+async function updateMyTimezoneServer(input, context, deps) {
+  if (input.timezone) {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: input.timezone });
+    } catch {
+      throw new Error("Invalid timezone");
+    }
+  }
+  const { error } = await deps.supabaseAdmin.from("profiles").upsert({ id: context.userId, timezone: input.timezone }, { onConflict: "id" });
+  if (error) throw new Error(error.message);
+  return { ok: true };
+}
+async function updateMyDefaultTenantServer(input, context, deps) {
+  const supabaseAdmin = deps.supabaseAdmin;
+  if (input.tenant_id) {
+    const { data: m, error: mErr } = await supabaseAdmin.from("tenant_users").select("tenant_id").eq("tenant_id", input.tenant_id).eq("user_id", context.userId).eq("status", "active").maybeSingle();
+    if (mErr) throw new Error(mErr.message);
+    if (!m) throw new Error("Not a member of that workspace");
+  }
+  const { error } = await supabaseAdmin.from("profiles").upsert({ id: context.userId, default_tenant_id: input.tenant_id }, { onConflict: "id" });
+  if (error) throw new Error(error.message);
+  return { ok: true };
+}
+
+// src/server/team.server.ts
+var MAX_DEPARTMENT_DEPTH = 4;
+async function assertCanReadTeam(supabase, tenantId, userId) {
+  const { data: ok, error } = await supabase.rpc("is_internal_staff", {
+    _tenant: tenantId,
+    _user: userId
+  });
+  if (error) throw new Error(error.message);
+  if (!ok) throw new Error("Forbidden");
+}
+async function assertCanWriteTeam(supabase, tenantId, userId) {
+  const { data, error } = await supabase.from("user_roles").select("role").eq("tenant_id", tenantId).eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  const roles = (data ?? []).map((r) => r.role);
+  if (!roles.some((r) => ["owner", "super_admin", "admin", "hr_manager"].includes(r))) {
+    throw new Error("Forbidden: owner, super_admin, admin, or hr_manager required");
   }
 }
-async function loadDeptPosNames(supabaseAdmin, tenantId, deptIds, posIds) {
-  const [{ data: depts }, { data: positions }] = await Promise.all([
-    deptIds.length ? supabaseAdmin.from("departments").select("id, name").eq("tenant_id", tenantId).in("id", deptIds) : Promise.resolve({ data: [] }),
-    posIds.length ? supabaseAdmin.from("positions").select("id, name").eq("tenant_id", tenantId).in("id", posIds) : Promise.resolve({ data: [] })
+async function loadDeptPosNames(supabase, tenantId, deptIds, posIds) {
+  const [{ data: depts, error: deptErr }, { data: positions, error: posErr }] = await Promise.all([
+    deptIds.length ? supabase.from("departments").select("id, name").eq("tenant_id", tenantId).in("id", deptIds) : Promise.resolve({ data: [], error: null }),
+    posIds.length ? supabase.from("positions").select("id, name").eq("tenant_id", tenantId).in("id", posIds) : Promise.resolve({ data: [], error: null })
   ]);
+  if (deptErr) throw new Error(deptErr.message);
+  if (posErr) throw new Error(posErr.message);
   return {
     deptName: new Map((depts ?? []).map((d) => [d.id, d.name])),
     posName: new Map((positions ?? []).map((p) => [p.id, p.name]))
   };
-}
-function createListTeamMembers(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({
-      tenant_id: z.string().uuid(),
-      search: z.string().max(200).optional(),
-      worker_type: z.enum(WORKER_TYPES).optional()
-    }).parse(i)
-  ).handler(async ({ data, context }) => {
-    assertTeamContext(deps, context, "createListTeamMembers");
-    const supabase = context.supabase;
-    await deps.assertCanReadTeam(supabase, data.tenant_id, context.userId);
-    let pq = supabase.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active").eq("tenant_id", data.tenant_id).eq("is_employee", true).order("name_en");
-    if (data.search?.trim()) {
-      const s = data.search.trim().replace(/[%,()]/g, "");
-      pq = pq.or(`name_en.ilike.%${s}%,contact_email.ilike.%${s}%`);
-    }
-    const { data: parties, error: pErr } = await pq;
-    if (pErr) throw new Error(pErr.message);
-    const partyIds = (parties ?? []).map((p) => p.id);
-    let profiles = [];
-    if (partyIds.length) {
-      const { data: profileRows, error: prErr } = await supabase.from("employee_profiles").select(
-        "party_id, department_id, position_id, manager_id, employment_status, hire_date, termination_date, worker_type"
-      ).eq("tenant_id", data.tenant_id).in("party_id", partyIds);
-      if (prErr) throw new Error(prErr.message);
-      profiles = profileRows ?? [];
-    }
-    const byParty = new Map(profiles.map((pr) => [pr.party_id, pr]));
-    const deptIds = Array.from(new Set(profiles.map((p) => p.department_id).filter(Boolean)));
-    const posIds = Array.from(new Set(profiles.map((p) => p.position_id).filter(Boolean)));
-    const { deptName, posName } = await loadDeptPosNames(supabase, data.tenant_id, deptIds, posIds);
-    let rows = (parties ?? []).map((p) => {
-      const prof = byParty.get(p.id);
-      return {
-        party_id: p.id,
-        linked_user_id: p.linked_user_id ?? null,
-        name_en: p.name_en,
-        contact_email: p.contact_email,
-        contact_phone: p.contact_phone,
-        active: p.active,
-        department_id: prof?.department_id ?? null,
-        department: prof?.department_id ? deptName.get(prof.department_id) ?? null : null,
-        position_id: prof?.position_id ?? null,
-        position: prof?.position_id ? posName.get(prof.position_id) ?? null : null,
-        manager_id: prof?.manager_id ?? null,
-        employment_status: prof?.employment_status ?? null,
-        hire_date: prof?.hire_date ?? null,
-        termination_date: prof?.termination_date ?? null,
-        worker_type: prof?.worker_type ?? "employee"
-      };
-    });
-    if (data.worker_type) {
-      rows = rows.filter((r) => r.worker_type === data.worker_type);
-    }
-    return { rows };
-  });
-}
-function createGetTeamMember(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({ tenant_id: z.string().uuid(), party_id: z.string().uuid() }).parse(i)
-  ).handler(async ({ data, context }) => {
-    assertTeamContext(deps, context, "createGetTeamMember");
-    const supabase = context.supabase;
-    await deps.assertCanReadTeam(supabase, data.tenant_id, context.userId);
-    const { data: party, error: pErr } = await supabase.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active, is_employee").eq("tenant_id", data.tenant_id).eq("id", data.party_id).maybeSingle();
-    if (pErr) throw new Error(pErr.message);
-    if (!party || !party.is_employee) throw new Error("Team member not found");
-    const { data: profile, error: prErr } = await supabase.from("employee_profiles").select(
-      "party_id, department_id, position_id, manager_id, employment_status, hire_date, termination_date, worker_type"
-    ).eq("tenant_id", data.tenant_id).eq("party_id", data.party_id).maybeSingle();
-    if (prErr) throw new Error(prErr.message);
-    const { deptName, posName } = await loadDeptPosNames(
-      supabase,
-      data.tenant_id,
-      profile?.department_id ? [profile.department_id] : [],
-      profile?.position_id ? [profile.position_id] : []
-    );
-    return {
-      party_id: party.id,
-      linked_user_id: party.linked_user_id ?? null,
-      name_en: party.name_en,
-      contact_email: party.contact_email,
-      contact_phone: party.contact_phone,
-      active: party.active,
-      department_id: profile?.department_id ?? null,
-      department: profile?.department_id ? deptName.get(profile.department_id) ?? null : null,
-      position_id: profile?.position_id ?? null,
-      position: profile?.position_id ? posName.get(profile.position_id) ?? null : null,
-      manager_id: profile?.manager_id ?? null,
-      employment_status: profile?.employment_status ?? null,
-      hire_date: profile?.hire_date ?? null,
-      termination_date: profile?.termination_date ?? null,
-      worker_type: profile?.worker_type ?? null
-    };
-  });
-}
-function createUpsertTeamMember(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({
-      tenant_id: z.string().uuid(),
-      party_id: z.string().uuid().optional(),
-      linked_user_id: z.string().uuid().optional(),
-      name_en: z.string().min(1).max(200).optional(),
-      contact_email: z.string().email().optional().nullable(),
-      contact_phone: z.string().max(60).optional().nullable(),
-      department_id: z.string().uuid().optional().nullable(),
-      position_id: z.string().uuid().optional().nullable(),
-      manager_id: z.string().uuid().optional().nullable(),
-      employment_status: z.enum(EMPLOYMENT_STATUSES).optional(),
-      hire_date: z.string().optional().nullable(),
-      termination_date: z.string().optional().nullable(),
-      worker_type: z.enum(WORKER_TYPES).default("employee")
-    }).parse(i)
-  ).handler(async ({ data, context }) => {
-    assertTeamContext(deps, context, "createUpsertTeamMember");
-    const callerId = context.userId;
-    const supabase = context.supabase;
-    await deps.assertCanWriteTeam(supabase, data.tenant_id, callerId);
-    let partyId;
-    let created = false;
-    if (data.party_id) {
-      partyId = data.party_id;
-      const patch = {};
-      if (data.name_en !== void 0) patch.name_en = data.name_en;
-      if (data.contact_email !== void 0) patch.contact_email = data.contact_email;
-      if (data.contact_phone !== void 0) patch.contact_phone = data.contact_phone;
-      if (Object.keys(patch).length > 0) {
-        const { error } = await supabase.from("parties").update({ ...patch, is_employee: true }).eq("id", partyId).eq("tenant_id", data.tenant_id);
-        if (error) throw new Error(error.message);
-      } else {
-        const { error } = await supabase.from("parties").update({ is_employee: true }).eq("id", partyId).eq("tenant_id", data.tenant_id);
-        if (error) throw new Error(error.message);
-      }
-    } else if (data.linked_user_id) {
-      const { data: existingParty, error: findErr } = await supabase.from("parties").select("id").eq("tenant_id", data.tenant_id).eq("linked_user_id", data.linked_user_id).eq("is_employee", true).maybeSingle();
-      if (findErr) throw new Error(findErr.message);
-      if (existingParty) {
-        partyId = existingParty.id;
-      } else {
-        const { data: member, error: mErr } = await supabase.from("tenant_users").select("display_name, email").eq("tenant_id", data.tenant_id).eq("user_id", data.linked_user_id).maybeSingle();
-        if (mErr) throw new Error(mErr.message);
-        if (!member) throw new Error("This person is not a member of this workspace");
-        const { data: newParty, error: insErr } = await supabase.from("parties").insert({
-          tenant_id: data.tenant_id,
-          linked_user_id: data.linked_user_id,
-          name_en: data.name_en ?? member.display_name ?? member.email ?? "Unnamed",
-          contact_email: data.contact_email ?? member.email ?? null,
-          is_employee: true
-        }).select("id").single();
-        if (insErr) throw new Error(insErr.message);
-        partyId = newParty.id;
-        created = true;
-      }
-    } else {
-      if (!data.name_en) throw new Error("name_en is required to create a new team member");
-      const { data: newParty, error: insErr } = await supabase.from("parties").insert({
-        tenant_id: data.tenant_id,
-        name_en: data.name_en,
-        contact_email: data.contact_email ?? null,
-        contact_phone: data.contact_phone ?? null,
-        is_employee: true
-      }).select("id").single();
-      if (insErr) throw new Error(insErr.message);
-      partyId = newParty.id;
-      created = true;
-    }
-    const { data: existingProfile, error: findProfErr } = await supabase.from("employee_profiles").select("id").eq("tenant_id", data.tenant_id).eq("party_id", partyId).maybeSingle();
-    if (findProfErr) throw new Error(findProfErr.message);
-    const profilePatch = {
-      department_id: data.department_id ?? null,
-      position_id: data.position_id ?? null,
-      manager_id: data.manager_id ?? null,
-      worker_type: data.worker_type,
-      ...data.hire_date !== void 0 ? { hire_date: data.hire_date } : {},
-      ...data.termination_date !== void 0 ? { termination_date: data.termination_date } : {},
-      ...data.employment_status ? { employment_status: data.employment_status } : {}
-    };
-    if (existingProfile) {
-      const { error } = await supabase.from("employee_profiles").update(profilePatch).eq("id", existingProfile.id);
-      if (error) throw new Error(error.message);
-    } else {
-      const { error } = await supabase.from("employee_profiles").insert({
-        tenant_id: data.tenant_id,
-        party_id: partyId,
-        employment_status: data.employment_status ?? "active",
-        ...profilePatch
-      });
-      if (error) throw new Error(error.message);
-    }
-    if (deps.onWrite) {
-      await deps.onWrite({ tenantId: data.tenant_id, userId: callerId, partyId, created });
-    }
-    return { party_id: partyId, created };
-  });
-}
-var MAX_DEPARTMENT_DEPTH = 4;
-function assertOrgStructureContext(deps, context, fnName) {
-  const problems = [];
-  if (!context) problems.push("context itself is falsy");
-  if (context && !context.supabase) problems.push("context.supabase is falsy");
-  if (context && context.supabase && typeof context.supabase.from !== "function") {
-    problems.push(`context.supabase.from is ${typeof context.supabase?.from}, not a function`);
-  }
-  if (context && context.userId === void 0) problems.push("context.userId is undefined");
-  if (typeof deps.assertCanReadOrgStructure !== "function") problems.push("deps.assertCanReadOrgStructure is not a function");
-  if (typeof deps.assertCanManageOrgStructure !== "function") problems.push("deps.assertCanManageOrgStructure is not a function");
-  if (problems.length) {
-    throw new Error(
-      `[org-structure diagnostic] ${fnName}: ${problems.join("; ")}. context keys: ${context ? Object.keys(context).join(",") : "n/a"}`
-    );
-  }
 }
 async function fetchAllDepartments(supabase, tenantId) {
   const { data, error } = await supabase.from("departments").select("id, parent_department_id, depth").eq("tenant_id", tenantId);
@@ -1057,237 +777,332 @@ function collectDescendants(all, id) {
   const queue = [...childrenOf.get(id) ?? []];
   while (queue.length) {
     const next = queue.shift();
+    if (!next) continue;
     out.push(next);
     queue.push(...childrenOf.get(next.id) ?? []);
   }
   return out;
 }
-function createListDepartmentsAndPositions(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => z.object({ tenant_id: z.string().uuid() }).parse(i)).handler(async ({ data, context }) => {
-    assertOrgStructureContext(deps, context, "createListDepartmentsAndPositions");
-    await deps.assertCanReadOrgStructure(context.supabase, data.tenant_id, context.userId);
-    const [{ data: departments, error: dErr }, { data: positions, error: pErr }] = await Promise.all([
-      context.supabase.from("departments").select("id, name, code, parent_department_id, depth").eq("tenant_id", data.tenant_id).order("depth").order("name"),
-      context.supabase.from("positions").select("id, name, department_id").eq("tenant_id", data.tenant_id).order("name")
-    ]);
-    if (dErr) throw new Error(dErr.message);
-    if (pErr) throw new Error(pErr.message);
-    return { departments: departments ?? [], positions: positions ?? [] };
-  });
-}
-function createCreateDepartment(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({
-      tenant_id: z.string().uuid(),
-      name: z.string().min(1).max(120),
-      code: z.string().max(20).optional().nullable(),
-      parent_department_id: z.string().uuid().optional().nullable()
-    }).parse(i)
-  ).handler(async ({ data, context }) => {
-    assertOrgStructureContext(deps, context, "createCreateDepartment");
-    await deps.assertCanManageOrgStructure(context.supabase, data.tenant_id, context.userId);
-    let depth = 1;
-    if (data.parent_department_id) {
-      const { data: parent, error: parentErr } = await context.supabase.from("departments").select("id, depth").eq("tenant_id", data.tenant_id).eq("id", data.parent_department_id).maybeSingle();
-      if (parentErr) throw new Error(parentErr.message);
-      if (!parent) throw new Error("Parent department not found");
-      depth = parent.depth + 1;
-      if (depth > MAX_DEPARTMENT_DEPTH) {
-        throw new Error(`Departments can nest at most ${MAX_DEPARTMENT_DEPTH} levels deep`);
-      }
-    }
-    const { data: dept, error } = await context.supabase.from("departments").insert({
-      tenant_id: data.tenant_id,
-      name: data.name,
-      code: data.code ? data.code.toUpperCase() : null,
-      parent_department_id: data.parent_department_id ?? null,
-      depth
-    }).select("id").single();
-    if (error) throw new Error(error.message);
-    return { id: dept.id };
-  });
-}
-function createUpdateDepartment(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({
-      tenant_id: z.string().uuid(),
-      id: z.string().uuid(),
-      name: z.string().min(1).max(120),
-      code: z.string().max(20).optional().nullable(),
-      /** Omit this field to leave the parent unchanged; pass null to promote to top-level. */
-      parent_department_id: z.string().uuid().optional().nullable()
-    }).parse(i)
-  ).handler(async ({ data, context }) => {
-    assertOrgStructureContext(deps, context, "createUpdateDepartment");
-    await deps.assertCanManageOrgStructure(context.supabase, data.tenant_id, context.userId);
-    const patch = {
-      name: data.name,
-      code: data.code ? data.code.toUpperCase() : null
+async function listTeamMembersServer(input, context) {
+  await assertCanReadTeam(context.supabase, input.tenant_id, context.userId);
+  let query = context.supabase.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active").eq("tenant_id", input.tenant_id).eq("is_employee", true).order("name_en");
+  if (input.search?.trim()) {
+    const search = input.search.trim().replace(/[%,()]/g, "");
+    query = query.or(`name_en.ilike.%${search}%,contact_email.ilike.%${search}%`);
+  }
+  const { data: parties, error } = await query;
+  if (error) throw new Error(error.message);
+  const partyIds = (parties ?? []).map((party) => party.id);
+  let profiles = [];
+  if (partyIds.length) {
+    const { data, error: profileErr } = await context.supabase.from("employee_profiles").select("party_id, department_id, position_id, manager_id, employment_status, hire_date, termination_date, worker_type").eq("tenant_id", input.tenant_id).in("party_id", partyIds);
+    if (profileErr) throw new Error(profileErr.message);
+    profiles = data ?? [];
+  }
+  const byParty = new Map(profiles.map((profile) => [profile.party_id, profile]));
+  const deptIds = Array.from(new Set(profiles.map((profile) => profile.department_id).filter((id) => Boolean(id))));
+  const posIds = Array.from(new Set(profiles.map((profile) => profile.position_id).filter((id) => Boolean(id))));
+  const { deptName, posName } = await loadDeptPosNames(context.supabase, input.tenant_id, deptIds, posIds);
+  let rows = (parties ?? []).map((party) => {
+    const profile = byParty.get(party.id);
+    return {
+      party_id: party.id,
+      linked_user_id: party.linked_user_id ?? null,
+      name_en: party.name_en,
+      contact_email: party.contact_email,
+      contact_phone: party.contact_phone,
+      active: party.active,
+      department_id: profile?.department_id ?? null,
+      department: profile?.department_id ? deptName.get(profile.department_id) ?? null : null,
+      position_id: profile?.position_id ?? null,
+      position: profile?.position_id ? posName.get(profile.position_id) ?? null : null,
+      manager_id: profile?.manager_id ?? null,
+      employment_status: profile?.employment_status ?? null,
+      hire_date: profile?.hire_date ?? null,
+      termination_date: profile?.termination_date ?? null,
+      worker_type: profile?.worker_type ?? "employee"
     };
-    if (data.parent_department_id !== void 0) {
-      if (data.parent_department_id === data.id) {
-        throw new Error("A department cannot be its own parent");
-      }
-      const all = await fetchAllDepartments(context.supabase, data.tenant_id);
-      const current = all.find((d) => d.id === data.id);
-      if (!current) throw new Error("Department not found");
-      let newDepth = 1;
-      if (data.parent_department_id) {
-        const parent = all.find((d) => d.id === data.parent_department_id);
-        if (!parent) throw new Error("Parent department not found");
-        if (isDescendantOf(all, data.id, data.parent_department_id)) {
-          throw new Error("Cannot move a department under one of its own sub-departments");
-        }
-        newDepth = parent.depth + 1;
-      }
-      const descendants = collectDescendants(all, data.id);
-      const depthDelta = newDepth - current.depth;
-      const deepestDescendant = descendants.reduce((max, d) => Math.max(max, d.depth), current.depth);
-      if (deepestDescendant + depthDelta > MAX_DEPARTMENT_DEPTH) {
-        throw new Error(`Departments can nest at most ${MAX_DEPARTMENT_DEPTH} levels deep`);
-      }
-      patch.parent_department_id = data.parent_department_id ?? null;
-      patch.depth = newDepth;
-      if (depthDelta !== 0 && descendants.length > 0) {
-        await Promise.all(
-          descendants.map(
-            (d) => context.supabase.from("departments").update({ depth: d.depth + depthDelta }).eq("id", d.id).eq("tenant_id", data.tenant_id)
-          )
-        );
-      }
-    }
-    const { error } = await context.supabase.from("departments").update(patch).eq("id", data.id).eq("tenant_id", data.tenant_id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
   });
+  if (input.worker_type) {
+    rows = rows.filter((row) => row.worker_type === input.worker_type);
+  }
+  return { rows };
 }
-function createDeleteDepartment(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({ tenant_id: z.string().uuid(), id: z.string().uuid() }).parse(i)
-  ).handler(async ({ data, context }) => {
-    assertOrgStructureContext(deps, context, "createDeleteDepartment");
-    await deps.assertCanManageOrgStructure(context.supabase, data.tenant_id, context.userId);
-    const [{ count: childCount, error: childErr }, { count: posCount, error: posErr }] = await Promise.all([
-      context.supabase.from("departments").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).eq("parent_department_id", data.id),
-      context.supabase.from("positions").select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).eq("department_id", data.id)
-    ]);
-    if (childErr) throw new Error(childErr.message);
-    if (posErr) throw new Error(posErr.message);
-    if ((childCount ?? 0) > 0) {
-      throw new Error("Move or delete this department's sub-departments first");
-    }
-    if ((posCount ?? 0) > 0) {
-      throw new Error("Move or delete this department's positions first");
-    }
-    const { error } = await context.supabase.from("departments").delete().eq("id", data.id).eq("tenant_id", data.tenant_id);
-    if (error) throw new Error(error.message);
-    return { ok: true };
-  });
+async function getTeamMemberServer(input, context) {
+  await assertCanReadTeam(context.supabase, input.tenant_id, context.userId);
+  const { data: party, error } = await context.supabase.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active, is_employee").eq("tenant_id", input.tenant_id).eq("id", input.party_id).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!party || !party.is_employee) throw new Error("Team member not found");
+  const { data: profile, error: profileErr } = await context.supabase.from("employee_profiles").select("party_id, department_id, position_id, manager_id, employment_status, hire_date, termination_date, worker_type").eq("tenant_id", input.tenant_id).eq("party_id", input.party_id).maybeSingle();
+  if (profileErr) throw new Error(profileErr.message);
+  const { deptName, posName } = await loadDeptPosNames(
+    context.supabase,
+    input.tenant_id,
+    profile?.department_id ? [profile.department_id] : [],
+    profile?.position_id ? [profile.position_id] : []
+  );
+  return {
+    party_id: party.id,
+    linked_user_id: party.linked_user_id ?? null,
+    name_en: party.name_en,
+    contact_email: party.contact_email,
+    contact_phone: party.contact_phone,
+    active: party.active,
+    department_id: profile?.department_id ?? null,
+    department: profile?.department_id ? deptName.get(profile.department_id) ?? null : null,
+    position_id: profile?.position_id ?? null,
+    position: profile?.position_id ? posName.get(profile.position_id) ?? null : null,
+    manager_id: profile?.manager_id ?? null,
+    employment_status: profile?.employment_status ?? null,
+    hire_date: profile?.hire_date ?? null,
+    termination_date: profile?.termination_date ?? null,
+    worker_type: profile?.worker_type ?? null
+  };
 }
-function createCreatePosition(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({
-      tenant_id: z.string().uuid(),
-      department_id: z.string().uuid(),
-      name: z.string().min(1).max(120)
-    }).parse(i)
-  ).handler(async ({ data, context }) => {
-    assertOrgStructureContext(deps, context, "createCreatePosition");
-    await deps.assertCanManageOrgStructure(context.supabase, data.tenant_id, context.userId);
-    const { data: pos, error } = await context.supabase.from("positions").insert({ tenant_id: data.tenant_id, department_id: data.department_id, name: data.name }).select("id").single();
+async function upsertTeamMemberServer(input, context, appCode) {
+  await assertCanWriteTeam(context.supabase, input.tenant_id, context.userId);
+  let partyId;
+  let created = false;
+  if (input.party_id) {
+    partyId = input.party_id;
+    const patch = { is_employee: true };
+    if (input.name_en !== void 0) patch.name_en = input.name_en;
+    if (input.contact_email !== void 0) patch.contact_email = input.contact_email;
+    if (input.contact_phone !== void 0) patch.contact_phone = input.contact_phone;
+    const { error } = await context.supabase.from("parties").update(patch).eq("id", partyId).eq("tenant_id", input.tenant_id);
     if (error) throw new Error(error.message);
-    return { id: pos.id };
-  });
-}
-function createUpdatePosition(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({
-      tenant_id: z.string().uuid(),
-      id: z.string().uuid(),
-      name: z.string().min(1).max(120)
-    }).parse(i)
-  ).handler(async ({ data, context }) => {
-    assertOrgStructureContext(deps, context, "createUpdatePosition");
-    await deps.assertCanManageOrgStructure(context.supabase, data.tenant_id, context.userId);
-    const { error } = await context.supabase.from("positions").update({ name: data.name }).eq("id", data.id).eq("tenant_id", data.tenant_id);
+  } else if (input.linked_user_id) {
+    const { data: existingParty, error: findErr } = await context.supabase.from("parties").select("id").eq("tenant_id", input.tenant_id).eq("linked_user_id", input.linked_user_id).eq("is_employee", true).maybeSingle();
+    if (findErr) throw new Error(findErr.message);
+    if (existingParty) {
+      partyId = existingParty.id;
+    } else {
+      const { data: member, error: memberErr } = await context.supabase.from("tenant_users").select("display_name, email").eq("tenant_id", input.tenant_id).eq("user_id", input.linked_user_id).maybeSingle();
+      if (memberErr) throw new Error(memberErr.message);
+      if (!member) throw new Error("This person is not a member of this workspace");
+      const { data: newParty, error: insertErr } = await context.supabase.from("parties").insert({
+        tenant_id: input.tenant_id,
+        linked_user_id: input.linked_user_id,
+        name_en: input.name_en ?? member.display_name ?? member.email ?? "Unnamed",
+        contact_email: input.contact_email ?? member.email ?? null,
+        contact_phone: input.contact_phone ?? null,
+        is_employee: true,
+        ...appCode ? { source_app: appCode } : {}
+      }).select("id").single();
+      if (insertErr) throw new Error(insertErr.message);
+      partyId = newParty.id;
+      created = true;
+    }
+  } else {
+    if (!input.name_en) throw new Error("name_en is required to create a new team member");
+    const { data: newParty, error: insertErr } = await context.supabase.from("parties").insert({
+      tenant_id: input.tenant_id,
+      name_en: input.name_en,
+      contact_email: input.contact_email ?? null,
+      contact_phone: input.contact_phone ?? null,
+      is_employee: true,
+      ...appCode ? { source_app: appCode } : {}
+    }).select("id").single();
+    if (insertErr) throw new Error(insertErr.message);
+    partyId = newParty.id;
+    created = true;
+  }
+  const { data: existingProfile, error: findProfileErr } = await context.supabase.from("employee_profiles").select("id").eq("tenant_id", input.tenant_id).eq("party_id", partyId).maybeSingle();
+  if (findProfileErr) throw new Error(findProfileErr.message);
+  const profilePatch = {
+    department_id: input.department_id ?? null,
+    position_id: input.position_id ?? null,
+    manager_id: input.manager_id ?? null,
+    worker_type: input.worker_type,
+    ...appCode ? { source_app: appCode } : {},
+    ...input.hire_date !== void 0 ? { hire_date: input.hire_date } : {},
+    ...input.termination_date !== void 0 ? { termination_date: input.termination_date } : {},
+    ...input.employment_status ? { employment_status: input.employment_status } : {}
+  };
+  if (existingProfile) {
+    const { error } = await context.supabase.from("employee_profiles").update(profilePatch).eq("id", existingProfile.id);
     if (error) throw new Error(error.message);
-    return { ok: true };
-  });
-}
-function createDeletePosition(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
-    (i) => z.object({ tenant_id: z.string().uuid(), id: z.string().uuid() }).parse(i)
-  ).handler(async ({ data, context }) => {
-    assertOrgStructureContext(deps, context, "createDeletePosition");
-    await deps.assertCanManageOrgStructure(context.supabase, data.tenant_id, context.userId);
-    const { error } = await context.supabase.from("positions").delete().eq("id", data.id).eq("tenant_id", data.tenant_id);
+  } else {
+    const { error } = await context.supabase.from("employee_profiles").insert({
+      tenant_id: input.tenant_id,
+      party_id: partyId,
+      employment_status: input.employment_status ?? "active",
+      ...profilePatch
+    });
     if (error) throw new Error(error.message);
-    return { ok: true };
-  });
+  }
+  return { party_id: partyId, created };
 }
-function createGetOrgChartTree(deps) {
-  return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator((i) => z.object({ tenant_id: z.string().uuid() }).parse(i)).handler(async ({ data, context }) => {
-    assertOrgStructureContext(deps, context, "createGetOrgChartTree");
-    await deps.assertCanReadOrgStructure(context.supabase, data.tenant_id, context.userId);
-    const [{ data: departments, error: dErr }, { data: positions, error: pErr }] = await Promise.all([
-      context.supabase.from("departments").select("id, name, parent_department_id, depth").eq("tenant_id", data.tenant_id),
-      context.supabase.from("positions").select("id, name, department_id").eq("tenant_id", data.tenant_id)
-    ]);
-    if (dErr) throw new Error(dErr.message);
-    if (pErr) throw new Error(pErr.message);
-    const { data: profiles, error: profErr } = await context.supabase.from("employee_profiles").select("party_id, department_id, position_id, worker_type, employment_status").eq("tenant_id", data.tenant_id).neq("employment_status", "terminated").not("position_id", "is", null);
-    if (profErr) throw new Error(profErr.message);
-    const partyIds = (profiles ?? []).map((p) => p.party_id);
-    let parties = [];
-    if (partyIds.length) {
-      const { data: partyRows, error: partyErr } = await context.supabase.from("parties").select("id, name_en").eq("tenant_id", data.tenant_id).in("id", partyIds);
-      if (partyErr) throw new Error(partyErr.message);
-      parties = partyRows ?? [];
+async function listDepartmentsAndPositionsServer(input, context, deps) {
+  await deps.assertCanReadOrgStructure(context.supabase, input.tenant_id, context.userId);
+  const [{ data: departments, error: deptErr }, { data: positions, error: posErr }] = await Promise.all([
+    context.supabase.from("departments").select("id, name, code, parent_department_id, depth").eq("tenant_id", input.tenant_id).order("depth").order("name"),
+    context.supabase.from("positions").select("id, name, department_id").eq("tenant_id", input.tenant_id).order("name")
+  ]);
+  if (deptErr) throw new Error(deptErr.message);
+  if (posErr) throw new Error(posErr.message);
+  return { departments: departments ?? [], positions: positions ?? [] };
+}
+async function createDepartmentServer(input, context, deps) {
+  await deps.assertCanManageOrgStructure(context.supabase, input.tenant_id, context.userId);
+  let depth = 1;
+  if (input.parent_department_id) {
+    const { data: parent, error: parentErr } = await context.supabase.from("departments").select("id, depth").eq("tenant_id", input.tenant_id).eq("id", input.parent_department_id).maybeSingle();
+    if (parentErr) throw new Error(parentErr.message);
+    if (!parent) throw new Error("Parent department not found");
+    depth = parent.depth + 1;
+    if (depth > MAX_DEPARTMENT_DEPTH) {
+      throw new Error(`Departments can nest at most ${MAX_DEPARTMENT_DEPTH} levels deep`);
     }
-    const nameByParty = new Map((parties ?? []).map((p) => [p.id, p.name_en]));
-    const peopleByPosition = /* @__PURE__ */ new Map();
-    for (const prof of profiles ?? []) {
-      if (!prof.position_id) continue;
-      const arr = peopleByPosition.get(prof.position_id) ?? [];
-      arr.push({
-        party_id: prof.party_id,
-        name: nameByParty.get(prof.party_id) ?? "\u2014",
-        worker_type: prof.worker_type ?? null
-      });
-      peopleByPosition.set(prof.position_id, arr);
+  }
+  const { data, error } = await context.supabase.from("departments").insert({
+    tenant_id: input.tenant_id,
+    name: input.name,
+    code: input.code ? input.code.toUpperCase() : null,
+    parent_department_id: input.parent_department_id ?? null,
+    depth
+  }).select("id").single();
+  if (error) throw new Error(error.message);
+  return { id: data.id };
+}
+async function updateDepartmentServer(input, context, deps) {
+  await deps.assertCanManageOrgStructure(context.supabase, input.tenant_id, context.userId);
+  const patch = {
+    name: input.name,
+    code: input.code ? input.code.toUpperCase() : null
+  };
+  if (input.parent_department_id !== void 0) {
+    if (input.parent_department_id === input.id) {
+      throw new Error("A department cannot be its own parent");
     }
-    const positionsByDept = /* @__PURE__ */ new Map();
-    for (const pos of positions ?? []) {
-      const arr = positionsByDept.get(pos.department_id) ?? [];
-      arr.push({ id: pos.id, name: pos.name, people: peopleByPosition.get(pos.id) ?? [] });
-      positionsByDept.set(pos.department_id, arr);
+    const all = await fetchAllDepartments(context.supabase, input.tenant_id);
+    const current = all.find((dept) => dept.id === input.id);
+    if (!current) throw new Error("Department not found");
+    let newDepth = 1;
+    if (input.parent_department_id) {
+      const parent = all.find((dept) => dept.id === input.parent_department_id);
+      if (!parent) throw new Error("Parent department not found");
+      if (isDescendantOf(all, input.id, input.parent_department_id)) {
+        throw new Error("Cannot move a department under one of its own sub-departments");
+      }
+      newDepth = parent.depth + 1;
     }
-    const nodeById = /* @__PURE__ */ new Map();
-    for (const d of departments ?? []) {
-      nodeById.set(d.id, {
-        id: d.id,
-        name: d.name,
-        depth: d.depth,
-        positions: positionsByDept.get(d.id) ?? [],
-        children: []
-      });
+    const descendants = collectDescendants(all, input.id);
+    const depthDelta = newDepth - current.depth;
+    const deepestDescendant = descendants.reduce((max, dept) => Math.max(max, dept.depth), current.depth);
+    if (deepestDescendant + depthDelta > MAX_DEPARTMENT_DEPTH) {
+      throw new Error(`Departments can nest at most ${MAX_DEPARTMENT_DEPTH} levels deep`);
     }
-    const roots = [];
-    for (const d of departments ?? []) {
-      const node = nodeById.get(d.id);
-      if (d.parent_department_id && nodeById.has(d.parent_department_id)) {
-        nodeById.get(d.parent_department_id).children.push(node);
-      } else {
-        roots.push(node);
+    patch.parent_department_id = input.parent_department_id ?? null;
+    patch.depth = newDepth;
+    if (depthDelta !== 0 && descendants.length > 0) {
+      const updates = await Promise.all(
+        descendants.map(
+          (dept) => context.supabase.from("departments").update({ depth: dept.depth + depthDelta }).eq("id", dept.id).eq("tenant_id", input.tenant_id)
+        )
+      );
+      for (const update of updates) {
+        if (update.error) throw new Error(update.error.message);
       }
     }
-    return { roots };
-  });
+  }
+  const { error } = await context.supabase.from("departments").update(patch).eq("id", input.id).eq("tenant_id", input.tenant_id);
+  if (error) throw new Error(error.message);
+  return { ok: true };
+}
+async function deleteDepartmentServer(input, context, deps) {
+  await deps.assertCanManageOrgStructure(context.supabase, input.tenant_id, context.userId);
+  const [{ count: childCount, error: childErr }, { count: posCount, error: posErr }] = await Promise.all([
+    context.supabase.from("departments").select("id", { count: "exact", head: true }).eq("tenant_id", input.tenant_id).eq("parent_department_id", input.id),
+    context.supabase.from("positions").select("id", { count: "exact", head: true }).eq("tenant_id", input.tenant_id).eq("department_id", input.id)
+  ]);
+  if (childErr) throw new Error(childErr.message);
+  if (posErr) throw new Error(posErr.message);
+  if ((childCount ?? 0) > 0) throw new Error("Move or delete this department's sub-departments first");
+  if ((posCount ?? 0) > 0) throw new Error("Move or delete this department's positions first");
+  const { error } = await context.supabase.from("departments").delete().eq("id", input.id).eq("tenant_id", input.tenant_id);
+  if (error) throw new Error(error.message);
+  return { ok: true };
+}
+async function createPositionServer(input, context, deps) {
+  await deps.assertCanManageOrgStructure(context.supabase, input.tenant_id, context.userId);
+  const { data, error } = await context.supabase.from("positions").insert({ tenant_id: input.tenant_id, department_id: input.department_id, name: input.name }).select("id").single();
+  if (error) throw new Error(error.message);
+  return { id: data.id };
+}
+async function updatePositionServer(input, context, deps) {
+  await deps.assertCanManageOrgStructure(context.supabase, input.tenant_id, context.userId);
+  const { error } = await context.supabase.from("positions").update({ name: input.name }).eq("id", input.id).eq("tenant_id", input.tenant_id);
+  if (error) throw new Error(error.message);
+  return { ok: true };
+}
+async function deletePositionServer(input, context, deps) {
+  await deps.assertCanManageOrgStructure(context.supabase, input.tenant_id, context.userId);
+  const { error } = await context.supabase.from("positions").delete().eq("id", input.id).eq("tenant_id", input.tenant_id);
+  if (error) throw new Error(error.message);
+  return { ok: true };
+}
+async function getOrgChartTreeServer(input, context, deps) {
+  await deps.assertCanReadOrgStructure(context.supabase, input.tenant_id, context.userId);
+  const [{ data: departments, error: deptErr }, { data: positions, error: posErr }] = await Promise.all([
+    context.supabase.from("departments").select("id, name, parent_department_id, depth").eq("tenant_id", input.tenant_id),
+    context.supabase.from("positions").select("id, name, department_id").eq("tenant_id", input.tenant_id)
+  ]);
+  if (deptErr) throw new Error(deptErr.message);
+  if (posErr) throw new Error(posErr.message);
+  const { data: profiles, error: profileErr } = await context.supabase.from("employee_profiles").select("party_id, department_id, position_id, worker_type, employment_status").eq("tenant_id", input.tenant_id).neq("employment_status", "terminated").not("position_id", "is", null);
+  if (profileErr) throw new Error(profileErr.message);
+  const partyIds = (profiles ?? []).map((profile) => profile.party_id);
+  let parties = [];
+  if (partyIds.length) {
+    const { data, error } = await context.supabase.from("parties").select("id, name_en").eq("tenant_id", input.tenant_id).in("id", partyIds);
+    if (error) throw new Error(error.message);
+    parties = data ?? [];
+  }
+  const nameByParty = new Map(parties.map((party) => [party.id, party.name_en]));
+  const peopleByPosition = /* @__PURE__ */ new Map();
+  for (const profile of profiles ?? []) {
+    if (!profile.position_id) continue;
+    const people = peopleByPosition.get(profile.position_id) ?? [];
+    people.push({
+      party_id: profile.party_id,
+      name: nameByParty.get(profile.party_id) ?? "\u2014",
+      worker_type: profile.worker_type ?? null
+    });
+    peopleByPosition.set(profile.position_id, people);
+  }
+  const positionsByDept = /* @__PURE__ */ new Map();
+  for (const position of positions ?? []) {
+    const rows = positionsByDept.get(position.department_id) ?? [];
+    rows.push({ id: position.id, name: position.name, people: peopleByPosition.get(position.id) ?? [] });
+    positionsByDept.set(position.department_id, rows);
+  }
+  const nodeById = /* @__PURE__ */ new Map();
+  for (const department of departments ?? []) {
+    nodeById.set(department.id, {
+      id: department.id,
+      name: department.name,
+      depth: department.depth,
+      positions: positionsByDept.get(department.id) ?? [],
+      children: []
+    });
+  }
+  const roots = [];
+  for (const department of departments ?? []) {
+    const node = nodeById.get(department.id);
+    if (!node) continue;
+    if (department.parent_department_id && nodeById.has(department.parent_department_id)) {
+      nodeById.get(department.parent_department_id)?.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  return { roots };
 }
 function resolveAppBaseUrl2(deps) {
   return (process.env.APP_BASE_URL || deps.appBaseUrl).replace(/\/$/, "");
 }
-var APP_ROLES2 = [
+var APP_ROLES = [
   "owner",
   "super_admin",
   "admin",
@@ -1307,7 +1122,7 @@ var APP_ROLES2 = [
   "sop_reviewer",
   "sop_operator"
 ];
-var AppRole2 = z.enum(APP_ROLES2);
+var AppRole = z.enum(APP_ROLES);
 async function assertOwnerOrAdmin2(supabaseAdmin, appCode, tenantId, userId) {
   const { data, error } = await supabaseAdmin.from("user_roles").select("role, app_code").eq("tenant_id", tenantId).eq("user_id", userId);
   if (error) throw new Error(error.message);
@@ -1477,7 +1292,7 @@ function createInviteTenantUser(deps) {
       display_name: z.string().min(1, "Name is required").max(120),
       position: z.string().max(120).optional(),
       portal: z.enum(["internal", "vendor", "approver", "customer"]).default("internal"),
-      roles: z.array(AppRole2).default([]),
+      roles: z.array(AppRole).default([]),
       party_id: z.string().uuid().optional()
     }).parse(i)
   ).handler(async ({ data, context }) => {
@@ -1606,7 +1421,7 @@ function createUpdateTenantUserRoles(deps) {
     (i) => z.object({
       tenant_id: z.string().uuid(),
       user_id: z.string().uuid(),
-      roles: z.array(AppRole2),
+      roles: z.array(AppRole),
       app_code: z.string().min(1).max(64).optional()
     }).parse(i)
   ).handler(async ({ data, context }) => {
@@ -3000,6 +2815,6 @@ function createListActiveBundleRules(deps) {
   });
 }
 
-export { APP_CODES as BILLING_APP_CODES, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, MAX_DEPARTMENT_DEPTH, createAccountResendInvitation, createAccountSendPasswordReset, createAccountUpdateUserProfile, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createCreateDepartment, createCreatePosition, createDeleteDepartment, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDeletePosition, createGetBillingInvoice, createGetBillingOverview, createGetMyProfile, createGetOrgChartTree, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTeamMember, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createHasEverHadMembership, createInvitePartyContact, createInviteTenantUser, createInviteUserToWorkspaces, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListDepartmentsAndPositions, createListManageableTenants, createListManageableUsers, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTeamMembers, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createSetUserAppRoles, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateDepartment, createUpdateMyDefaultTenant, createUpdateMyTimezone, createUpdatePosition, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, createUpsertTeamMember, resolveScopedTenantIds };
+export { ACCOUNT_APP_ROLES, APP_CODES as BILLING_APP_CODES, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, MAX_DEPARTMENT_DEPTH, accountResendInvitationServer, accountSendPasswordResetServer, accountUpdateUserProfileServer, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDepartmentServer, createGetBillingInvoice, createGetBillingOverview, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createHasEverHadMembership, createInvitePartyContact, createInviteTenantUser, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createPositionServer, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, deleteDepartmentServer, deletePositionServer, getMyProfileServer, getOrgChartTreeServer, getTeamMemberServer, inviteUserToWorkspacesServer, listDepartmentsAndPositionsServer, listManageableTenantsServer, listManageableUsersServer, listTeamMembersServer, resolveScopedTenantIds, setUserAppRolesServer, updateDepartmentServer, updateMyDefaultTenantServer, updateMyTimezoneServer, updatePositionServer, upsertTeamMemberServer };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map
