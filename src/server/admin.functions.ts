@@ -83,6 +83,32 @@ async function assertOwnerOrAdmin(supabaseAdmin: any, appCode: string, tenantId:
   if (!ok) throw new Error("Forbidden: admin role required");
 }
 
+// Stricter than assertOwnerOrAdmin above: that check also passes for an
+// app-scoped "admin" role, which is fine for ordinary admin actions but not
+// for writing to user_roles itself (granting roles to anyone, including
+// yourself) -- an app-scoped admin has no business doing that. Matches the
+// caller bar setUserAppRolesServer (account.server.ts) already uses.
+// Independently requires the caller already be tenant-wide Owner before any
+// grant may include "owner", so a Super Admin can't grant themselves (or
+// anyone) Owner.
+async function assertCanAssignRoles(supabaseAdmin: any, tenantId: string, callerId: string, roles: string[]) {
+  const { data, error } = await supabaseAdmin
+    .from("user_roles")
+    .select("role")
+    .eq("tenant_id", tenantId)
+    .eq("user_id", callerId);
+  if (error) throw new Error(error.message);
+  const callerRoles = (data ?? []).map((r: any) => r.role as string);
+  const isOwner = callerRoles.includes("owner");
+  const isSuperAdmin = callerRoles.includes("super_admin");
+  if (!isOwner && !isSuperAdmin) {
+    throw new Error("Forbidden: owner or super_admin required to assign roles");
+  }
+  if (roles.includes("owner") && !isOwner) {
+    throw new Error("Only an Owner can grant the Owner role.");
+  }
+}
+
 async function assertCanEditVendor(supabaseAdmin: any, appCode: string, tenantId: string, userId: string) {
   const { data, error } = await supabaseAdmin
     .from("user_roles")
@@ -548,7 +574,7 @@ export function createUpdateTenantUserRoles(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertOwnerOrAdmin(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
+      await assertCanAssignRoles(deps.supabaseAdmin, data.tenant_id, context.userId, data.roles);
       const appCode = data.app_code ?? deps.appCode;
       const { error: delErr } = await deps.supabaseAdmin
         .from("user_roles")
