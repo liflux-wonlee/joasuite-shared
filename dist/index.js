@@ -38,7 +38,7 @@ var ROLES_BY_APP = {
   joaoffice: ["owner", "super_admin", "approver"],
   joaapproval: ["owner", "super_admin", "approver"],
   joacrm: ["owner", "super_admin", "approver"],
-  joahr: ["owner", "super_admin", "approver"]
+  joahr: ["owner", "super_admin", "approver", "hr_manager", "manager", "employee", "billing_admin"]
 };
 var SETTINGS_KV_APP_URL_KEYS = APP_CODES.map((c) => `app_url.${c}`);
 function roleLabel(role) {
