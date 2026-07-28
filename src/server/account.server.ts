@@ -189,6 +189,30 @@ async function assertCallerCanManageUser(
   return shared;
 }
 
+// Supabase Auth email is a single, platform-wide identity shared across every
+// tenant and app in the suite — changing it hijacks the target's login
+// everywhere they have access, not just in tenants the caller manages. Only
+// allow it when the caller manages EVERY tenant the target belongs to (never
+// a strict subset), otherwise an owner sharing just one tenant with a user
+// could redirect that user's login email and take over their account in
+// unrelated tenants/apps.
+async function assertCallerCanChangeUserEmail(
+  supabaseAdmin: any,
+  callerId: string,
+  targetUserId: string,
+): Promise<void> {
+  const managedTenantIds = new Set(await getCallerManageableTenantIds(supabaseAdmin, callerId));
+  const { data, error } = await supabaseAdmin
+    .from("tenant_users")
+    .select("tenant_id")
+    .eq("user_id", targetUserId);
+  if (error) throw new Error(error.message);
+  const targetTenantIds = (data ?? []).map((r: any) => r.tenant_id as string);
+  if (targetTenantIds.length === 0 || !targetTenantIds.every((id: string) => managedTenantIds.has(id))) {
+    throw new Error("Forbidden: cannot change this user's login email — they belong to a workspace you do not manage");
+  }
+}
+
 async function getTargetEmail(
   supabaseAdmin: any,
   targetUserId: string,
@@ -642,6 +666,9 @@ export async function accountUpdateUserProfileServer(
 ) {
   const supabaseAdmin = deps.supabaseAdmin;
   const sharedTenantIds = await assertCallerCanManageUser(supabaseAdmin, context.userId, input.user_id);
+  if (input.email) {
+    await assertCallerCanChangeUserEmail(supabaseAdmin, context.userId, input.user_id);
+  }
   const patch: { display_name: string; email?: string; position?: string | null } = {
     display_name: input.display_name,
   };
