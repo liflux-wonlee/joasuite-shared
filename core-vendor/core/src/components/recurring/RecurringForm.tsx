@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { listAccountsWithBalance } from "@/lib/accounting.functions";
-import { listParties, listCurrencies, listCategories } from "@/lib/admin.functions";
+import { listParties, listCurrencies, listCategories, getTenantSettings } from "@/lib/admin.functions";
 import { AddVendorDialog } from "@/components/AddVendorDialog";
 import { previewOccurrenceDates } from "@/lib/recurring-preview";
 import { fmtDate, fmtMoney } from "@/lib/format";
@@ -150,6 +150,7 @@ export function RecurringForm({
   const listCurrenciesFn = useServerFn(listCurrencies);
   const listAccountsFn = useServerFn(listAccountsWithBalance);
   const listCategoriesFn = useServerFn(listCategories);
+  const getSettingsFn = useServerFn(getTenantSettings);
   const partiesQ = useQuery({
     queryKey: ["parties-all", tenantId],
     enabled: !!tenantId,
@@ -170,6 +171,30 @@ export function RecurringForm({
     enabled: !!tenantId,
     queryFn: () => listAccountsFn({ data: { tenant_id: tenantId } }),
   });
+  const tenantSettingsQ = useQuery({
+    queryKey: ["tenant-settings", tenantId],
+    enabled: !!tenantId,
+    queryFn: () => getSettingsFn({ data: { tenant_id: tenantId } }),
+  });
+  const primaryCode =
+    (((tenantSettingsQ.data?.settings ?? {}) as Record<string, unknown>).primary_currency_code as string) || "USD";
+  // DEFAULTS.currency_code is a static "USD" placeholder used before the
+  // tenant's real primary currency loads. On a brand-new item (no explicit
+  // initial.currency_code — i.e. not editing an existing row whose currency
+  // is already meaningful) that hardcoded "USD" was never corrected, so a
+  // recurring item created on a non-USD-primary tenant silently defaulted
+  // to USD unless the user happened to notice and change the Currency
+  // field. Applied exactly once, right after settings load, so it never
+  // fights a currency the user has since picked themselves (including USD).
+  const autoDefaultedCurrency = useRef(false);
+  useEffect(() => {
+    if (initial?.currency_code) return;
+    if (autoDefaultedCurrency.current) return;
+    if (!tenantSettingsQ.data) return;
+    autoDefaultedCurrency.current = true;
+    if (primaryCode !== "USD") set("currency_code", primaryCode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantSettingsQ.data]);
   type PartyOpt = { id: string; name_en: string; nick_name?: string | null; is_vendor?: boolean | null; is_customer?: boolean | null };
   const parties = (partiesQ.data ?? []) as PartyOpt[];
   const partyList = parties.filter((p) =>
@@ -401,17 +426,17 @@ export function RecurringForm({
           <>
             <div>
               <Label>{t("recurring.amount_min", "Min")} *</Label>
-              <Input type="number" step="0.01" min="0.01" required value={v.amount_min ?? 0} onChange={(e) => set("amount_min", Number(e.target.value))} />
+              <Input type="number" step="0.01" min="0.01" required value={v.amount_min ?? ""} onChange={(e) => set("amount_min", e.target.value === "" ? null : Number(e.target.value))} />
             </div>
             <div>
               <Label>{t("recurring.amount_max", "Max")} *</Label>
-              <Input type="number" step="0.01" min="0.01" required value={v.amount_max ?? 0} onChange={(e) => set("amount_max", Number(e.target.value))} />
+              <Input type="number" step="0.01" min="0.01" required value={v.amount_max ?? ""} onChange={(e) => set("amount_max", e.target.value === "" ? null : Number(e.target.value))} />
             </div>
           </>
         ) : (
           <div>
             <Label>{t("recurring.total_amount", "Total Amount")} *</Label>
-            <Input type="number" step="0.01" min="0.01" required value={v.amount ?? 0} onChange={(e) => set("amount", Number(e.target.value))} />
+            <Input type="number" step="0.01" min="0.01" required value={v.amount ?? ""} onChange={(e) => set("amount", e.target.value === "" ? null : Number(e.target.value))} />
           </div>
         )}
         <div>
@@ -903,8 +928,8 @@ function CustomPlanEditor({
                 <Input
                   type="number"
                   step="0.01"
-                  value={l.amount}
-                  onChange={(e) => update(i, { amount: Number(e.target.value) })}
+                  value={l.amount === 0 || l.amount == null ? "" : l.amount}
+                  onChange={(e) => update(i, { amount: e.target.value === "" ? 0 : Number(e.target.value) })}
                 />
               </div>
               <div className="col-span-4">
