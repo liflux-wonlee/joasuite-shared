@@ -103,10 +103,9 @@ export function SuiteHomePage() {
               <EmptyState text={t("suite.empty.requested", "Nothing requested yet.")} />
             ) : (
               homeQ.data!.requestedByMe.map((r: any) => {
-                const to =
-                  r.kind === "payment_request"
-                    ? "/app/payment-requests/$id"
-                    : "/app/bills/$id";
+                // "bill" doc kind is retired — Payment Request is the only
+                // AP document type this list ever contains now.
+                const to = "/app/payment-requests/$id";
                 return (
                   <Link
                     key={`${r.kind}-${r.id}`}

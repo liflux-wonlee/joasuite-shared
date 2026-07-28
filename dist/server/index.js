@@ -125,32 +125,33 @@ function createGetSuiteHome(deps) {
       { data: settings },
       { data: approvals },
       { data: prs },
-      { data: bills },
       { data: notifs },
       { data: activity }
     ] = await Promise.all([
       supabase.from("settings_kv").select("key, value").eq("tenant_id", tenantId).in("key", APP_URL_KEYS),
       supabase.from("approvals").select("id, doc_kind, doc_id, sequence_no, created_at, source_app, meta, link_path").eq("tenant_id", tenantId).eq("assigned_to", userId).eq("status", "pending").order("created_at", { ascending: false }).limit(10),
-      supabase.from("payment_requests").select("id, request_no, status, amount_usd, created_at, due_date").eq("tenant_id", tenantId).eq("submitted_by", userId).order("created_at", { ascending: false }).limit(5),
-      supabase.from("bills").select("id, bill_no, status, amount_usd, created_at, due_date").eq("tenant_id", tenantId).eq("created_by", userId).order("created_at", { ascending: false }).limit(5),
+      // "Bill" no longer exists as a standalone document — Payment Request
+      // IS the surviving Bill (see joabooks' CLAUDE.md Bill/PR unification
+      // notes). This table is physically named `bills` post-rename, but
+      // its shape is the Payment Request one (request_no/submitted_by),
+      // not the old, retired Bill schema.
+      supabase.from("bills").select("id, request_no, status, amount_usd, created_at, due_date").eq("tenant_id", tenantId).eq("submitted_by", userId).order("created_at", { ascending: false }).limit(5),
       supabase.from("notifications").select("id, kind, title, body, link_path, read_at, created_at, app_code").eq("tenant_id", tenantId).eq("user_id", userId).order("created_at", { ascending: false }).limit(10),
       supabase.from("audit_logs").select("id, action, record_type, record_id, user_name, created_at, app_code").eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(10)
     ]);
     const prIds = (approvals ?? []).filter((a) => a.doc_kind === "payment_request").map((a) => a.doc_id);
-    const billIds = (approvals ?? []).filter((a) => a.doc_kind === "bill").map((a) => a.doc_id);
     const expIds = (approvals ?? []).filter((a) => a.doc_kind === "expense").map((a) => a.doc_id);
     const invIds = (approvals ?? []).filter((a) => a.doc_kind === "invoice").map((a) => a.doc_id);
-    const [prTitles, billTitles, expTitles, invTitles] = await Promise.all([
-      prIds.length ? supabase.from("payment_requests").select("id, request_no, amount_usd, due_date").in("id", prIds) : Promise.resolve({ data: [] }),
-      billIds.length ? supabase.from("bills").select("id, bill_no, amount_usd, due_date").in("id", billIds) : Promise.resolve({ data: [] }),
+    const [prTitles, expTitles, invTitles] = await Promise.all([
+      prIds.length ? supabase.from("bills").select("id, request_no, amount_usd, due_date").in("id", prIds) : Promise.resolve({ data: [] }),
       expIds.length ? supabase.from("expenses").select("id, expense_no, amount_usd").in("id", expIds) : Promise.resolve({ data: [] }),
       invIds.length ? supabase.from("invoices").select("id, invoice_no, amount_usd, due_date").in("id", invIds) : Promise.resolve({ data: [] })
     ]);
     const titleFor = (kind, id) => {
-      const m = kind === "payment_request" ? (prTitles.data ?? []).find((r) => r.id === id) : kind === "bill" ? (billTitles.data ?? []).find((r) => r.id === id) : kind === "expense" ? (expTitles.data ?? []).find((r) => r.id === id) : kind === "invoice" ? (invTitles.data ?? []).find((r) => r.id === id) : null;
+      const m = kind === "payment_request" ? (prTitles.data ?? []).find((r) => r.id === id) : kind === "expense" ? (expTitles.data ?? []).find((r) => r.id === id) : kind === "invoice" ? (invTitles.data ?? []).find((r) => r.id === id) : null;
       if (!m) return { title: null, amount_usd: null, due_date: null };
       return {
-        title: (m.request_no || m.bill_no || m.expense_no || m.invoice_no) ?? null,
+        title: (m.request_no || m.expense_no || m.invoice_no) ?? null,
         amount_usd: m.amount_usd ?? null,
         due_date: m.due_date ?? null
       };
@@ -187,24 +188,14 @@ function createGetSuiteHome(deps) {
           link_path: a.link_path ?? null
         };
       }),
-      requestedByMe: [
-        ...(prs ?? []).map((r) => ({
-          id: r.id,
-          kind: "payment_request",
-          no: r.request_no,
-          status: r.status,
-          amount_usd: r.amount_usd,
-          created_at: r.created_at
-        })),
-        ...(bills ?? []).map((r) => ({
-          id: r.id,
-          kind: "bill",
-          no: r.bill_no,
-          status: r.status,
-          amount_usd: r.amount_usd,
-          created_at: r.created_at
-        }))
-      ].sort((a, b) => a.created_at < b.created_at ? 1 : -1).slice(0, 8),
+      requestedByMe: (prs ?? []).map((r) => ({
+        id: r.id,
+        kind: "payment_request",
+        no: r.request_no,
+        status: r.status,
+        amount_usd: r.amount_usd,
+        created_at: r.created_at
+      })).sort((a, b) => a.created_at < b.created_at ? 1 : -1).slice(0, 8),
       notifications: notifs ?? [],
       recentActivity: activity ?? []
     };
@@ -1814,7 +1805,7 @@ function createUpsertPartyBankAccount(deps) {
       bank_addr_zip: data.bank.bank_addr_zip ?? null
     };
     if (data.bank.id) {
-      const { count: refCount } = await deps.supabaseAdmin.from("payment_requests").select("id", { head: true, count: "exact" }).eq("tenant_id", data.tenant_id).eq("party_bank_account_id", data.bank.id);
+      const { count: refCount } = await deps.supabaseAdmin.from("bills").select("id", { head: true, count: "exact" }).eq("tenant_id", data.tenant_id).eq("party_bank_account_id", data.bank.id);
       if ((refCount ?? 0) > 0) {
         const { data: newRow, error: insErr } = await deps.supabaseAdmin.from("party_bank_accounts").insert({ tenant_id: data.tenant_id, party_id: data.party_id, ...patch }).select("id").single();
         if (insErr) throw new Error(insErr.message);
@@ -1844,7 +1835,7 @@ function createDeletePartyBankAccount(deps) {
     }).parse(i)
   ).handler(async ({ data, context }) => {
     await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
-    const { count: refCount } = await deps.supabaseAdmin.from("payment_requests").select("id", { head: true, count: "exact" }).eq("tenant_id", data.tenant_id).eq("party_bank_account_id", data.bank_id);
+    const { count: refCount } = await deps.supabaseAdmin.from("bills").select("id", { head: true, count: "exact" }).eq("tenant_id", data.tenant_id).eq("party_bank_account_id", data.bank_id);
     if ((refCount ?? 0) > 0) {
       const { error: error2 } = await deps.supabaseAdmin.from("party_bank_accounts").update({
         archived_at: (/* @__PURE__ */ new Date()).toISOString(),

@@ -1163,7 +1163,7 @@ export function createUpsertPartyBankAccount(deps: AdminDeps) {
       };
       if (data.bank.id) {
         const { count: refCount } = await deps.supabaseAdmin
-          .from("payment_requests")
+          .from("bills")
           .select("id", { head: true, count: "exact" })
           .eq("tenant_id", data.tenant_id)
           .eq("party_bank_account_id", data.bank.id);
@@ -1218,7 +1218,7 @@ export function createDeletePartyBankAccount(deps: AdminDeps) {
     .handler(async ({ data, context }) => {
       await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       const { count: refCount } = await deps.supabaseAdmin
-        .from("payment_requests")
+        .from("bills")
         .select("id", { head: true, count: "exact" })
         .eq("tenant_id", data.tenant_id)
         .eq("party_bank_account_id", data.bank_id);

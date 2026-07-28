@@ -2406,7 +2406,7 @@ function SuiteHomePage() {
       /* @__PURE__ */ jsxs(Card, { className: "p-5", children: [
         /* @__PURE__ */ jsx(SectionHeader, { icon: Send, title: t("suite.section.requested", "Requested by Me") }),
         /* @__PURE__ */ jsx("div", { className: "mt-3 space-y-2", children: homeQ.isLoading ? /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("common.loading") }) : (homeQ.data?.requestedByMe ?? []).length === 0 ? /* @__PURE__ */ jsx(EmptyState, { text: t("suite.empty.requested", "Nothing requested yet.") }) : homeQ.data.requestedByMe.map((r) => {
-          const to = r.kind === "payment_request" ? "/app/payment-requests/$id" : "/app/bills/$id";
+          const to = "/app/payment-requests/$id";
           return /* @__PURE__ */ jsxs(
             Link,
             {
