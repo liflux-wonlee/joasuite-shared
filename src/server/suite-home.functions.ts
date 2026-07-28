@@ -27,7 +27,7 @@ export type SuiteHomeData = {
   }>;
   requestedByMe: Array<{
     id: string;
-    kind: "payment_request" | "bill";
+    kind: "payment_request";
     no: string | null;
     status: string;
     amount_usd: number | null;
@@ -108,7 +108,6 @@ export function createGetSuiteHome(deps: Deps) {
         { data: settings },
         { data: approvals },
         { data: prs },
-        { data: bills },
         { data: notifs },
         { data: activity },
       ] = await Promise.all([
@@ -125,18 +124,16 @@ export function createGetSuiteHome(deps: Deps) {
           .eq("status", "pending")
           .order("created_at", { ascending: false })
           .limit(10),
+        // "Bill" no longer exists as a standalone document — Payment Request
+        // IS the surviving Bill (see joabooks' CLAUDE.md Bill/PR unification
+        // notes). This table is physically named `bills` post-rename, but
+        // its shape is the Payment Request one (request_no/submitted_by),
+        // not the old, retired Bill schema.
         supabase
-          .from("payment_requests")
+          .from("bills")
           .select("id, request_no, status, amount_usd, created_at, due_date")
           .eq("tenant_id", tenantId)
           .eq("submitted_by", userId)
-          .order("created_at", { ascending: false })
-          .limit(5),
-        supabase
-          .from("bills")
-          .select("id, bill_no, status, amount_usd, created_at, due_date")
-          .eq("tenant_id", tenantId)
-          .eq("created_by", userId)
           .order("created_at", { ascending: false })
           .limit(5),
         supabase
@@ -154,12 +151,11 @@ export function createGetSuiteHome(deps: Deps) {
           .limit(10),
       ]);
 
-      // Resolve approval titles for payment_requests/bills/expenses/invoices
+      // Resolve approval titles for payment_requests/expenses/invoices.
+      // "bill" is not a live doc_kind here — Payment Request is the only AP
+      // document type (see joabooks' CLAUDE.md Bill/PR unification notes).
       const prIds = (approvals ?? [])
         .filter((a: any) => a.doc_kind === "payment_request")
-        .map((a: any) => a.doc_id);
-      const billIds = (approvals ?? [])
-        .filter((a: any) => a.doc_kind === "bill")
         .map((a: any) => a.doc_id);
       const expIds = (approvals ?? [])
         .filter((a: any) => a.doc_kind === "expense")
@@ -168,18 +164,12 @@ export function createGetSuiteHome(deps: Deps) {
         .filter((a: any) => a.doc_kind === "invoice")
         .map((a: any) => a.doc_id);
 
-      const [prTitles, billTitles, expTitles, invTitles] = await Promise.all([
+      const [prTitles, expTitles, invTitles] = await Promise.all([
         prIds.length
           ? supabase
-              .from("payment_requests")
+              .from("bills")
               .select("id, request_no, amount_usd, due_date")
               .in("id", prIds)
-          : Promise.resolve({ data: [] as any[] }),
-        billIds.length
-          ? supabase
-              .from("bills")
-              .select("id, bill_no, amount_usd, due_date")
-              .in("id", billIds)
           : Promise.resolve({ data: [] as any[] }),
         expIds.length
           ? supabase
@@ -198,16 +188,14 @@ export function createGetSuiteHome(deps: Deps) {
         const m =
           kind === "payment_request"
             ? (prTitles.data ?? []).find((r: any) => r.id === id)
-            : kind === "bill"
-              ? (billTitles.data ?? []).find((r: any) => r.id === id)
-              : kind === "expense"
-                ? (expTitles.data ?? []).find((r: any) => r.id === id)
-                : kind === "invoice"
-                  ? (invTitles.data ?? []).find((r: any) => r.id === id)
-                  : null;
+            : kind === "expense"
+              ? (expTitles.data ?? []).find((r: any) => r.id === id)
+              : kind === "invoice"
+                ? (invTitles.data ?? []).find((r: any) => r.id === id)
+                : null;
         if (!m) return { title: null as string | null, amount_usd: null, due_date: null };
         return {
-          title: (m.request_no || m.bill_no || m.expense_no || m.invoice_no) ?? null,
+          title: (m.request_no || m.expense_no || m.invoice_no) ?? null,
           amount_usd: m.amount_usd ?? null,
           due_date: m.due_date ?? null,
         };
@@ -264,25 +252,16 @@ export function createGetSuiteHome(deps: Deps) {
               link_path: a.link_path ?? null,
             };
           }),
-        requestedByMe: [
-          ...(prs ?? []).map((r: any) => ({
+        requestedByMe: (prs ?? [])
+          .map((r: any) => ({
             id: r.id,
             kind: "payment_request" as const,
             no: r.request_no,
             status: r.status,
             amount_usd: r.amount_usd,
             created_at: r.created_at,
-          })),
-          ...(bills ?? []).map((r: any) => ({
-            id: r.id,
-            kind: "bill" as const,
-            no: r.bill_no,
-            status: r.status,
-            amount_usd: r.amount_usd,
-            created_at: r.created_at,
-          })),
-        ]
-          .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+          }))
+          .sort((a: { created_at: string }, b: { created_at: string }) => (a.created_at < b.created_at ? 1 : -1))
           .slice(0, 8),
         notifications: (notifs ?? []) as any,
         recentActivity: (activity ?? []) as any,

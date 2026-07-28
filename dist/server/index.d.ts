@@ -62,7 +62,7 @@ type SuiteHomeData = {
     }>;
     requestedByMe: Array<{
         id: string;
-        kind: "payment_request" | "bill";
+        kind: "payment_request";
         no: string | null;
         status: string;
         amount_usd: number | null;
