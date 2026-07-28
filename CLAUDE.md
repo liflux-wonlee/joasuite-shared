@@ -67,3 +67,35 @@ Checklist before adding any new service-role-backed factory here:
 - If that check is missing, it's the same bug class as joabooks'
   `financeApprove`/`markPaymentRequestPaid` incident — and since this is
   shared code, the exposure is 4 apps wide, not 1.
+
+# Security pattern: platform-wide identity mutations need full tenant coverage, not partial overlap
+
+Any `create*` factory in `src/server/` that mutates a platform-wide
+Supabase Auth identity field (email, phone, password, ban status) for a
+user other than the caller must verify the caller manages **every**
+tenant the target user belongs to — not just one shared tenant. Supabase
+Auth is a single instance shared across all JoaSuite apps, so a check
+based on partial tenant overlap lets an admin in one org hijack a user's
+login and take over their account in unrelated orgs/apps. As with the
+service-role-write pattern above, a gap here ships to every consuming app
+at once (this factory is used directly by joaoffice/joasop, and joabooks/
+joahr each carry an identical local copy).
+
+Found and fixed 2026-07-28: `accountUpdateUserProfileServer` let a caller
+who is owner/super_admin of just one tenant shared with a target user call
+`supabaseAdmin.auth.admin.updateUserById(user_id, { email })` and change
+that user's login email platform-wide, enabling account takeover in every
+other tenant/app the target belongs to. Fixed by adding
+`assertCallerCanChangeUserEmail`, called only when an email change is
+requested, which requires the target's full tenant set to be a subset of
+the caller's managed-tenant set — the existing tenant-scoped
+`display_name`/`position` update path is unchanged.
+
+Checklist before adding any new `supabaseAdmin.auth.admin.*` call for a
+user other than the caller:
+- Does it change email, phone, password, or ban status?
+- If so, does it require the caller to manage the target's **entire**
+  tenant set, not just a shared subset?
+- If that check is missing, it's the same bug class as the
+  `accountUpdateUserProfile` incident above — copy the
+  `assertCallerCanChangeUserEmail` pattern rather than inventing a new one.
