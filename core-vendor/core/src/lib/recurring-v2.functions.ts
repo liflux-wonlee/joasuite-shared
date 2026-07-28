@@ -591,13 +591,12 @@ export const linkOccurrence = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({
     occurrence_id: z.string().uuid(),
-    linked_kind: z.enum(["bill", "payment_request", "transaction", "invoice"]),
+    linked_kind: z.enum(["payment_request", "transaction", "invoice"]),
     linked_id: z.string().uuid(),
     actual_amount: z.number().optional(),
   }).parse(i))
   .handler(async ({ data, context }) => {
     const statusMap: Record<string, string> = {
-      bill: "linked_bill",
       payment_request: "linked_payment_request",
       transaction: "linked_transaction",
       invoice: "linked_transaction",
@@ -618,6 +617,26 @@ export const unlinkOccurrence = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({ occurrence_id: z.string().uuid() }).parse(i))
   .handler(async ({ data, context }) => {
+    const { data: occ, error: occErr } = await context.supabase
+      .from("recurring_occurrences")
+      .select("id, linked_kind, linked_id")
+      .eq("id", data.occurrence_id)
+      .single();
+    if (occErr) throw new Error(occErr.message);
+
+    // If linked to a payment request (whether created from this occurrence,
+    // or matched to an already-paid one via
+    // linkOccurrenceToPaidPaymentRequest), clear that PR's back-reference too
+    // — otherwise it stays permanently excluded from future match search
+    // (findCandidateMatchingPaymentRequests only offers unlinked PRs).
+    if (occ.linked_kind === "payment_request" && occ.linked_id) {
+      const { error: prErr } = await context.supabase
+        .from("bills")
+        .update({ source_recurring_occurrence_id: null })
+        .eq("id", occ.linked_id);
+      if (prErr) throw new Error(prErr.message);
+    }
+
     const { error } = await context.supabase
       .from("recurring_occurrences")
       .update({ linked_kind: null, linked_id: null, actual_amount: null, status: "forecasted" })
@@ -626,16 +645,170 @@ export const unlinkOccurrence = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// Mark an occurrence as paid/collected directly, without linking it to a real
-// bill/payment_request/transaction row (e.g. an autopay charge or a
-// bank transfer that was already recorded elsewhere). Distinct from the
-// linked_* statuses set by linkOccurrence.
+// Search for already-paid Payment Requests that might be the SAME real-world
+// payment as the one about to be recorded via markOccurrencePaid — guards
+// against double-booking when a user pays a bill through the PR flow first,
+// then separately (and redundantly) marks the corresponding Planned
+// Transaction occurrence as paid, unaware a PR already covers it. Only
+// suggests PRs for the same vendor, already paid/partially_paid, not yet
+// linked to any other occurrence, with a payment date within 15 days of the
+// amount/date the user is about to submit — the user makes the final call.
+export const findCandidateMatchingPaymentRequests = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({
+    occurrence_id: z.string().uuid(),
+    amount: z.number().positive(),
+    payment_date: z.string(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: occ, error: occErr } = await context.supabase
+      .from("recurring_occurrences")
+      .select("*, recurring_transactions:recurring_id(*)")
+      .eq("id", data.occurrence_id)
+      .single();
+    if (occErr) throw new Error(occErr.message);
+    const r: any = occ.recurring_transactions;
+    if (!r || r.direction !== "money_out" || !r.party_id) {
+      return { candidates: [] as Array<{
+        payment_request_id: string; request_no: string; detail: string | null;
+        amount_usd: number; status: string; paid_date: string; paid_amount: number;
+      }> };
+    }
+
+    const centerDate = new Date(data.payment_date);
+    const fromDate = new Date(centerDate); fromDate.setDate(fromDate.getDate() - 15);
+    const toDate = new Date(centerDate); toDate.setDate(toDate.getDate() + 15);
+    const toIsoDate = (d: Date) => d.toISOString().slice(0, 10);
+
+    const { data: prs, error: prErr } = await context.supabase
+      .from("bills")
+      .select("id, request_no, amount_usd, detail, status")
+      .eq("tenant_id", occ.tenant_id)
+      .eq("party_id", r.party_id)
+      .in("status", ["paid", "partially_paid"])
+      .is("source_recurring_occurrence_id", null);
+    if (prErr) throw new Error(prErr.message);
+    if (!prs || prs.length === 0) return { candidates: [] };
+
+    const prIds = prs.map((p) => p.id as string);
+    const { data: txns, error: tErr } = await context.supabase
+      .from("transactions")
+      .select("txn_date, amount, source_id")
+      .eq("tenant_id", occ.tenant_id)
+      .eq("source_kind", "payment_request")
+      .in("source_id", prIds)
+      .gte("txn_date", toIsoDate(fromDate))
+      .lte("txn_date", toIsoDate(toDate))
+      .order("txn_date", { ascending: false });
+    if (tErr) throw new Error(tErr.message);
+
+    const txnByPr = new Map<string, { txn_date: string; amount: number }>();
+    for (const t of txns ?? []) {
+      const sid = (t as any).source_id as string;
+      if (!txnByPr.has(sid)) {
+        txnByPr.set(sid, { txn_date: (t as any).txn_date as string, amount: Number((t as any).amount) });
+      }
+    }
+
+    const candidates = prs
+      .filter((p) => txnByPr.has(p.id as string))
+      .map((p) => {
+        const t = txnByPr.get(p.id as string)!;
+        return {
+          payment_request_id: p.id as string,
+          request_no: p.request_no as string,
+          detail: (p as any).detail as string | null,
+          amount_usd: Number(p.amount_usd),
+          status: p.status as string,
+          paid_date: t.txn_date,
+          paid_amount: t.amount,
+        };
+      })
+      .sort((a, b) => Math.abs(a.paid_amount - data.amount) - Math.abs(b.paid_amount - data.amount));
+
+    return { candidates };
+  });
+
+// Confirms that an already-paid Payment Request IS the same real-world
+// payment as this occurrence, in place of calling markOccurrencePaid (which
+// would create a second, duplicate transactions row). Links the two
+// (bills.source_recurring_occurrence_id, and the occurrence's own
+// linked_kind/linked_id — same shape linkOccurrence uses), and mirrors the
+// PR's own paid amount/status onto the occurrence. No new payments/
+// transactions rows are created — the PR's existing payment IS the payment.
+export const linkOccurrenceToPaidPaymentRequest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i) => z.object({
+    occurrence_id: z.string().uuid(),
+    payment_request_id: z.string().uuid(),
+  }).parse(i))
+  .handler(async ({ data, context }) => {
+    const { data: occ, error: occErr } = await context.supabase
+      .from("recurring_occurrences")
+      .select("id, linked_kind")
+      .eq("id", data.occurrence_id)
+      .single();
+    if (occErr) throw new Error(occErr.message);
+    if (occ.linked_kind) {
+      throw new Error("This occurrence is already linked to a document.");
+    }
+
+    const { data: pr, error: prErr } = await context.supabase
+      .from("bills")
+      .select("id, tenant_id, status, source_recurring_occurrence_id")
+      .eq("id", data.payment_request_id)
+      .single();
+    if (prErr) throw new Error(prErr.message);
+    if (pr.source_recurring_occurrence_id) {
+      throw new Error("This payment request is already linked to another Planned Transaction occurrence.");
+    }
+    if (pr.status !== "paid" && pr.status !== "partially_paid") {
+      throw new Error("This payment request isn't marked paid.");
+    }
+
+    const { data: pays } = await context.supabase
+      .from("payments")
+      .select("amount_usd")
+      .eq("tenant_id", pr.tenant_id)
+      .eq("doc_kind", "payment_request")
+      .eq("doc_id", data.payment_request_id);
+    const paidTotal = (pays ?? []).reduce((s, p: any) => s + (Number(p.amount_usd) || 0), 0);
+
+    const { error: prLinkErr } = await context.supabase
+      .from("bills")
+      .update({ source_recurring_occurrence_id: data.occurrence_id })
+      .eq("id", data.payment_request_id);
+    if (prLinkErr) throw new Error(prLinkErr.message);
+
+    const { error: occLinkErr } = await context.supabase
+      .from("recurring_occurrences")
+      .update({
+        linked_kind: "payment_request",
+        linked_id: data.payment_request_id,
+        status: pr.status === "paid" ? "paid" : "partially_paid",
+        actual_amount: paidTotal,
+      })
+      .eq("id", data.occurrence_id);
+    if (occLinkErr) throw new Error(occLinkErr.message);
+
+    return { ok: true };
+  });
+
+// Mark an occurrence as paid/collected directly (e.g. an autopay charge or a
+// bank transfer with no separate bill/payment_request first). Distinct from
+// the linked_* statuses set by linkOccurrence: this does NOT set the
+// occurrence's own linked_kind/linked_id (those stay reserved for
+// convertOccurrenceToDoc's "converted to a real document" flow), so
+// revertOccurrencePayment can still undo it directly.
 //
 // Records the payment detail as a row in the generic `payments` table
 // (doc_kind="shared.recurring_occurrence"), mirroring markPaymentRequestPaid
 // in payment-requests.functions.ts — same full-vs-partial-paid model, same
 // note/proof_attachment_id fields — instead of adding bespoke columns to
-// recurring_occurrences.
+// recurring_occurrences. It ALSO records a real `transactions` row
+// (source_kind="shared.recurring_occurrence") the same way
+// convertOccurrenceToDoc's "money_out" branch and markPaymentRequestPaid do,
+// so this payment shows up in Financial Activity like any other payment.
 export const markOccurrencePaid = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({
@@ -650,10 +823,12 @@ export const markOccurrencePaid = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { data: occ, error: occErr } = await context.supabase
       .from("recurring_occurrences")
-      .select("id, tenant_id, recurring_id, forecast_amount, occurrence_date")
+      .select("*, recurring_transactions:recurring_id(*)")
       .eq("id", data.occurrence_id)
       .single();
     if (occErr) throw new Error(occErr.message);
+    const r: any = occ.recurring_transactions;
+    if (!r) throw new Error("Parent recurring transaction not found");
 
     const { data: priorPays } = await context.supabase
       .from("payments")
@@ -663,6 +838,9 @@ export const markOccurrencePaid = createServerFn({ method: "POST" })
       .eq("doc_id", data.occurrence_id);
     const paidSoFar = (priorPays ?? []).reduce((s, p: any) => s + (Number(p.amount_usd) || 0), 0);
     const newTotalPaid = paidSoFar + data.amount;
+    // Phase 1: derive fully-paid from balance, ignore client's flag.
+    const forecastAmt = Number(occ.forecast_amount ?? 0);
+    const fullyPaidServer = forecastAmt > 0 && newTotalPaid + 0.001 >= forecastAmt;
 
     const { error: payErr } = await context.supabase.from("payments").insert({
       tenant_id: occ.tenant_id,
@@ -678,7 +856,62 @@ export const markOccurrencePaid = createServerFn({ method: "POST" })
     } as any);
     if (payErr) throw new Error(payErr.message);
 
-    const newStatus: "paid" | "partially_paid" = data.fully_paid ? "paid" : "partially_paid";
+    // Also record a real ledger transaction for this payment — same
+    // source_kind/source_id pattern as convertOccurrenceToDoc's "money_out"
+    // branch and markPaymentRequestPaid — so it shows up in Financial
+    // Activity like every other payment. Previously this function only wrote
+    // to `payments` + updated the occurrence's own status, which Activity
+    // never reads, so a "Mark as paid" here was invisible in Activity.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: isStaff, error: roleErr } = await supabaseAdmin.rpc("is_internal_staff_scoped", {
+      _tenant: occ.tenant_id, _user: context.userId, _app_code: APP_CODE,
+    });
+    if (roleErr) throw new Error(roleErr.message);
+    if (!isStaff) throw new Error("Internal staff role required");
+
+    const { data: txnNo, error: nErr } = await supabaseAdmin.rpc("next_doc_number", {
+      _tenant: occ.tenant_id,
+      _doc_type: "transaction",
+    });
+    if (nErr) throw new Error(nErr.message);
+    const txnDirection: "in" | "out" = r.direction === "money_in" ? "in" : "out";
+    const detail = r.description || `Planned transaction: ${r.name}`;
+    const { data: txn, error: tErr } = await supabaseAdmin
+      .from("transactions")
+      .insert({
+        tenant_id: occ.tenant_id,
+        txn_no: txnNo as unknown as string,
+        txn_date: data.payment_date,
+        direction: txnDirection,
+        party_id: r.party_id ?? null,
+        description: detail + (fullyPaidServer ? "" : " (partial payment)"),
+        amount: data.amount,
+        fee: 0,
+        category_id: r.category_id ?? null,
+        payment_method: r.payment_method ?? null,
+        payment_account_id: data.payment_account_id,
+        status: "recorded",
+        source_kind: "shared.recurring_occurrence",
+        source_id: data.occurrence_id,
+        created_by: context.userId,
+        paid_by: context.userId,
+      } as never)
+      .select("id")
+      .single();
+    if (tErr) throw new Error(tErr.message);
+
+    await supabaseAdmin.from("transaction_lines").insert({
+      tenant_id: occ.tenant_id,
+      transaction_id: (txn as any).id,
+      category_id: r.category_id ?? null,
+      description: detail,
+      amount: data.amount,
+      note: data.note,
+      sort_order: 0,
+    });
+
+    // Status is balance-driven (computed above as fullyPaidServer).
+    const newStatus: "paid" | "partially_paid" = fullyPaidServer ? "paid" : "partially_paid";
     const { error } = await context.supabase
       .from("recurring_occurrences")
       .update({ status: newStatus, actual_amount: newTotalPaid } as never)
@@ -690,22 +923,15 @@ export const markOccurrencePaid = createServerFn({ method: "POST" })
     // "converted" behave identically from the schedule's point of view). A
     // partial payment doesn't advance the schedule — the occurrence is still
     // outstanding.
-    if (data.fully_paid) {
-      const { data: r } = await context.supabase
+    if (fullyPaidServer && r.next_date && occ.occurrence_date >= r.next_date) {
+      const newNext = advance(occ.occurrence_date, r.frequency, r.due_day);
+      await context.supabase
         .from("recurring_transactions")
-        .select("next_date, frequency, due_day")
-        .eq("id", occ.recurring_id)
-        .maybeSingle();
-      if (r?.next_date && occ.occurrence_date >= r.next_date) {
-        const newNext = advance(occ.occurrence_date, r.frequency, r.due_day);
-        await context.supabase
-          .from("recurring_transactions")
-          .update({ next_date: newNext })
-          .eq("id", occ.recurring_id);
-      }
+        .update({ next_date: newNext })
+        .eq("id", occ.recurring_id);
     }
 
-    return { ok: true, status: newStatus };
+    return { ok: true, status: newStatus, transaction_id: (txn as any).id };
   });
 
 // Undo a mistaken markOccurrencePaid call. Resets the occurrence back to
@@ -739,6 +965,32 @@ export const revertOccurrencePayment = createServerFn({ method: "POST" })
       .eq("doc_kind", "shared.recurring_occurrence")
       .eq("doc_id", data.occurrence_id);
     if (delErr) throw new Error(delErr.message);
+
+    // Also remove the ledger transaction(s) markOccurrencePaid created for
+    // this occurrence (source_kind/source_id pair), mirroring the payments
+    // cleanup above — otherwise a reverted occurrence would leave a stale
+    // "paid" entry sitting in Financial Activity.
+    const { data: relatedTxns, error: relErr } = await context.supabase
+      .from("transactions")
+      .select("id")
+      .eq("tenant_id", occ.tenant_id)
+      .eq("source_kind", "shared.recurring_occurrence")
+      .eq("source_id", data.occurrence_id);
+    if (relErr) throw new Error(relErr.message);
+    const relatedTxnIds = (relatedTxns ?? []).map((t: any) => t.id as string);
+    if (relatedTxnIds.length) {
+      const { error: linesDelErr } = await context.supabase
+        .from("transaction_lines")
+        .delete()
+        .in("transaction_id", relatedTxnIds);
+      if (linesDelErr) throw new Error(linesDelErr.message);
+      const { error: txnDelErr } = await context.supabase
+        .from("transactions")
+        .delete()
+        .in("id", relatedTxnIds);
+      if (txnDelErr) throw new Error(txnDelErr.message);
+    }
+
     const { error } = await context.supabase
       .from("recurring_occurrences")
       .update({ status: "forecasted", actual_amount: null })
@@ -896,14 +1148,14 @@ export const listRecurringReminderLog = createServerFn({ method: "POST" })
 
 // ------------------------- Convert occurrence -> real doc -------------------------
 
-const ConvertKind = z.enum(["bill", "money_out", "payment_request"]);
+const ConvertKind = z.enum(["money_out", "payment_request"]);
 
 export const convertOccurrenceToDoc = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({
     occurrence_id: z.string().uuid(),
     target_kind: ConvertKind,
-    doc_date: z.string().optional(),     // bill_date / txn_date / due_date
+    doc_date: z.string().optional(),     // txn_date / due_date
     amount: z.number().nonnegative().optional(),
     detail: z.string().max(2000).optional(),
     note: z.string().max(2000).optional(),
@@ -952,114 +1204,69 @@ export const convertOccurrenceToDoc = createServerFn({ method: "POST" })
       };
     }
 
-    // Direct create for bill / money_out via supabaseAdmin
+    // Direct create for money_out via supabaseAdmin
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Permission gate: internal staff only (matches createBill/addAccountTransaction)
-    const { data: isStaff, error: roleErr } = await supabaseAdmin.rpc("is_internal_staff", {
-      _tenant: tenantId, _user: userId,
+    // Permission gate: internal staff only (matches addAccountTransaction)
+    const { data: isStaff, error: roleErr } = await supabaseAdmin.rpc("is_internal_staff_scoped", {
+      _tenant: tenantId, _user: userId, _app_code: APP_CODE,
     });
     if (roleErr) throw new Error(roleErr.message);
     if (!isStaff) throw new Error("Internal staff role required");
 
-    let newId: string;
-    let linkedKind: "bill" | "transaction";
-    let newStatus: "linked_bill" | "linked_transaction";
-
-    if (data.target_kind === "bill") {
-      const { data: docNo, error: nErr } = await supabaseAdmin.rpc("next_doc_number", {
-        _tenant: tenantId,
-        _doc_type: "bill",
-      });
-      if (nErr) throw new Error(nErr.message);
-      const { data: row, error } = await supabaseAdmin
-        .from("bills")
-        .insert({
-          tenant_id: tenantId,
-          bill_no: docNo as unknown as string,
-          status: "submitted",
-          party_id: r.party_id ?? null,
-          bill_date: docDate,
-          due_date: r.must_pay_by ?? null,
-          amount_usd: amount,
-          detail,
-          note,
-          created_by: userId,
-        })
-        .select("id").single();
-      if (error) throw new Error(error.message);
-      newId = row.id as string;
-      linkedKind = "bill";
-      newStatus = "linked_bill";
-
-      // single line w/ recurring's category
-      await supabaseAdmin.from("document_lines").insert({
+    // Money Out means the payment has already happened, so this always
+    // creates a real transactions row directly — no intermediate document,
+    // no unpaid state (that's what a Payment Request is for). Uses the
+    // "transaction" numbering format (TXN-####), same as every other
+    // transactions row, not a separate "money_out" doc-type prefix.
+    const { data: txnNo, error: nErr } = await supabaseAdmin.rpc("next_doc_number", {
+      _tenant: tenantId,
+      _doc_type: "transaction",
+    });
+    if (nErr) throw new Error(nErr.message);
+    const { data: txn, error: tErr } = await supabaseAdmin
+      .from("transactions")
+      .insert({
         tenant_id: tenantId,
-        doc_kind: "bill",
-        doc_id: newId,
-        category_id: r.category_id ?? null,
-        description: detail,
+        txn_no: txnNo as unknown as string,
+        txn_date: docDate,
+        direction: "out",
+        party_id: r.party_id ?? null,
+        description: detail || `Planned transaction: ${r.name}`,
         amount,
-        note,
-        sort_order: 0,
-      });
-    } else {
-      // Money Out means the payment has already happened, so this always
-      // creates a real transactions row directly — no intermediate document,
-      // no unpaid state (that's what a Bill is for). Uses the "transaction"
-      // numbering format (TXN-####), same as every other transactions row,
-      // not a separate "money_out" doc-type prefix.
-      const { data: txnNo, error: nErr } = await supabaseAdmin.rpc("next_doc_number", {
-        _tenant: tenantId,
-        _doc_type: "transaction",
-      });
-      if (nErr) throw new Error(nErr.message);
-      const { data: txn, error: tErr } = await supabaseAdmin
-        .from("transactions")
-        .insert({
-          tenant_id: tenantId,
-          txn_no: txnNo as unknown as string,
-          txn_date: docDate,
-          direction: "out",
-          party_id: r.party_id ?? null,
-          description: detail || `Planned transaction: ${r.name}`,
-          amount,
-          fee: 0,
-          category_id: r.category_id ?? null,
-          payment_method: data.payment_method ?? r.payment_method ?? null,
-          payment_account_id: data.payment_account_id ?? r.payment_account_id ?? null,
-          status: "recorded",
-          source_kind: "shared.recurring_occurrence",
-          source_id: data.occurrence_id,
-          created_by: userId,
-          paid_by: userId,
-        } as never)
-        .select("id").single();
-      if (tErr) throw new Error(tErr.message);
-      newId = (txn as any).id as string;
-      linkedKind = "transaction";
-      newStatus = "linked_transaction";
+        fee: 0,
+        category_id: r.category_id ?? null,
+        payment_method: data.payment_method ?? r.payment_method ?? null,
+        payment_account_id: data.payment_account_id ?? r.payment_account_id ?? null,
+        status: "recorded",
+        source_kind: "shared.recurring_occurrence",
+        source_id: data.occurrence_id,
+        created_by: userId,
+        paid_by: userId,
+      } as never)
+      .select("id").single();
+    if (tErr) throw new Error(tErr.message);
+    const newId = (txn as any).id as string;
 
-      await supabaseAdmin.from("transaction_lines").insert({
-        tenant_id: tenantId,
-        transaction_id: newId,
-        category_id: r.category_id ?? null,
-        description: detail,
-        amount,
-        note,
-        sort_order: 0,
-      });
-    }
+    await supabaseAdmin.from("transaction_lines").insert({
+      tenant_id: tenantId,
+      transaction_id: newId,
+      category_id: r.category_id ?? null,
+      description: detail,
+      amount,
+      note,
+      sort_order: 0,
+    });
 
     // Link occurrence
     const { error: linkErr } = await supabaseAdmin
       .from("recurring_occurrences")
       .update({
-        linked_kind: linkedKind,
+        linked_kind: "transaction",
         linked_id: newId,
         actual_amount: amount,
-        status: newStatus,
-        stage: (linkedKind === "transaction" ? "paid" : "billed") as "paid" | "billed",
+        status: "linked_transaction",
+        stage: "paid" as const,
       })
       .eq("id", data.occurrence_id);
     if (linkErr) throw new Error(linkErr.message);
@@ -1075,9 +1282,9 @@ export const convertOccurrenceToDoc = createServerFn({ method: "POST" })
 
     return {
       kind: "created" as const,
-      target: linkedKind,
+      target: "transaction" as const,
       id: newId,
-      path: linkedKind === "bill" ? `/app/bills/${newId}` : `/app/ledger/${newId}`,
+      path: `/app/ledger/${newId}`,
     };
   });
 
@@ -1215,3 +1422,7 @@ export async function runRecurringRemindersImpl(now: Date = new Date()) {
   return { processed: rows?.length ?? 0, queued, skipped, errors };
 }
 
+
+
+// ---- Multicurrency Phase 1 canonical alias ----
+export const recordRecurringPayment = markOccurrencePaid;
