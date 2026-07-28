@@ -1,4 +1,5 @@
-export { A as AppCode, a as BILLING_APP_CODES, A as BillingAppCode } from '../constants-ME_hdmjZ.js';
+import { A as AppCode } from '../constants-ME_hdmjZ.js';
+export { a as BILLING_APP_CODES } from '../constants-ME_hdmjZ.js';
 import * as _tanstack_start_client_core from '@tanstack/start-client-core';
 import { SupabaseClient } from '@supabase/supabase-js';
 
@@ -372,7 +373,7 @@ type UpsertTeamMemberInput = {
     termination_date?: string | null;
     worker_type: "employee" | "contractor";
 };
-type TenantInput = {
+type TenantInput$1 = {
     tenant_id: string;
 };
 type CreateDepartmentInput = {
@@ -432,7 +433,7 @@ declare function upsertTeamMemberServer(input: UpsertTeamMemberInput, context: T
     party_id: string;
     created: boolean;
 }>;
-declare function listDepartmentsAndPositionsServer(input: TenantInput, context: TeamContext, deps: OrgStructureDeps): Promise<{
+declare function listDepartmentsAndPositionsServer(input: TenantInput$1, context: TeamContext, deps: OrgStructureDeps): Promise<{
     departments: any;
     positions: any;
 }>;
@@ -471,7 +472,7 @@ type OrgChartDepartment = {
     positions: OrgChartPosition[];
     children: OrgChartDepartment[];
 };
-declare function getOrgChartTreeServer(input: TenantInput, context: TeamContext, deps: OrgStructureDeps): Promise<{
+declare function getOrgChartTreeServer(input: TenantInput$1, context: TeamContext, deps: OrgStructureDeps): Promise<{
     roots: OrgChartDepartment[];
 }>;
 
@@ -764,24 +765,56 @@ declare function createMergeParties(deps: MergePartiesDeps): _tanstack_start_cli
     reassigned: Record<string, number>;
 }>>;
 
+/**
+ * Shared Billing module — plain business-logic functions, deliberately NOT
+ * wrapped in `createServerFn()` here.
+ *
+ * Same root cause and fix as team.server.ts/account.server.ts (see those
+ * files' doc comments for the full history): a `createServerFn()` call
+ * living inside this package's pre-compiled dist can lose
+ * context.supabase/context.userId at the handler, because it's this
+ * package's own build step processing the call rather than each consuming
+ * app's TanStack Start/router-plugin Vite build. Confirmed broken here too
+ * via a real report on JoaHR's Billing & Plan page ("Cannot read
+ * properties of undefined (reading 'from')" — context.supabase arriving
+ * empty at the handler despite `.middleware([deps.requireSupabaseAuth])`
+ * being correctly wired in source).
+ *
+ * So the split is the same as team.server.ts/account.server.ts: this file
+ * owns the actual Supabase queries and authorization logic (the part
+ * that's genuinely identical across apps and worth sharing); each
+ * consuming app's own `billing.functions.ts` supplies a thin
+ * `createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
+ * .inputValidator(...).handler(({data, context}) => xServer(data, context
+ * as never, deps))` wrapper living in its own source, so the
+ * createServerFn() boundary is always app-local.
+ *
+ * `BillingDeps` only carries `supabaseAdmin` now (used for the public plan
+ * catalog read, which has no auth context, and for best-effort audit-log
+ * writes) — `requireSupabaseAuth` moved out since it now lives only in
+ * each app's local wrapper's `.middleware([...])` call.
+ */
+
 declare const PLAN_CODES: readonly ["free", "basic", "pro", "business"];
 declare const INTERVALS: readonly ["month", "year"];
 type PlanCode = (typeof PLAN_CODES)[number];
 type BillingInterval = (typeof INTERVALS)[number];
+type BillingContext = {
+    supabase: any;
+    userId: string;
+};
 type BillingDeps = {
-    requireSupabaseAuth: any;
     supabaseAdmin: any;
 };
-declare function createCanManageBillingFn(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+type TenantInput = {
     tenant_id: string;
-}, Promise<{
+};
+declare function canManageBillingFnServer(input: TenantInput, context: BillingContext): Promise<{
     can_manage: boolean;
     can_view: boolean;
     roles: string[];
-}>>;
-declare function createGetBillingOverview(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-}, Promise<{
+}>;
+declare function getBillingOverviewServer(input: TenantInput, context: BillingContext): Promise<{
     tenant: any;
     customer: any;
     subscriptions: any;
@@ -790,144 +823,139 @@ declare function createGetBillingOverview(deps: BillingDeps): _tanstack_start_cl
     roles: string[];
     can_manage: boolean;
     can_view: boolean;
-}>>;
-declare function createUpdateBillingCustomer(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+}>;
+type UpdateBillingCustomerInput = {
     tenant_id: string;
-    billing_email?: string | null | undefined;
-    company_legal_name?: string | null | undefined;
-    tax_id?: string | null | undefined;
-    address_line1?: string | null | undefined;
-    address_line2?: string | null | undefined;
-    city?: string | null | undefined;
-    state?: string | null | undefined;
-    postal_code?: string | null | undefined;
-    country?: string | null | undefined;
-    default_currency?: string | undefined;
-    billing_phone?: string | null | undefined;
-    billing_contact_name?: string | null | undefined;
-    billing_contact_email?: string | null | undefined;
-    invoice_memo?: string | null | undefined;
-}, Promise<any>>;
-declare function createListBillingPlans(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<undefined, (i: unknown) => {
-    app_code?: "joabooks" | "joaapproval" | "joacrm" | "joaoffice" | "joasop" | "joahr" | undefined;
-    interval?: "month" | "year" | undefined;
-}, Promise<any>>;
-declare function createChangeSubscriptionPlan(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+    billing_email?: string | null;
+    company_legal_name?: string | null;
+    tax_id?: string | null;
+    address_line1?: string | null;
+    address_line2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    postal_code?: string | null;
+    country?: string | null;
+    default_currency?: string;
+    billing_phone?: string | null;
+    billing_contact_name?: string | null;
+    billing_contact_email?: string | null;
+    invoice_memo?: string | null;
+};
+declare function updateBillingCustomerServer(input: UpdateBillingCustomerInput, context: BillingContext, deps: BillingDeps): Promise<any>;
+type ListBillingPlansInput = {
+    app_code?: AppCode;
+    interval?: BillingInterval;
+};
+declare function listBillingPlansServer(input: ListBillingPlansInput, deps: BillingDeps): Promise<any>;
+type ChangeSubscriptionPlanInput = {
     tenant_id: string;
-    app_code: "joabooks" | "joaapproval" | "joacrm" | "joaoffice" | "joasop" | "joahr";
-    plan_code: "basic" | "business" | "free" | "pro";
-    interval: "month" | "year";
+    app_code: AppCode;
+    plan_code: PlanCode;
+    interval: BillingInterval;
     seats: number;
-}, Promise<{
-    ok: true;
-    mock: true;
+};
+declare function changeSubscriptionPlanServer(input: ChangeSubscriptionPlanInput, context: BillingContext, deps: BillingDeps): Promise<{
+    ok: boolean;
+    mock: boolean;
     subscription: any;
-}>>;
-declare function createCancelSubscription(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+}>;
+type CancelSubscriptionInput = {
     tenant_id: string;
-    app_code: "joabooks" | "joaapproval" | "joacrm" | "joaoffice" | "joasop" | "joahr";
+    app_code: AppCode;
     at_period_end: boolean;
-}, Promise<{
-    ok: true;
-    mock: true;
+};
+declare function cancelSubscriptionServer(input: CancelSubscriptionInput, context: BillingContext, deps: BillingDeps): Promise<{
+    ok: boolean;
+    mock: boolean;
     subscription: any;
-}>>;
-declare function createListBillingInvoices(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+}>;
+type ListBillingInvoicesInput = {
     tenant_id: string;
     limit: number;
-}, Promise<any>>;
-declare function createGetBillingInvoice(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+};
+declare function listBillingInvoicesServer(input: ListBillingInvoicesInput, context: BillingContext): Promise<any>;
+type GetBillingInvoiceInput = {
     tenant_id: string;
     id: string;
-}, Promise<any>>;
-declare function createRetryInvoicePayment(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-    id: string;
-}, Promise<{
-    ok: false;
-    mock: true;
-    message: "Stripe integration coming later";
-}>>;
-declare function createSeedSampleBillingInvoices(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-}, Promise<{
-    ok: true;
-    inserted: 0;
-    skipped: true;
+};
+declare function getBillingInvoiceServer(input: GetBillingInvoiceInput, context: BillingContext): Promise<any>;
+declare function retryInvoicePaymentServer(input: GetBillingInvoiceInput, context: BillingContext, deps: BillingDeps): Promise<{
+    ok: boolean;
+    mock: boolean;
+    message: string;
+}>;
+declare function seedSampleBillingInvoicesServer(input: TenantInput, context: BillingContext, deps: BillingDeps): Promise<{
+    ok: boolean;
+    inserted: number;
+    skipped: boolean;
 } | {
-    ok: true;
+    ok: boolean;
     inserted: number;
     skipped?: undefined;
-}>>;
-declare function createListBillingPaymentMethods(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-}, Promise<any>>;
-declare function createAddMockPaymentMethod(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+}>;
+declare function listBillingPaymentMethodsServer(input: TenantInput, context: BillingContext): Promise<any>;
+type AddMockPaymentMethodInput = {
     tenant_id: string;
     brand: string;
     last4: string;
     exp_month: number;
     exp_year: number;
     make_default: boolean;
-}, Promise<any>>;
-declare function createSetDefaultPaymentMethod(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+};
+declare function addMockPaymentMethodServer(input: AddMockPaymentMethodInput, context: BillingContext, deps: BillingDeps): Promise<any>;
+type PaymentMethodIdInput = {
     tenant_id: string;
     id: string;
-}, Promise<{
-    ok: true;
-}>>;
-declare function createRemovePaymentMethod(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+};
+declare function setDefaultPaymentMethodServer(input: PaymentMethodIdInput, context: BillingContext, deps: BillingDeps): Promise<{
+    ok: boolean;
+}>;
+declare function removePaymentMethodServer(input: PaymentMethodIdInput, context: BillingContext, deps: BillingDeps): Promise<{
+    ok: boolean;
+}>;
+type StartTrialInput = {
     tenant_id: string;
-    id: string;
-}, Promise<{
-    ok: true;
-}>>;
-declare function createStartTrial(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-    app_code: "joabooks" | "joaapproval" | "joacrm" | "joaoffice" | "joasop" | "joahr";
-    plan_code: "basic" | "business" | "free" | "pro";
-    interval: "month" | "year";
+    app_code: AppCode;
+    plan_code: PlanCode;
+    interval: BillingInterval;
     trial_days: number;
-}, Promise<{
-    ok: true;
-    mock: true;
+};
+declare function startTrialServer(input: StartTrialInput, context: BillingContext, deps: BillingDeps): Promise<{
+    ok: boolean;
+    mock: boolean;
     subscription: any;
-}>>;
-declare function createReactivateSubscription(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+}>;
+type AppSubscriptionInput = {
     tenant_id: string;
-    app_code: "joabooks" | "joaapproval" | "joacrm" | "joaoffice" | "joasop" | "joahr";
-}, Promise<{
-    ok: true;
-    mock: true;
+    app_code: AppCode;
+};
+declare function reactivateSubscriptionServer(input: AppSubscriptionInput, context: BillingContext, deps: BillingDeps): Promise<{
+    ok: boolean;
+    mock: boolean;
     subscription: any;
-}>>;
-declare function createAddAppSubscription(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+}>;
+type AddAppSubscriptionInput = {
     tenant_id: string;
-    app_code: "joabooks" | "joaapproval" | "joacrm" | "joaoffice" | "joasop" | "joahr";
-    plan_code: "basic" | "business" | "free" | "pro";
-    interval: "month" | "year";
-}, Promise<{
-    ok: true;
-    mock: true;
+    app_code: AppCode;
+    plan_code: PlanCode;
+    interval: BillingInterval;
+};
+declare function addAppSubscriptionServer(input: AddAppSubscriptionInput, context: BillingContext, deps: BillingDeps): Promise<{
+    ok: boolean;
+    mock: boolean;
     subscription: any;
-}>>;
-declare function createRemoveAppSubscription(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-    app_code: "joabooks" | "joaapproval" | "joacrm" | "joaoffice" | "joasop" | "joahr";
-}, Promise<{
-    ok: true;
-    mock: true;
-}>>;
-declare function createListAvailablePromotions(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-}, Promise<any>>;
-declare function createListTenantDiscounts(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-}, Promise<any>>;
-declare function createRedeemPromoCode(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+}>;
+declare function removeAppSubscriptionServer(input: AppSubscriptionInput, context: BillingContext, deps: BillingDeps): Promise<{
+    ok: boolean;
+    mock: boolean;
+}>;
+declare function listAvailablePromotionsServer(input: TenantInput, context: BillingContext): Promise<any>;
+declare function listTenantDiscountsServer(input: TenantInput, context: BillingContext): Promise<any>;
+type RedeemPromoCodeInput = {
     tenant_id: string;
     code: string;
-}, Promise<{
+};
+declare function redeemPromoCodeServer(input: RedeemPromoCodeInput, context: BillingContext, deps: BillingDeps): Promise<{
     ok: false;
     reason: "not_found";
     discount?: undefined;
@@ -947,35 +975,36 @@ declare function createRedeemPromoCode(deps: BillingDeps): _tanstack_start_clien
     ok: true;
     discount: any;
     reason?: undefined;
-}>>;
-declare function createRemoveTenantDiscount(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+}>;
+type RemoveTenantDiscountInput = {
     tenant_id: string;
     discount_id: string;
-}, Promise<{
-    ok: true;
-}>>;
-declare function createGetReferralProgram(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
-    tenant_id: string;
-}, Promise<{
+};
+declare function removeTenantDiscountServer(input: RemoveTenantDiscountInput, context: BillingContext, deps: BillingDeps): Promise<{
+    ok: boolean;
+}>;
+declare function getReferralProgramServer(input: TenantInput, context: BillingContext): Promise<{
     program: any;
     referrals: any;
-}>>;
-declare function createAddMockReferral(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+}>;
+type AddMockReferralInput = {
     tenant_id: string;
     referee_email: string;
+    referee_org_name?: string;
     status: "pending" | "signed_up" | "subscribed";
-    referee_org_name?: string | undefined;
-}, Promise<{
-    ok: true;
+};
+declare function addMockReferralServer(input: AddMockReferralInput, context: BillingContext, deps: BillingDeps): Promise<{
+    ok: boolean;
     referral: any;
-}>>;
-declare function createUpdateReferralStatus(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+}>;
+type UpdateReferralStatusInput = {
     tenant_id: string;
     referral_id: string;
-    status: "canceled" | "pending" | "signed_up" | "subscribed";
-}, Promise<{
-    ok: true;
-}>>;
+    status: "pending" | "signed_up" | "subscribed" | "canceled";
+};
+declare function updateReferralStatusServer(input: UpdateReferralStatusInput, context: BillingContext, deps: BillingDeps): Promise<{
+    ok: boolean;
+}>;
 type PlanLimits = {
     users: number | null;
     customers: number | null;
@@ -984,14 +1013,12 @@ type PlanLimits = {
     projects: number | null;
     attachments: number | null;
 };
-declare function createGetTenantUsage(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (data: {
+type GetTenantUsageInput = {
     tenant_id: string;
     app_code?: string;
-}) => {
-    tenant_id: string;
-    app_code?: string;
-}, Promise<{
-    app_code: any;
+};
+declare function getTenantUsageServer(input: GetTenantUsageInput, context: BillingContext): Promise<{
+    app_code: string;
     plan_code: any;
     plan_status: any;
     limits: PlanLimits;
@@ -1002,9 +1029,9 @@ declare function createGetTenantUsage(deps: BillingDeps): _tanstack_start_client
         attachments: any;
         storage_gb: number;
         active_apps: any;
-        projects: 0;
+        projects: number;
     };
-}>>;
-declare function createListActiveBundleRules(deps: BillingDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], undefined, Promise<any>>;
+}>;
+declare function listActiveBundleRulesServer(context: BillingContext): Promise<any>;
 
-export { ACCOUNT_APP_ROLES, type AccountAppRole, type AccountContext, type AccountDeps, type AccountPortal, type AccountUpdateUserProfileInput, type AccountUserIdInput, type AdminDeps, type AppAssignmentInput, type AppCatalogEntry, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, type BillingDeps, type BillingInterval, type PlanCode as BillingPlanCode, type CreateDepartmentInput, type CreatePositionInput, type DeleteDepartmentInput, type DeletePositionInput, type InviteUserToWorkspacesInput, type ListTeamMembersInput, MAX_DEPARTMENT_DEPTH, type MergePartiesDeps, type OrgChartDepartment, type OrgChartPerson, type OrgChartPosition, type OrgStructureDeps, type PartyRefTable, type SendEmailFn, type SetUserAppRolesInput, type SuiteHomeData, type TeamContext, type TeamMemberInput, type TenantAppRow, type TenantInput, type UpdateDepartmentInput, type UpdateMyDefaultTenantInput, type UpdateMyTimezoneInput, type UpdatePositionInput, type UpsertTeamMemberInput, accountResendInvitationServer, accountSendPasswordResetServer, accountUpdateUserProfileServer, createAddAppSubscription, createAddMockPaymentMethod, createAddMockReferral, createArchiveParty, createCanManageBillingFn, createCancelApp, createCancelSubscription, createChangeSubscriptionPlan, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDepartmentServer, createGetBillingInvoice, createGetBillingOverview, createGetParty, createGetReferralProgram, createGetSuiteHome, createGetTenantSettings, createGetTenantUsage, createGetTenantUser, createHasEverHadMembership, createInvitePartyContact, createInviteTenantUser, createListActiveBundleRules, createListAvailablePromotions, createListBillingInvoices, createListBillingPaymentMethods, createListBillingPlans, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantDiscounts, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createPositionServer, createReactivateSubscription, createRedeemPromoCode, createRemoveAppSubscription, createRemovePaymentMethod, createRemoveTenantDiscount, createRemoveTenantUser, createResendInvitation, createRetryInvoicePayment, createRevokePartyContact, createSeedSampleBillingInvoices, createSendPasswordResetLink, createSetAppUrl, createSetDefaultPaymentMethod, createSetTenantUserStatus, createStartTrial, createSubscribeApp, createUnarchiveParty, createUpdateBillingCustomer, createUpdateReferralStatus, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, deleteDepartmentServer, deletePositionServer, getMyProfileServer, getOrgChartTreeServer, getTeamMemberServer, inviteUserToWorkspacesServer, listDepartmentsAndPositionsServer, listManageableTenantsServer, listManageableUsersServer, listTeamMembersServer, resolveScopedTenantIds, setUserAppRolesServer, updateDepartmentServer, updateMyDefaultTenantServer, updateMyTimezoneServer, updatePositionServer, upsertTeamMemberServer };
+export { ACCOUNT_APP_ROLES, type AccountAppRole, type AccountContext, type AccountDeps, type AccountPortal, type AccountUpdateUserProfileInput, type AccountUserIdInput, type AddAppSubscriptionInput, type AddMockPaymentMethodInput, type AddMockReferralInput, type AdminDeps, type AppAssignmentInput, type AppCatalogEntry, AppCode, type AppSubscriptionInput, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, AppCode as BillingAppCode, type BillingContext, type BillingDeps, type BillingInterval, type PlanCode as BillingPlanCode, type TenantInput as BillingTenantInput, type CancelSubscriptionInput, type ChangeSubscriptionPlanInput, type CreateDepartmentInput, type CreatePositionInput, type DeleteDepartmentInput, type DeletePositionInput, type GetBillingInvoiceInput, type GetTenantUsageInput, type InviteUserToWorkspacesInput, type ListBillingInvoicesInput, type ListBillingPlansInput, type ListTeamMembersInput, MAX_DEPARTMENT_DEPTH, type MergePartiesDeps, type OrgChartDepartment, type OrgChartPerson, type OrgChartPosition, type OrgStructureDeps, type PartyRefTable, type PaymentMethodIdInput, type RedeemPromoCodeInput, type RemoveTenantDiscountInput, type SendEmailFn, type SetUserAppRolesInput, type StartTrialInput, type SuiteHomeData, type TeamContext, type TeamMemberInput, type TenantAppRow, type TenantInput$1 as TenantInput, type UpdateBillingCustomerInput, type UpdateDepartmentInput, type UpdateMyDefaultTenantInput, type UpdateMyTimezoneInput, type UpdatePositionInput, type UpdateReferralStatusInput, type UpsertTeamMemberInput, accountResendInvitationServer, accountSendPasswordResetServer, accountUpdateUserProfileServer, addAppSubscriptionServer, addMockPaymentMethodServer, addMockReferralServer, canManageBillingFnServer, cancelSubscriptionServer, changeSubscriptionPlanServer, createArchiveParty, createCancelApp, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDepartmentServer, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createHasEverHadMembership, createInvitePartyContact, createInviteTenantUser, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createPositionServer, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSubscribeApp, createUnarchiveParty, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, deleteDepartmentServer, deletePositionServer, getBillingInvoiceServer, getBillingOverviewServer, getMyProfileServer, getOrgChartTreeServer, getReferralProgramServer, getTeamMemberServer, getTenantUsageServer, inviteUserToWorkspacesServer, listActiveBundleRulesServer, listAvailablePromotionsServer, listBillingInvoicesServer, listBillingPaymentMethodsServer, listBillingPlansServer, listDepartmentsAndPositionsServer, listManageableTenantsServer, listManageableUsersServer, listTeamMembersServer, listTenantDiscountsServer, reactivateSubscriptionServer, redeemPromoCodeServer, removeAppSubscriptionServer, removePaymentMethodServer, removeTenantDiscountServer, resolveScopedTenantIds, retryInvoicePaymentServer, seedSampleBillingInvoicesServer, setDefaultPaymentMethodServer, setUserAppRolesServer, startTrialServer, updateBillingCustomerServer, updateDepartmentServer, updateMyDefaultTenantServer, updateMyTimezoneServer, updatePositionServer, updateReferralStatusServer, upsertTeamMemberServer };
