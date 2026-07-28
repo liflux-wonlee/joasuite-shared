@@ -601,8 +601,8 @@ async function setUserAppRolesServer(input, context, deps) {
   await assertCallerManagesTenant(supabaseAdmin, input.tenant_id, callerId);
   if (input.roles.includes("owner")) {
     const isOwner = await callerIsOwner(supabaseAdmin, input.tenant_id, callerId);
-    if (!isOwner && input.user_id !== callerId) {
-      throw new Error("Only an Owner can grant the Owner role to another user.");
+    if (!isOwner) {
+      throw new Error("Only an Owner can grant the Owner role.");
     }
   }
   if (input.roles.length > 0) {
@@ -1135,6 +1135,19 @@ async function assertOwnerOrAdmin2(supabaseAdmin, appCode, tenantId, userId) {
   });
   if (!ok) throw new Error("Forbidden: admin role required");
 }
+async function assertCanAssignRoles(supabaseAdmin, tenantId, callerId, roles) {
+  const { data, error } = await supabaseAdmin.from("user_roles").select("role").eq("tenant_id", tenantId).eq("user_id", callerId);
+  if (error) throw new Error(error.message);
+  const callerRoles = (data ?? []).map((r) => r.role);
+  const isOwner = callerRoles.includes("owner");
+  const isSuperAdmin = callerRoles.includes("super_admin");
+  if (!isOwner && !isSuperAdmin) {
+    throw new Error("Forbidden: owner or super_admin required to assign roles");
+  }
+  if (roles.includes("owner") && !isOwner) {
+    throw new Error("Only an Owner can grant the Owner role.");
+  }
+}
 async function assertCanEditVendor(supabaseAdmin, appCode, tenantId, userId) {
   const { data, error } = await supabaseAdmin.from("user_roles").select("role, app_code").eq("tenant_id", tenantId).eq("user_id", userId);
   if (error) throw new Error(error.message);
@@ -1425,7 +1438,7 @@ function createUpdateTenantUserRoles(deps) {
       app_code: z.string().min(1).max(64).optional()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertOwnerOrAdmin2(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
+    await assertCanAssignRoles(deps.supabaseAdmin, data.tenant_id, context.userId, data.roles);
     const appCode = data.app_code ?? deps.appCode;
     const { error: delErr } = await deps.supabaseAdmin.from("user_roles").delete().eq("tenant_id", data.tenant_id).eq("user_id", data.user_id).eq("app_code", appCode);
     if (delErr) throw new Error(delErr.message);

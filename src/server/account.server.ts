@@ -547,8 +547,8 @@ export async function setUserAppRolesServer(input: SetUserAppRolesInput, context
   await assertCallerManagesTenant(supabaseAdmin, input.tenant_id, callerId);
   if (input.roles.includes("owner")) {
     const isOwner = await callerIsOwner(supabaseAdmin, input.tenant_id, callerId);
-    if (!isOwner && input.user_id !== callerId) {
-      throw new Error("Only an Owner can grant the Owner role to another user.");
+    if (!isOwner) {
+      throw new Error("Only an Owner can grant the Owner role.");
     }
   }
   if (input.roles.length > 0) {
