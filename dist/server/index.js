@@ -348,6 +348,15 @@ async function assertCallerCanManageUser(supabaseAdmin, callerId, targetUserId) 
   if (shared.length === 0) throw new Error("Forbidden: target user is not in any of your workspaces");
   return shared;
 }
+async function assertCallerCanChangeUserEmail(supabaseAdmin, callerId, targetUserId) {
+  const managedTenantIds = new Set(await getCallerManageableTenantIds(supabaseAdmin, callerId));
+  const { data, error } = await supabaseAdmin.from("tenant_users").select("tenant_id").eq("user_id", targetUserId);
+  if (error) throw new Error(error.message);
+  const targetTenantIds = (data ?? []).map((r) => r.tenant_id);
+  if (targetTenantIds.length === 0 || !targetTenantIds.every((id) => managedTenantIds.has(id))) {
+    throw new Error("Forbidden: cannot change this user's login email \u2014 they belong to a workspace you do not manage");
+  }
+}
 async function getTargetEmail(supabaseAdmin, targetUserId) {
   const { data, error } = await supabaseAdmin.from("tenant_users").select("email, display_name").eq("user_id", targetUserId).limit(1).maybeSingle();
   if (error) throw new Error(error.message);
@@ -662,6 +671,9 @@ async function accountSendPasswordResetServer(input, context, deps) {
 async function accountUpdateUserProfileServer(input, context, deps) {
   const supabaseAdmin = deps.supabaseAdmin;
   const sharedTenantIds = await assertCallerCanManageUser(supabaseAdmin, context.userId, input.user_id);
+  if (input.email) {
+    await assertCallerCanChangeUserEmail(supabaseAdmin, context.userId, input.user_id);
+  }
   const patch = {
     display_name: input.display_name
   };
