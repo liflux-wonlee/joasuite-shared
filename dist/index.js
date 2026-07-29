@@ -35,7 +35,7 @@ var ROLES_BY_APP = {
     "approver"
   ],
   joasop: ["owner", "super_admin", "sop_admin", "sop_author", "sop_reviewer", "sop_operator"],
-  joaoffice: ["owner", "super_admin", "approver"],
+  joaoffice: ["owner", "super_admin", "admin", "hr_manager", "manager", "employee"],
   joaapproval: ["owner", "super_admin", "approver"],
   joacrm: ["owner", "super_admin", "approver"],
   joahr: ["owner", "super_admin", "approver", "hr_manager", "manager", "employee", "billing_admin"]
