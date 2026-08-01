@@ -99,6 +99,7 @@ export {
   getOrgChartTreeServer,
   MAX_DEPARTMENT_DEPTH,
   type TeamContext,
+  type TeamDeps,
   type OrgStructureDeps,
   type ListTeamMembersInput,
   type TeamMemberInput,

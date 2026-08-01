@@ -54,35 +54,21 @@ export type SuiteHomeData = {
   }>;
 };
 
-type Deps = { requireSupabaseAuth: any; supabaseAdmin?: any; appCode?: string };
+type Deps = { requireSupabaseAuth: any; appCode: string };
 
-// See suite.functions.ts's assertOwner comment: has_any_role has no
-// app_code parameter, so it's only safe for owner/super_admin (always
-// suite-wide). When deps.supabaseAdmin + deps.appCode are supplied, check
-// user_roles directly with app_code scoping to support app-scoped 'admin'
-// correctly; otherwise fall back to the original owner/super_admin-only RPC.
+// See suite.functions.ts's assertOwner comment: `has_any_role` has no
+// app_code parameter, so an owner/admin role scoped to a *different* app
+// would incorrectly pass here too. `appCode` is required and this always
+// goes through the scoped RPC now - a genuinely suite-wide owner/super_admin
+// row (app_code IS NULL) still passes.
 async function assertOwnerOrAdmin(deps: Deps, supabase: any, tenantId: string, userId: string) {
-  if (deps.supabaseAdmin && deps.appCode) {
-    const { data, error } = await deps.supabaseAdmin
-      .from("user_roles")
-      .select("role, app_code")
-      .eq("tenant_id", tenantId)
-      .eq("user_id", userId);
-    if (error) throw new Error(error.message);
-    const ok = (data ?? []).some((r: any) => {
-      const role = r.role as string;
-      const appCode = r.app_code as string | null;
-      if (appCode === null) return role === "owner" || role === "super_admin";
-      return appCode === deps.appCode && role === "admin";
-    });
-    if (!ok) throw new Error("Forbidden");
-    return;
-  }
-  const { data: ok } = await supabase.rpc("has_any_role", {
+  const { data: ok, error } = await supabase.rpc("has_any_role_scoped", {
     _tenant: tenantId,
     _user: userId,
-    _roles: ["owner", "super_admin"],
+    _roles: ["owner", "super_admin", "admin"],
+    _app_code: deps.appCode,
   });
+  if (error) throw new Error(error.message);
   if (!ok) throw new Error("Forbidden");
 }
 

@@ -25,17 +25,32 @@
  * as never, deps))` wrapper living in its own source, so the createServerFn
  * boundary is always app-local.
  *
- * Team member read/write gates are hardcoded (not dependency-injected) --
- * per the original design intent, these must NOT diverge per app. Departments/
- * positions/org-chart authorization DOES vary per app (e.g. JoaSOP gates on
- * its own sop_admin/sop_author/sop_reviewer roles plus an active JoaSOP
- * subscription; JoaHR uses its own assertJoahrRole), so those take an
- * `OrgStructureDeps` gate pair injected by the caller.
+ * Team member read/write gates used to be hardcoded here (unscoped
+ * `is_internal_staff`/a raw unscoped `user_roles` query), with a doc
+ * comment claiming this "must NOT diverge per app" was intentional. That
+ * claim didn't survive scrutiny: `admin`/`hr_manager` (the roles checked)
+ * are app-scoped by this package's own conventions (see `ROLES_BY_APP` in
+ * `src/constants.ts` and the `app_code`-stamping grant paths in
+ * `admin.functions.ts`/`account.server.ts`), so an unscoped check let a
+ * user with a matching role in ANY one app read/write EVERY app's Team
+ * directory once any consuming app called these functions. JoaBooks had
+ * already independently forked this exact logic to a scoped
+ * `is_joabooks_staff` check rather than use these shared functions -- now
+ * that gates are injected (like `OrgStructureDeps` below), every consumer
+ * can supply its own scoped check and there is no shared/local fork to
+ * keep in sync.
  */
 
 export type TeamContext = {
   supabase: any;
   userId: string;
+};
+
+export type TeamDeps = {
+  /** Read-gate: who may see the Team directory (names, contact info, employment status, etc). */
+  assertCanReadTeam: (supabase: any, tenantId: string, userId: string) => Promise<void>;
+  /** Write-gate: who may create/edit Team member records. */
+  assertCanWriteTeam: (supabase: any, tenantId: string, userId: string) => Promise<void>;
 };
 
 export type OrgStructureDeps = {
@@ -97,35 +112,6 @@ export type CreatePositionInput = {
 export type UpdatePositionInput = { tenant_id: string; id: string; name: string };
 export type DeletePositionInput = { tenant_id: string; id: string };
 
-/**
- * Read-gate for the Team directory: any internal staff member of the tenant.
- * Write-gate: owner / super_admin / admin / hr_manager. Identical across
- * every JoaSuite app that has this Team feature (joabooks/joaoffice/joasop) —
- * do not diverge these two checks per app; that's why they're hardcoded
- * rather than DI'd like the org-structure gates below.
- */
-async function assertCanReadTeam(supabase: any, tenantId: string, userId: string) {
-  const { data: ok, error } = await supabase.rpc("is_internal_staff", {
-    _tenant: tenantId,
-    _user: userId,
-  });
-  if (error) throw new Error(error.message);
-  if (!ok) throw new Error("Forbidden");
-}
-
-async function assertCanWriteTeam(supabase: any, tenantId: string, userId: string) {
-  const { data, error } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("tenant_id", tenantId)
-    .eq("user_id", userId);
-  if (error) throw new Error(error.message);
-  const roles = (data ?? []).map((r: any) => r.role as string);
-  if (!roles.some((r: string) => ["owner", "super_admin", "admin", "hr_manager"].includes(r))) {
-    throw new Error("Forbidden: owner, super_admin, admin, or hr_manager required");
-  }
-}
-
 async function loadDeptPosNames(supabase: any, tenantId: string, deptIds: string[], posIds: string[]) {
   const [{ data: depts, error: deptErr }, { data: positions, error: posErr }] = await Promise.all([
     deptIds.length
@@ -184,8 +170,8 @@ function collectDescendants(all: DeptRow[], id: string): DeptRow[] {
   return out;
 }
 
-export async function listTeamMembersServer(input: ListTeamMembersInput, context: TeamContext) {
-  await assertCanReadTeam(context.supabase, input.tenant_id, context.userId);
+export async function listTeamMembersServer(input: ListTeamMembersInput, context: TeamContext, deps: TeamDeps) {
+  await deps.assertCanReadTeam(context.supabase, input.tenant_id, context.userId);
 
   let query = context.supabase
     .from("parties")
@@ -257,8 +243,8 @@ export async function listTeamMembersServer(input: ListTeamMembersInput, context
   return { rows };
 }
 
-export async function getTeamMemberServer(input: TeamMemberInput, context: TeamContext) {
-  await assertCanReadTeam(context.supabase, input.tenant_id, context.userId);
+export async function getTeamMemberServer(input: TeamMemberInput, context: TeamContext, deps: TeamDeps) {
+  await deps.assertCanReadTeam(context.supabase, input.tenant_id, context.userId);
 
   const { data: party, error } = await context.supabase
     .from("parties")
@@ -309,8 +295,8 @@ export async function getTeamMemberServer(input: TeamMemberInput, context: TeamC
  * traced back to whichever app created/last wrote them. Purely informational
  * — omit it and the columns are simply left null.
  */
-export async function upsertTeamMemberServer(input: UpsertTeamMemberInput, context: TeamContext, appCode?: string) {
-  await assertCanWriteTeam(context.supabase, input.tenant_id, context.userId);
+export async function upsertTeamMemberServer(input: UpsertTeamMemberInput, context: TeamContext, deps: TeamDeps, appCode?: string) {
+  await deps.assertCanWriteTeam(context.supabase, input.tenant_id, context.userId);
 
   let partyId: string;
   let created = false;

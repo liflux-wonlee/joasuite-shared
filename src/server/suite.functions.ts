@@ -26,42 +26,31 @@ const SubInput = z.object({
   plan: z.string().min(1).max(64).default("basic"),
 });
 
-// `has_any_role` (unlike the 4-arg `has_role(..., _app_code)` overload) has
-// no app_code parameter at all - it matches a role by name regardless of
-// which app it was granted for. That's safe for owner/super_admin (always
-// suite-wide, app_code IS NULL by convention) but NOT safe for 'admin' - a
-// user holding 'admin' in a different suite app would incorrectly pass.
-// When deps.supabaseAdmin + deps.appCode are supplied, check user_roles
-// directly with proper app_code scoping instead (supports app-scoped
-// 'admin' correctly). Falls back to the RPC (owner/super_admin only, the
-// original behavior) when they aren't - keeps existing consumers working
-// unchanged until they opt in.
+// `has_any_role` (unlike the scoped `has_any_role_scoped(..., _app_code)`
+// RPC) has no app_code parameter at all - it matches a role by name
+// regardless of which app it was granted for. This used to be treated as
+// "safe for owner/super_admin, always suite-wide by convention" and fall
+// back to the unscoped RPC whenever a caller didn't supply appCode - but
+// that convention isn't actually enforced anywhere on the write side
+// (account.server.ts's invite/role-grant path stores whatever app_code the
+// caller selected, including for owner/super_admin), so an owner scoped to
+// one app could subscribe/cancel a DIFFERENT app's subscription for the
+// same tenant. `appCode` is now required and the check always goes through
+// `has_any_role_scoped`, which still passes for a genuinely suite-wide
+// owner/super_admin row (app_code IS NULL) - only a same-name role scoped
+// to a different app now correctly fails.
 async function assertOwner(deps: Deps, supabase: any, tenantId: string, userId: string) {
-  if (deps.supabaseAdmin && deps.appCode) {
-    const { data, error } = await deps.supabaseAdmin
-      .from("user_roles")
-      .select("role, app_code")
-      .eq("tenant_id", tenantId)
-      .eq("user_id", userId);
-    if (error) throw new Error(error.message);
-    const ok = (data ?? []).some((r: any) => {
-      const role = r.role as string;
-      const appCode = r.app_code as string | null;
-      if (appCode === null) return role === "owner" || role === "super_admin";
-      return appCode === deps.appCode && role === "admin";
-    });
-    if (!ok) throw new Error("Forbidden");
-    return;
-  }
-  const { data: ok } = await supabase.rpc("has_any_role", {
+  const { data: ok, error } = await supabase.rpc("has_any_role_scoped", {
     _tenant: tenantId,
     _user: userId,
     _roles: ["owner", "super_admin"],
+    _app_code: deps.appCode,
   });
+  if (error) throw new Error(error.message);
   if (!ok) throw new Error("Forbidden");
 }
 
-type Deps = { requireSupabaseAuth: any; supabaseAdmin?: any; appCode?: string };
+type Deps = { requireSupabaseAuth: any; appCode: string };
 
 export function createListSuiteApps(deps: Deps) {
   return createServerFn({ method: "POST" })
@@ -148,10 +137,8 @@ export function createCancelApp(deps: Deps) {
     )
     .handler(async ({ data, context }) => {
       await assertOwner(deps, context.supabase, data.tenantId, context.userId);
-      // An app can't cancel its own subscription from within itself -
-      // defaults to "joabooks" (the original hardcoded behavior) when the
-      // calling app doesn't identify itself via deps.appCode.
-      if (data.appCode === (deps.appCode ?? "joabooks")) {
+      // An app can't cancel its own subscription from within itself.
+      if (data.appCode === deps.appCode) {
         throw new Error("This app cannot be canceled here");
       }
       const { error } = await context.supabase

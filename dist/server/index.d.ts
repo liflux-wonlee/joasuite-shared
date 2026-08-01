@@ -23,8 +23,7 @@ type TenantAppRow = {
 };
 type Deps$2 = {
     requireSupabaseAuth: any;
-    supabaseAdmin?: any;
-    appCode?: string;
+    appCode: string;
 };
 declare function createListSuiteApps(deps: Deps$2): _tanstack_start_client_core.OptionalFetcher<readonly [any], (d: unknown) => {
     tenantId: string;
@@ -91,8 +90,7 @@ type SuiteHomeData = {
 };
 type Deps$1 = {
     requireSupabaseAuth: any;
-    supabaseAdmin?: any;
-    appCode?: string;
+    appCode: string;
 };
 declare function createGetSuiteHome(deps: Deps$1): _tanstack_start_client_core.OptionalFetcher<readonly [any], (d: unknown) => {
     tenantId: string;
@@ -331,16 +329,30 @@ declare function updateMyDefaultTenantServer(input: UpdateMyDefaultTenantInput, 
  * as never, deps))` wrapper living in its own source, so the createServerFn
  * boundary is always app-local.
  *
- * Team member read/write gates are hardcoded (not dependency-injected) --
- * per the original design intent, these must NOT diverge per app. Departments/
- * positions/org-chart authorization DOES vary per app (e.g. JoaSOP gates on
- * its own sop_admin/sop_author/sop_reviewer roles plus an active JoaSOP
- * subscription; JoaHR uses its own assertJoahrRole), so those take an
- * `OrgStructureDeps` gate pair injected by the caller.
+ * Team member read/write gates used to be hardcoded here (unscoped
+ * `is_internal_staff`/a raw unscoped `user_roles` query), with a doc
+ * comment claiming this "must NOT diverge per app" was intentional. That
+ * claim didn't survive scrutiny: `admin`/`hr_manager` (the roles checked)
+ * are app-scoped by this package's own conventions (see `ROLES_BY_APP` in
+ * `src/constants.ts` and the `app_code`-stamping grant paths in
+ * `admin.functions.ts`/`account.server.ts`), so an unscoped check let a
+ * user with a matching role in ANY one app read/write EVERY app's Team
+ * directory once any consuming app called these functions. JoaBooks had
+ * already independently forked this exact logic to a scoped
+ * `is_joabooks_staff` check rather than use these shared functions -- now
+ * that gates are injected (like `OrgStructureDeps` below), every consumer
+ * can supply its own scoped check and there is no shared/local fork to
+ * keep in sync.
  */
 type TeamContext = {
     supabase: any;
     userId: string;
+};
+type TeamDeps = {
+    /** Read-gate: who may see the Team directory (names, contact info, employment status, etc). */
+    assertCanReadTeam: (supabase: any, tenantId: string, userId: string) => Promise<void>;
+    /** Write-gate: who may create/edit Team member records. */
+    assertCanWriteTeam: (supabase: any, tenantId: string, userId: string) => Promise<void>;
 };
 type OrgStructureDeps = {
     /** Read-gate: any tenant member who may see the org structure. */
@@ -403,10 +415,10 @@ type DeletePositionInput = {
     tenant_id: string;
     id: string;
 };
-declare function listTeamMembersServer(input: ListTeamMembersInput, context: TeamContext): Promise<{
+declare function listTeamMembersServer(input: ListTeamMembersInput, context: TeamContext, deps: TeamDeps): Promise<{
     rows: any;
 }>;
-declare function getTeamMemberServer(input: TeamMemberInput, context: TeamContext): Promise<{
+declare function getTeamMemberServer(input: TeamMemberInput, context: TeamContext, deps: TeamDeps): Promise<{
     party_id: any;
     linked_user_id: any;
     name_en: any;
@@ -429,7 +441,7 @@ declare function getTeamMemberServer(input: TeamMemberInput, context: TeamContex
  * traced back to whichever app created/last wrote them. Purely informational
  * — omit it and the columns are simply left null.
  */
-declare function upsertTeamMemberServer(input: UpsertTeamMemberInput, context: TeamContext, appCode?: string): Promise<{
+declare function upsertTeamMemberServer(input: UpsertTeamMemberInput, context: TeamContext, deps: TeamDeps, appCode?: string): Promise<{
     party_id: string;
     created: boolean;
 }>;
@@ -805,16 +817,17 @@ type BillingContext = {
 };
 type BillingDeps = {
     supabaseAdmin: any;
+    appCode: string;
 };
 type TenantInput = {
     tenant_id: string;
 };
-declare function canManageBillingFnServer(input: TenantInput, context: BillingContext): Promise<{
+declare function canManageBillingFnServer(input: TenantInput, context: BillingContext, deps: BillingDeps): Promise<{
     can_manage: boolean;
     can_view: boolean;
     roles: string[];
 }>;
-declare function getBillingOverviewServer(input: TenantInput, context: BillingContext): Promise<{
+declare function getBillingOverviewServer(input: TenantInput, context: BillingContext, deps: BillingDeps): Promise<{
     tenant: any;
     customer: any;
     subscriptions: any;
@@ -873,12 +886,12 @@ type ListBillingInvoicesInput = {
     tenant_id: string;
     limit: number;
 };
-declare function listBillingInvoicesServer(input: ListBillingInvoicesInput, context: BillingContext): Promise<any>;
+declare function listBillingInvoicesServer(input: ListBillingInvoicesInput, context: BillingContext, deps: BillingDeps): Promise<any>;
 type GetBillingInvoiceInput = {
     tenant_id: string;
     id: string;
 };
-declare function getBillingInvoiceServer(input: GetBillingInvoiceInput, context: BillingContext): Promise<any>;
+declare function getBillingInvoiceServer(input: GetBillingInvoiceInput, context: BillingContext, deps: BillingDeps): Promise<any>;
 declare function retryInvoicePaymentServer(input: GetBillingInvoiceInput, context: BillingContext, deps: BillingDeps): Promise<{
     ok: boolean;
     mock: boolean;
@@ -893,7 +906,7 @@ declare function seedSampleBillingInvoicesServer(input: TenantInput, context: Bi
     inserted: number;
     skipped?: undefined;
 }>;
-declare function listBillingPaymentMethodsServer(input: TenantInput, context: BillingContext): Promise<any>;
+declare function listBillingPaymentMethodsServer(input: TenantInput, context: BillingContext, deps: BillingDeps): Promise<any>;
 type AddMockPaymentMethodInput = {
     tenant_id: string;
     brand: string;
@@ -949,8 +962,8 @@ declare function removeAppSubscriptionServer(input: AppSubscriptionInput, contex
     ok: boolean;
     mock: boolean;
 }>;
-declare function listAvailablePromotionsServer(input: TenantInput, context: BillingContext): Promise<any>;
-declare function listTenantDiscountsServer(input: TenantInput, context: BillingContext): Promise<any>;
+declare function listAvailablePromotionsServer(input: TenantInput, context: BillingContext, deps: BillingDeps): Promise<any>;
+declare function listTenantDiscountsServer(input: TenantInput, context: BillingContext, deps: BillingDeps): Promise<any>;
 type RedeemPromoCodeInput = {
     tenant_id: string;
     code: string;
@@ -983,7 +996,7 @@ type RemoveTenantDiscountInput = {
 declare function removeTenantDiscountServer(input: RemoveTenantDiscountInput, context: BillingContext, deps: BillingDeps): Promise<{
     ok: boolean;
 }>;
-declare function getReferralProgramServer(input: TenantInput, context: BillingContext): Promise<{
+declare function getReferralProgramServer(input: TenantInput, context: BillingContext, deps: BillingDeps): Promise<{
     program: any;
     referrals: any;
 }>;
@@ -1017,7 +1030,7 @@ type GetTenantUsageInput = {
     tenant_id: string;
     app_code?: string;
 };
-declare function getTenantUsageServer(input: GetTenantUsageInput, context: BillingContext): Promise<{
+declare function getTenantUsageServer(input: GetTenantUsageInput, context: BillingContext, deps: BillingDeps): Promise<{
     app_code: string;
     plan_code: any;
     plan_status: any;
@@ -1034,4 +1047,4 @@ declare function getTenantUsageServer(input: GetTenantUsageInput, context: Billi
 }>;
 declare function listActiveBundleRulesServer(context: BillingContext): Promise<any>;
 
-export { ACCOUNT_APP_ROLES, type AccountAppRole, type AccountContext, type AccountDeps, type AccountPortal, type AccountUpdateUserProfileInput, type AccountUserIdInput, type AddAppSubscriptionInput, type AddMockPaymentMethodInput, type AddMockReferralInput, type AdminDeps, type AppAssignmentInput, type AppCatalogEntry, AppCode, type AppSubscriptionInput, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, AppCode as BillingAppCode, type BillingContext, type BillingDeps, type BillingInterval, type PlanCode as BillingPlanCode, type TenantInput as BillingTenantInput, type CancelSubscriptionInput, type ChangeSubscriptionPlanInput, type CreateDepartmentInput, type CreatePositionInput, type DeleteDepartmentInput, type DeletePositionInput, type GetBillingInvoiceInput, type GetTenantUsageInput, type InviteUserToWorkspacesInput, type ListBillingInvoicesInput, type ListBillingPlansInput, type ListTeamMembersInput, MAX_DEPARTMENT_DEPTH, type MergePartiesDeps, type OrgChartDepartment, type OrgChartPerson, type OrgChartPosition, type OrgStructureDeps, type PartyRefTable, type PaymentMethodIdInput, type RedeemPromoCodeInput, type RemoveTenantDiscountInput, type SendEmailFn, type SetUserAppRolesInput, type StartTrialInput, type SuiteHomeData, type TeamContext, type TeamMemberInput, type TenantAppRow, type TenantInput$1 as TenantInput, type UpdateBillingCustomerInput, type UpdateDepartmentInput, type UpdateMyDefaultTenantInput, type UpdateMyTimezoneInput, type UpdatePositionInput, type UpdateReferralStatusInput, type UpsertTeamMemberInput, accountResendInvitationServer, accountSendPasswordResetServer, accountUpdateUserProfileServer, addAppSubscriptionServer, addMockPaymentMethodServer, addMockReferralServer, canManageBillingFnServer, cancelSubscriptionServer, changeSubscriptionPlanServer, createArchiveParty, createCancelApp, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDepartmentServer, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createHasEverHadMembership, createInvitePartyContact, createInviteTenantUser, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createPositionServer, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSubscribeApp, createUnarchiveParty, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, deleteDepartmentServer, deletePositionServer, getBillingInvoiceServer, getBillingOverviewServer, getMyProfileServer, getOrgChartTreeServer, getReferralProgramServer, getTeamMemberServer, getTenantUsageServer, inviteUserToWorkspacesServer, listActiveBundleRulesServer, listAvailablePromotionsServer, listBillingInvoicesServer, listBillingPaymentMethodsServer, listBillingPlansServer, listDepartmentsAndPositionsServer, listManageableTenantsServer, listManageableUsersServer, listTeamMembersServer, listTenantDiscountsServer, reactivateSubscriptionServer, redeemPromoCodeServer, removeAppSubscriptionServer, removePaymentMethodServer, removeTenantDiscountServer, resolveScopedTenantIds, retryInvoicePaymentServer, seedSampleBillingInvoicesServer, setDefaultPaymentMethodServer, setUserAppRolesServer, startTrialServer, updateBillingCustomerServer, updateDepartmentServer, updateMyDefaultTenantServer, updateMyTimezoneServer, updatePositionServer, updateReferralStatusServer, upsertTeamMemberServer };
+export { ACCOUNT_APP_ROLES, type AccountAppRole, type AccountContext, type AccountDeps, type AccountPortal, type AccountUpdateUserProfileInput, type AccountUserIdInput, type AddAppSubscriptionInput, type AddMockPaymentMethodInput, type AddMockReferralInput, type AdminDeps, type AppAssignmentInput, type AppCatalogEntry, AppCode, type AppSubscriptionInput, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, AppCode as BillingAppCode, type BillingContext, type BillingDeps, type BillingInterval, type PlanCode as BillingPlanCode, type TenantInput as BillingTenantInput, type CancelSubscriptionInput, type ChangeSubscriptionPlanInput, type CreateDepartmentInput, type CreatePositionInput, type DeleteDepartmentInput, type DeletePositionInput, type GetBillingInvoiceInput, type GetTenantUsageInput, type InviteUserToWorkspacesInput, type ListBillingInvoicesInput, type ListBillingPlansInput, type ListTeamMembersInput, MAX_DEPARTMENT_DEPTH, type MergePartiesDeps, type OrgChartDepartment, type OrgChartPerson, type OrgChartPosition, type OrgStructureDeps, type PartyRefTable, type PaymentMethodIdInput, type RedeemPromoCodeInput, type RemoveTenantDiscountInput, type SendEmailFn, type SetUserAppRolesInput, type StartTrialInput, type SuiteHomeData, type TeamContext, type TeamDeps, type TeamMemberInput, type TenantAppRow, type TenantInput$1 as TenantInput, type UpdateBillingCustomerInput, type UpdateDepartmentInput, type UpdateMyDefaultTenantInput, type UpdateMyTimezoneInput, type UpdatePositionInput, type UpdateReferralStatusInput, type UpsertTeamMemberInput, accountResendInvitationServer, accountSendPasswordResetServer, accountUpdateUserProfileServer, addAppSubscriptionServer, addMockPaymentMethodServer, addMockReferralServer, canManageBillingFnServer, cancelSubscriptionServer, changeSubscriptionPlanServer, createArchiveParty, createCancelApp, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDepartmentServer, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createHasEverHadMembership, createInvitePartyContact, createInviteTenantUser, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createPositionServer, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSubscribeApp, createUnarchiveParty, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, deleteDepartmentServer, deletePositionServer, getBillingInvoiceServer, getBillingOverviewServer, getMyProfileServer, getOrgChartTreeServer, getReferralProgramServer, getTeamMemberServer, getTenantUsageServer, inviteUserToWorkspacesServer, listActiveBundleRulesServer, listAvailablePromotionsServer, listBillingInvoicesServer, listBillingPaymentMethodsServer, listBillingPlansServer, listDepartmentsAndPositionsServer, listManageableTenantsServer, listManageableUsersServer, listTeamMembersServer, listTenantDiscountsServer, reactivateSubscriptionServer, redeemPromoCodeServer, removeAppSubscriptionServer, removePaymentMethodServer, removeTenantDiscountServer, resolveScopedTenantIds, retryInvoicePaymentServer, seedSampleBillingInvoicesServer, setDefaultPaymentMethodServer, setUserAppRolesServer, startTrialServer, updateBillingCustomerServer, updateDepartmentServer, updateMyDefaultTenantServer, updateMyTimezoneServer, updatePositionServer, updateReferralStatusServer, upsertTeamMemberServer };
