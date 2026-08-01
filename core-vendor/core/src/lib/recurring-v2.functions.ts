@@ -456,7 +456,28 @@ export const getRecurring = createServerFn({ method: "POST" })
     const { data: occs } = await context.supabase
       .from("recurring_occurrences")
       .select("*").eq("recurring_id", data.id).order("occurrence_date");
-    return { recurring: row, plan_lines: lines ?? [], occurrences: occs ?? [] };
+    // Attach the ledger transactions auto-created by markOccurrencePaid so the
+    // occurrence list can show a TXN-number badge without a second round trip.
+    const occList = occs ?? [];
+    let txnsByOcc = new Map<string, { id: string; txn_no: string }[]>();
+    if (occList.length > 0) {
+      const { data: txns } = await context.supabase
+        .from("transactions")
+        .select("id, txn_no, source_id")
+        .eq("tenant_id", row.tenant_id)
+        .eq("source_kind", "shared.recurring_occurrence")
+        .in("source_id", occList.map((o: any) => o.id));
+      for (const t of txns ?? []) {
+        const arr = txnsByOcc.get((t as any).source_id) ?? [];
+        arr.push({ id: (t as any).id, txn_no: (t as any).txn_no });
+        txnsByOcc.set((t as any).source_id, arr);
+      }
+    }
+    return {
+      recurring: row,
+      plan_lines: lines ?? [],
+      occurrences: occList.map((o: any) => ({ ...o, payment_txns: txnsByOcc.get(o.id) ?? [] })),
+    };
   });
 
 export const createRecurring = createServerFn({ method: "POST" })
@@ -807,8 +828,8 @@ export const linkOccurrenceToPaidPaymentRequest = createServerFn({ method: "POST
 // note/proof_attachment_id fields — instead of adding bespoke columns to
 // recurring_occurrences. It ALSO records a real `transactions` row
 // (source_kind="shared.recurring_occurrence") the same way
-// convertOccurrenceToDoc's "money_out" branch and markPaymentRequestPaid do,
-// so this payment shows up in Financial Activity like any other payment.
+// markPaymentRequestPaid does, so this payment shows up in Financial Activity
+// like any other payment.
 export const markOccurrencePaid = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) => z.object({
@@ -857,11 +878,10 @@ export const markOccurrencePaid = createServerFn({ method: "POST" })
     if (payErr) throw new Error(payErr.message);
 
     // Also record a real ledger transaction for this payment — same
-    // source_kind/source_id pattern as convertOccurrenceToDoc's "money_out"
-    // branch and markPaymentRequestPaid — so it shows up in Financial
-    // Activity like every other payment. Previously this function only wrote
-    // to `payments` + updated the occurrence's own status, which Activity
-    // never reads, so a "Mark as paid" here was invisible in Activity.
+    // source_kind/source_id pattern as markPaymentRequestPaid — so it shows up
+    // in Financial Activity like every other payment. Previously this function
+    // only wrote to `payments` + updated the occurrence's own status, which
+    // Activity never reads, so a "Mark as paid" here was invisible in Activity.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: isStaff, error: roleErr } = await supabaseAdmin.rpc("is_internal_staff_scoped", {
       _tenant: occ.tenant_id, _user: context.userId, _app_code: APP_CODE,
@@ -1010,7 +1030,14 @@ export const getCashFlowForecast = createServerFn({ method: "POST" })
     include_committed: z.boolean().default(true),
     include_forecast: z.boolean().default(true),
     include_actuals: z.boolean().default(true),
+    // Real documents (JoaBooks bills / invoices). Unpaid bills are money
+    // out, unpaid invoices are money in. A bill with no due date is treated
+    // as "ASAP" and lands on today's bucket.
+    include_bills: z.boolean().default(true),
+    include_pending_bills: z.boolean().default(false),
+    include_invoices: z.boolean().default(true),
     opening_balance: z.number().default(0),
+
   }).parse(i))
   .handler(async ({ data, context }) => {
     const userId = context.userId;
@@ -1030,12 +1057,111 @@ export const getCashFlowForecast = createServerFn({ method: "POST" })
     // Pull recurring occurrences in range
     const { data: occs, error } = await sb
       .from("recurring_occurrences")
-      .select("occurrence_date, direction, forecast_amount, actual_amount, stage, status, forecast_included, priority, recurring_id, recurring_transactions:recurring_id(name,type,party_id)")
+      .select("id, occurrence_date, direction, forecast_amount, actual_amount, stage, status, forecast_included, priority, recurring_id, recurring_transactions:recurring_id(name,type,party_id)")
       .in("tenant_id", tenant_ids)
       .gte("occurrence_date", data.from_date)
       .lte("occurrence_date", data.to_date)
       .eq("forecast_included", true);
     if (error) throw new Error(error.message);
+
+    // ---- Real documents: unpaid bills (money out) + unpaid invoices (money in) ----
+    const today = todayIso(); // shared with the overdue bucket below
+    const PENDING_BILL_STATUSES = ["submitted", "finance_review", "approval_pending", "pending_by_approver", "partially_approved", "fully_approved"] as const;
+
+    let billRows: any[] = [];
+    let invoiceRows: any[] = [];
+    if (data.include_bills) {
+      let q = sb
+        .from("bills")
+        .select("id, request_no, amount_usd, due_date, status, source_recurring_occurrence_id, parties:party_id(name_en)")
+        .in("tenant_id", tenant_ids)
+        .not("status", "in", "(paid,cancelled,void,rejected,draft)");
+      q = data.include_pending_bills ? q.in("status", PENDING_BILL_STATUSES) : q.eq("status", "fully_approved");
+      const { data: rows, error: e } = await q;
+      if (e) throw new Error(e.message);
+      billRows = rows ?? [];
+    }
+    if (data.include_invoices) {
+      // NOTE: invoices.party_id has no FK to parties, so PostgREST cannot
+      // embed `parties:party_id(...)` here — resolve names in a second query.
+      const { data: rows, error: e } = await sb
+        .from("invoices")
+        .select("id, invoice_no, amount_usd, due_date, status, party_id")
+        .in("tenant_id", tenant_ids)
+        .not("status", "in", "(paid,cancelled,void,draft)");
+      if (e) throw new Error(e.message);
+      invoiceRows = rows ?? [];
+      const partyIds = [...new Set(invoiceRows.map((r) => r.party_id).filter(Boolean))] as string[];
+      if (partyIds.length > 0) {
+        const { data: ps } = await sb.from("parties").select("id, name_en").in("id", partyIds);
+        const nameById = new Map((ps ?? []).map((p) => [p.id as string, p.name_en as string]));
+        for (const r of invoiceRows) {
+          r.parties = r.party_id ? { name_en: nameById.get(r.party_id) ?? null } : null;
+        }
+      }
+    }
+
+
+    // Paid-to-date per document, summed from `payments` (invoices'
+    // paid_amount_usd column is dead, and a bill can be partially paid) —
+    // reversals net to zero because the adjustment row carries the negated
+    // amount.
+    const paidByDoc = new Map<string, number>();
+    const docIds = [...billRows.map((b) => b.id), ...invoiceRows.map((i) => i.id)];
+    if (docIds.length > 0) {
+      const { data: pays } = await sb
+        .from("payments")
+        .select("doc_id, amount_usd")
+        .in("tenant_id", tenant_ids)
+        .in("doc_id", docIds);
+      for (const p of pays ?? []) {
+        paidByDoc.set(p.doc_id as string, (paidByDoc.get(p.doc_id as string) ?? 0) + (Number(p.amount_usd) || 0));
+      }
+    }
+
+    // A bill created from a planned occurrence would otherwise be counted
+    // twice — keep the bill (it's the harder commitment) and drop its
+    // originating occurrence.
+    const occurrenceIdsCoveredByBill = new Set(
+      billRows.map((b) => b.source_recurring_occurrence_id).filter(Boolean) as string[],
+    );
+
+    type DocItem = {
+      source: "bill" | "invoice";
+      doc_id: string; doc_no: string; doc_status: string;
+      name: string; date: string; asap: boolean;
+      direction: "money_in" | "money_out";
+      forecast_amount: number; actual_amount: null; stage: string;
+      priority: string; remaining: number; days_overdue: number;
+      recurring_id: null; recurring_transactions: null;
+    };
+    const docItems: DocItem[] = [];
+    const pushDoc = (r: any, source: "bill" | "invoice") => {
+      const remaining = Number(r.amount_usd ?? 0) - (paidByDoc.get(r.id) ?? 0);
+      if (remaining <= 0) return;
+      const asap = !r.due_date;
+      const date = (r.due_date as string | null) ?? today;
+      docItems.push({
+        source,
+        doc_id: r.id,
+        doc_no: (source === "bill" ? r.request_no : r.invoice_no) ?? "—",
+        doc_status: r.status,
+        name: r.parties?.name_en ?? ((source === "bill" ? r.request_no : r.invoice_no) ?? "—"),
+        date,
+        asap,
+        direction: source === "bill" ? "money_out" : "money_in",
+        forecast_amount: remaining,
+        actual_amount: null,
+        stage: source,
+        priority: "normal",
+        remaining,
+        days_overdue: Math.max(0, Math.round((new Date(today).getTime() - new Date(date).getTime()) / 86_400_000)),
+        recurring_id: null,
+        recurring_transactions: null,
+      });
+    };
+    for (const b of billRows) pushDoc(b, "bill");
+    for (const i of invoiceRows) pushDoc(i, "invoice");
 
     // Group by date
     const byDate: Record<string, {
@@ -1048,6 +1174,7 @@ export const getCashFlowForecast = createServerFn({ method: "POST" })
       if (o.stage === "forecast" && !data.include_forecast) continue;
       if (o.stage === "committed" && !data.include_committed) continue;
       if ((o.stage === "billed" || o.stage === "paid") && !data.include_actuals) continue;
+      if (occurrenceIdsCoveredByBill.has(o.id as string)) continue;
       const amt = Number(o.actual_amount ?? o.forecast_amount ?? 0);
       const d = o.occurrence_date;
       if (!byDate[d]) byDate[d] = { date: d, money_in: 0, money_out: 0, net: 0, running: 0, items: [] };
@@ -1055,6 +1182,18 @@ export const getCashFlowForecast = createServerFn({ method: "POST" })
       else byDate[d].money_out += amt;
       byDate[d].items.push(o);
     }
+
+    // Documents dated inside the requested window join the daily rows; the
+    // rest (already past due) fall into the overdue bucket below.
+    const docItemsInWindow = docItems.filter((it) => it.date >= data.from_date && it.date <= data.to_date && it.date >= today);
+    for (const it of docItemsInWindow) {
+      const d = it.date;
+      if (!byDate[d]) byDate[d] = { date: d, money_in: 0, money_out: 0, net: 0, running: 0, items: [] };
+      if (it.direction === "money_in") byDate[d].money_in += it.remaining;
+      else byDate[d].money_out += it.remaining;
+      byDate[d].items.push(it);
+    }
+
 
     // Sort and accumulate
     const rows = Object.values(byDate).sort((a, b) => a.date.localeCompare(b.date));
@@ -1074,6 +1213,7 @@ export const getCashFlowForecast = createServerFn({ method: "POST" })
     // Monthly aggregate: forecast (stage in forecast/committed) vs actual (billed/paid OR has actual_amount)
     const byMonth: Record<string, { month: string; forecast_in: number; forecast_out: number; actual_in: number; actual_out: number }> = {};
     for (const o of occs ?? []) {
+      if (occurrenceIdsCoveredByBill.has(o.id as string)) continue;
       const m = (o.occurrence_date as string).slice(0, 7); // YYYY-MM
       if (!byMonth[m]) byMonth[m] = { month: m, forecast_in: 0, forecast_out: 0, actual_in: 0, actual_out: 0 };
       const fAmt = Number(o.forecast_amount ?? 0);
@@ -1087,14 +1227,21 @@ export const getCashFlowForecast = createServerFn({ method: "POST" })
         if (isActual) byMonth[m].actual_out += aAmt || fAmt;
       }
     }
+    // Documents are unpaid commitments — forecast side only, never "actual".
+    for (const it of docItemsInWindow) {
+      const m = it.date.slice(0, 7);
+      if (!byMonth[m]) byMonth[m] = { month: m, forecast_in: 0, forecast_out: 0, actual_in: 0, actual_out: 0 };
+      if (it.direction === "money_in") byMonth[m].forecast_in += it.remaining;
+      else byMonth[m].forecast_out += it.remaining;
+    }
     const months = Object.values(byMonth).sort((a, b) => a.month.localeCompare(b.month));
+
 
     // Overdue bucket: forecasted/partially_paid occurrences dated before
     // today, regardless of the requested from/to window — otherwise an
     // unpaid item just falls out of a forward-looking range and silently
     // disappears from the forecast. A partially paid occurrence stays here
     // for whatever remains unpaid.
-    const today = todayIso();
     const { data: overdueRows, error: overdueErr } = await sb
       .from("recurring_occurrences")
       .select("id, occurrence_date, direction, forecast_amount, actual_amount, priority, recurring_id, recurring_transactions:recurring_id(name,type,party_id)")
@@ -1107,18 +1254,28 @@ export const getCashFlowForecast = createServerFn({ method: "POST" })
     if (overdueErr) throw new Error(overdueErr.message);
 
     const priorityRank: Record<string, number> = { critical: 0, high: 1, normal: 2, low: 3, optional: 4 };
-    const overdueItems = (overdueRows ?? [])
-      .map((o: any) => ({
-        ...o,
-        remaining: Math.max(0, Number(o.forecast_amount ?? 0) - Number(o.actual_amount ?? 0)),
-        days_overdue: Math.round((new Date(today).getTime() - new Date(o.occurrence_date).getTime()) / 86_400_000),
-      }))
+    const overdueItems = [
+      ...(overdueRows ?? [])
+        .filter((o: any) => !occurrenceIdsCoveredByBill.has(o.id))
+        .map((o: any) => ({
+          ...o,
+          source: "planned" as const,
+          remaining: Math.max(0, Number(o.forecast_amount ?? 0) - Number(o.actual_amount ?? 0)),
+          days_overdue: Math.round((new Date(today).getTime() - new Date(o.occurrence_date).getTime()) / 86_400_000),
+        })),
+      // Past-due bills/invoices (a doc with no due date is "ASAP" = today,
+      // so it never lands here — it goes into today's row instead).
+      ...docItems
+        .filter((it) => it.date < today)
+        .map((it) => ({ ...it, id: it.doc_id, occurrence_date: it.date })),
+    ]
       .filter((o: any) => o.remaining > 0)
       .sort((a: any, b: any) =>
         (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9)
         || b.days_overdue - a.days_overdue
         || b.remaining - a.remaining,
       );
+
     const overdueBucket = {
       pay_total: overdueItems.filter((o: any) => o.direction === "money_out").reduce((s: number, o: any) => s + o.remaining, 0),
       collect_total: overdueItems.filter((o: any) => o.direction === "money_in").reduce((s: number, o: any) => s + o.remaining, 0),
@@ -1148,7 +1305,7 @@ export const listRecurringReminderLog = createServerFn({ method: "POST" })
 
 // ------------------------- Convert occurrence -> real doc -------------------------
 
-const ConvertKind = z.enum(["money_out", "payment_request"]);
+const ConvertKind = z.enum(["payment_request"]);
 
 export const convertOccurrenceToDoc = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -1159,9 +1316,6 @@ export const convertOccurrenceToDoc = createServerFn({ method: "POST" })
     amount: z.number().nonnegative().optional(),
     detail: z.string().max(2000).optional(),
     note: z.string().max(2000).optional(),
-    // money_out-specific: which account the payment came out of
-    payment_method: z.string().max(40).optional(),
-    payment_account_id: z.string().uuid().nullable().optional(),
   }).parse(i))
   .handler(async ({ data, context }) => {
     // Load occurrence + recurring
@@ -1176,115 +1330,27 @@ export const convertOccurrenceToDoc = createServerFn({ method: "POST" })
     const r: any = occ.recurring_transactions;
     if (!r) throw new Error("Parent recurring transaction not found");
 
-    const tenantId: string = occ.tenant_id;
-    const userId = context.userId;
     const amount = Number(data.amount ?? occ.actual_amount ?? occ.forecast_amount ?? 0);
-    const docDate = data.doc_date ?? occ.occurrence_date;
     const detail = data.detail ?? r.description ?? r.name ?? "";
     const note = data.note ?? "";
 
-    if (data.target_kind === "payment_request") {
-      // PR creation flow is complex (party bank, signature, approvers).
-      // Return a prefill URL so the UI navigates to the New PR form. Param
-      // names match what /app/payment-requests/new's validateSearch reads
-      // (see app.payment-requests.new.tsx) — `vendor` in particular is the
-      // pre-existing param that page's vendor auto-select already consumes.
-      const params = new URLSearchParams({ from: "recurring_occurrence", from_id: data.occurrence_id });
-      if (r.party_id) params.set("vendor", r.party_id);
-      params.set("amount", String(amount));
-      params.set("currency", r.currency_code ?? "USD");
-      if (detail) params.set("detail", detail);
-      if (r.must_pay_by) params.set("due_date", r.must_pay_by);
-      const prNote = occ.note ?? note;
-      if (prNote) params.set("note", prNote);
-      if (r.category_id) params.set("category_id", r.category_id);
-      return {
-        kind: "redirect" as const,
-        path: `/app/payment-requests/new?${params.toString()}`,
-      };
-    }
-
-    // Direct create for money_out via supabaseAdmin
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-
-    // Permission gate: internal staff only (matches addAccountTransaction)
-    const { data: isStaff, error: roleErr } = await supabaseAdmin.rpc("is_internal_staff_scoped", {
-      _tenant: tenantId, _user: userId, _app_code: APP_CODE,
-    });
-    if (roleErr) throw new Error(roleErr.message);
-    if (!isStaff) throw new Error("Internal staff role required");
-
-    // Money Out means the payment has already happened, so this always
-    // creates a real transactions row directly — no intermediate document,
-    // no unpaid state (that's what a Payment Request is for). Uses the
-    // "transaction" numbering format (TXN-####), same as every other
-    // transactions row, not a separate "money_out" doc-type prefix.
-    const { data: txnNo, error: nErr } = await supabaseAdmin.rpc("next_doc_number", {
-      _tenant: tenantId,
-      _doc_type: "transaction",
-    });
-    if (nErr) throw new Error(nErr.message);
-    const { data: txn, error: tErr } = await supabaseAdmin
-      .from("transactions")
-      .insert({
-        tenant_id: tenantId,
-        txn_no: txnNo as unknown as string,
-        txn_date: docDate,
-        direction: "out",
-        party_id: r.party_id ?? null,
-        description: detail || `Planned transaction: ${r.name}`,
-        amount,
-        fee: 0,
-        category_id: r.category_id ?? null,
-        payment_method: data.payment_method ?? r.payment_method ?? null,
-        payment_account_id: data.payment_account_id ?? r.payment_account_id ?? null,
-        status: "recorded",
-        source_kind: "shared.recurring_occurrence",
-        source_id: data.occurrence_id,
-        created_by: userId,
-        paid_by: userId,
-      } as never)
-      .select("id").single();
-    if (tErr) throw new Error(tErr.message);
-    const newId = (txn as any).id as string;
-
-    await supabaseAdmin.from("transaction_lines").insert({
-      tenant_id: tenantId,
-      transaction_id: newId,
-      category_id: r.category_id ?? null,
-      description: detail,
-      amount,
-      note,
-      sort_order: 0,
-    });
-
-    // Link occurrence
-    const { error: linkErr } = await supabaseAdmin
-      .from("recurring_occurrences")
-      .update({
-        linked_kind: "transaction",
-        linked_id: newId,
-        actual_amount: amount,
-        status: "linked_transaction",
-        stage: "paid" as const,
-      })
-      .eq("id", data.occurrence_id);
-    if (linkErr) throw new Error(linkErr.message);
-
-    // Advance parent next_date if this occurrence was the current one
-    if (r.next_date && occ.occurrence_date >= r.next_date) {
-      const newNext = advance(occ.occurrence_date, r.frequency, r.due_day);
-      await supabaseAdmin
-        .from("recurring_transactions")
-        .update({ next_date: newNext })
-        .eq("id", r.id);
-    }
-
+    // PR creation flow is complex (party bank, signature, approvers).
+    // Return a prefill URL so the UI navigates to the New PR form. Param
+    // names match what /app/payment-requests/new's validateSearch reads
+    // (see app.payment-requests.new.tsx) — `vendor` in particular is the
+    // pre-existing param that page's vendor auto-select already consumes.
+    const params = new URLSearchParams({ from: "recurring_occurrence", from_id: data.occurrence_id });
+    if (r.party_id) params.set("vendor", r.party_id);
+    params.set("amount", String(amount));
+    params.set("currency", r.currency_code ?? "USD");
+    if (detail) params.set("detail", detail);
+    if (r.must_pay_by) params.set("due_date", r.must_pay_by);
+    const prNote = occ.note ?? note;
+    if (prNote) params.set("note", prNote);
+    if (r.category_id) params.set("category_id", r.category_id);
     return {
-      kind: "created" as const,
-      target: "transaction" as const,
-      id: newId,
-      path: `/app/ledger/${newId}`,
+      kind: "redirect" as const,
+      path: `/app/payment-requests/new?${params.toString()}`,
     };
   });
 

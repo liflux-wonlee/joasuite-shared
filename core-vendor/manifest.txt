@@ -55,14 +55,42 @@ src/lib/cron-auth.server.ts
 # See docs/prompts/joaoffice-core-migration/08-recurring-transactions.md
 # and 09-core-resync-2026-07.md in the joabooks repo for the full spec this
 # module was ported against.
+#
+# Re-synced 2026-08-01 (daily drift audit caught JoaOffice's copy had
+# fallen behind two JoaBooks features: a TXN-number badge on
+# listRecurring's occurrences, and Cash Flow Forecast bills/invoices
+# inclusion). Also removed in this sync: the dead `money_out` branch of
+# `ConvertKind`/`convertOccurrenceToDoc` — JoaBooks removed this earlier
+# (money_out's direct-transaction-create behavior is now a strict subset
+# of what `markOccurrencePaid` already does, so the separate "Create Money
+# Out" conversion path became redundant). JoaOffice's UI
+# (`app.recurring.$id.tsx`, NOT vendored, see note below) had its own
+# "Create Money Out (in JoaBooks)" button removed to match — it already had
+# a fully-equivalent "Mark as paid" flow, confirmed before removing.
 src/lib/recurring-v2.functions.ts
 src/lib/recurring-preview.ts
 src/components/recurring/RecurringForm.tsx
 
-# Cash Flow Forecast page — reconciled 2026-07-11. Confirmed near-byte-
-# identical between JoaBooks and JoaOffice already (only whitespace/comment
-# noise + a `p-8` wrapper class in JoaOffice's copy). No documented
-# post-pull edits needed beyond that wrapper class, if present.
+# Cash Flow Forecast page — reconciled 2026-07-11, re-synced 2026-08-01.
+# JoaBooks' canonical copy has since diverged further than a wrapper class:
+# it now uses `OrgScopeToggle`/`useOrgScope` (@joasuite/shared-ui) for
+# multi-org combining instead of a single `currentTenantId`, and has the
+# Bills/Invoices-inclusion checkboxes + SourceBadge/ItemLink rendering that
+# came with the 2026-08-01 recurring-v2.functions.ts sync above. This cache
+# file is kept byte-for-byte canonical (including OrgScopeToggle) per the
+# usual rule, but **JoaOffice's actual copy intentionally does NOT adopt
+# OrgScopeToggle** — that's a separate, substantial multi-org UI feature
+# out of scope for the 2026-08-01 fix, so JoaOffice kept its existing
+# single-tenant `currentTenantId` pattern (`tenant_ids: [currentTenantId!]`)
+# and only added the Bills/Invoices checkboxes + SourceBadge/ItemLink on
+# top of it. JoaOffice's ItemLink also differs necessarily: bill/invoice
+# rows link out cross-app to JoaBooks via a plain `<a>` (no local
+# `/app/payment-requests/$id` or `/app/invoices/$id` route exists in
+# JoaOffice), same convention as the existing linked-occurrence link in
+# `app.recurring.$id.tsx`. Re-verify feature parity (not file identity) on
+# future pulls, same lesson as the $id.tsx note below — do not mechanically
+# force OrgScopeToggle into JoaOffice without treating it as its own
+# scoped task.
 src/routes/app.cashflow.tsx
 
 # "New Planned Transaction" page — reconciled 2026-07-11. Required
