@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, ChevronRight, ChevronDown } from "lucide-react";
-import { useAuth } from "@/lib/auth-context";
+import { OrgScopeToggle, useOrgScope } from "@joasuite/shared-ui";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -97,7 +97,7 @@ const PRESETS: { key: PresetKey; label: string }[] = [
 
 function Page() {
   const { t } = useTranslation();
-  const { currentTenantId } = useAuth();
+  const [orgScope, setOrgScope] = useOrgScope();
   const fn = useServerFn(getCashFlowForecast);
   const [fromDate, setFromDate] = useState(todayPlus(-7));
   const [toDate, setToDate] = useState(todayPlus(90));
@@ -105,19 +105,24 @@ function Page() {
   const [incForecast, setIncForecast] = useState(true);
   const [incCommitted, setIncCommitted] = useState(true);
   const [incActuals, setIncActuals] = useState(true);
+  const [incBills, setIncBills] = useState(true);
+  const [incPendingBills, setIncPendingBills] = useState(false);
+  const [incInvoices, setIncInvoices] = useState(true);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const [granularity, setGranularity] = useState<Granularity>("daily");
   const toggle = (d: string) => setOpen((s) => ({ ...s, [d]: !s[d] }));
 
   const q = useQuery({
-    queryKey: ["cashflow", currentTenantId, fromDate, toDate, opening, incForecast, incCommitted, incActuals],
-    enabled: !!currentTenantId,
+    queryKey: ["cashflow", orgScope, fromDate, toDate, opening, incForecast, incCommitted, incActuals, incBills, incPendingBills, incInvoices],
+    enabled: orgScope.length > 0,
     queryFn: () => fn({ data: {
-      tenant_id: currentTenantId!,
+      tenant_ids: orgScope,
       from_date: fromDate, to_date: toDate, opening_balance: opening,
       include_forecast: incForecast, include_committed: incCommitted, include_actuals: incActuals,
+      include_bills: incBills, include_pending_bills: incPendingBills, include_invoices: incInvoices,
     } }),
   });
+
 
   const data = q.data as any;
 
@@ -138,9 +143,12 @@ function Page() {
       <Link to="/app" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> {t("common.back", "Back")}
       </Link>
-      <div>
-        <h1 className="text-2xl font-semibold">{t("cashflow.title", "Cash Flow Forecast")}</h1>
-        <p className="text-sm text-muted-foreground">{t("cashflow.desc", "Forecast cash inflows and outflows using planned transactions.")}</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-semibold">{t("cashflow.title", "Cash Flow Forecast")}</h1>
+          <p className="text-sm text-muted-foreground">{t("cashflow.desc", "Forecast cash inflows and outflows using planned transactions.")}</p>
+        </div>
+        <OrgScopeToggle value={orgScope} onChange={setOrgScope} />
       </div>
 
       <div className="flex gap-3 flex-wrap items-end border rounded p-3 bg-card">
@@ -182,10 +190,17 @@ function Page() {
           <Input type="number" value={opening} onChange={(e) => setOpening(Number(e.target.value))} className="w-32" />
         </div>
 
-        <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={incForecast} onChange={(e) => setIncForecast(e.target.checked)} /> Forecast</label>
-        <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={incCommitted} onChange={(e) => setIncCommitted(e.target.checked)} /> Committed</label>
-        <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={incActuals} onChange={(e) => setIncActuals(e.target.checked)} /> Actuals</label>
+        <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={incForecast} onChange={(e) => setIncForecast(e.target.checked)} /> {t("cashflow.include_forecast", "Forecast")}</label>
+        <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={incCommitted} onChange={(e) => setIncCommitted(e.target.checked)} /> {t("cashflow.include_committed", "Committed")}</label>
+        <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={incActuals} onChange={(e) => setIncActuals(e.target.checked)} /> {t("cashflow.include_actuals", "Actuals")}</label>
+        <span className="h-5 w-px bg-border" />
+        <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={incBills} onChange={(e) => setIncBills(e.target.checked)} /> {t("cashflow.include_bills", "Bills")}</label>
+        <label className={`flex items-center gap-1 text-sm ${incBills ? "" : "opacity-50"}`}>
+          <input type="checkbox" disabled={!incBills} checked={incPendingBills} onChange={(e) => setIncPendingBills(e.target.checked)} /> {t("cashflow.include_pending_bills", "Include pending approval")}
+        </label>
+        <label className="flex items-center gap-1 text-sm"><input type="checkbox" checked={incInvoices} onChange={(e) => setIncInvoices(e.target.checked)} /> {t("cashflow.include_invoices", "Invoices")}</label>
         <Button size="sm" onClick={() => q.refetch()}>{t("common.refresh", "Refresh")}</Button>
+
       </div>
 
       {q.isLoading && <div className="text-muted-foreground">{t("common.loading")}</div>}
@@ -281,29 +296,29 @@ function CashflowTable({ rows, t, open, toggle }: { rows: any[]; t: any; open: R
                         </thead>
                         <tbody>
                           {(r.items as any[]).map((it, i) => {
-                            const name = it.recurring_transactions?.name ?? "—";
-                            const amt = Number(it.actual_amount ?? it.forecast_amount ?? 0);
+                            const isDoc = it.source === "bill" || it.source === "invoice";
+                            const name = isDoc ? it.name : (it.recurring_transactions?.name ?? "—");
+                            const amt = isDoc ? Number(it.remaining ?? 0) : Number(it.actual_amount ?? it.forecast_amount ?? 0);
                             return (
                               <tr key={i} className="border-t border-border/40">
-                                <td className="py-1">{name}</td>
-                                <td className="py-1">{it.stage}</td>
+                                <td className="py-1">
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <SourceBadge source={it.source} t={t} />
+                                    {name}
+                                    {isDoc && <span className="text-muted-foreground">{it.doc_no}</span>}
+                                    {it.asap && <span className="text-[10px] px-1 rounded bg-amber-100 text-amber-800">{t("cashflow.asap", "ASAP")}</span>}
+                                  </span>
+                                </td>
+                                <td className="py-1">{isDoc ? String(it.doc_status).replace(/_/g, " ") : it.stage}</td>
                                 <td className="py-1">{it.direction === "money_in" ? t("cashflow.money_in", "Money In") : t("cashflow.money_out", "Money Out")}</td>
                                 <td className={`py-1 text-right num ${it.direction === "money_in" ? "text-emerald-700" : "text-rose-700"}`}>{fmtMoney(amt)}</td>
                                 <td className="py-1 text-right">
-                                  {it.recurring_id && (
-                                    <Link
-                                      to="/app/recurring/$id"
-                                      params={{ id: it.recurring_id }}
-                                      className="text-primary hover:underline"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      {t("common.view", "View")}
-                                    </Link>
-                                  )}
+                                  <ItemLink item={it} t={t} />
                                 </td>
                               </tr>
                             );
                           })}
+
                         </tbody>
                       </table>
                     </td>
@@ -316,6 +331,32 @@ function CashflowTable({ rows, t, open, toggle }: { rows: any[]; t: any; open: R
       </table>
     </div>
   );
+}
+
+/** Where a forecast line came from: a planned transaction, a bill, or an invoice. */
+function SourceBadge({ source, t }: { source?: string; t: any }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    bill: { label: t("cashflow.source.bill", "Bill"), cls: "bg-rose-100 text-rose-800" },
+    invoice: { label: t("cashflow.source.invoice", "Invoice"), cls: "bg-emerald-100 text-emerald-800" },
+    planned: { label: t("cashflow.source.planned", "Planned"), cls: "bg-muted text-muted-foreground" },
+  };
+  const s = map[source ?? "planned"] ?? map.planned;
+  return <span className={`text-[10px] px-1.5 py-0.5 rounded ${s.cls}`}>{s.label}</span>;
+}
+
+function ItemLink({ item, t }: { item: any; t: any }) {
+  const cls = "text-primary hover:underline";
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
+  if (item.source === "bill") {
+    return <Link to="/app/payment-requests/$id" params={{ id: item.doc_id }} className={cls} onClick={stop}>{t("common.view", "View")}</Link>;
+  }
+  if (item.source === "invoice") {
+    return <Link to="/app/invoices/$id" params={{ id: item.doc_id }} className={cls} onClick={stop}>{t("common.view", "View")}</Link>;
+  }
+  if (item.recurring_id) {
+    return <Link to="/app/recurring/$id" params={{ id: item.recurring_id }} className={cls} onClick={stop}>{t("common.view", "View")}</Link>;
+  }
+  return null;
 }
 
 
@@ -425,19 +466,27 @@ function OverdueBucket({ overdue, t }: { overdue: any; t: any }) {
               </tr>
             </thead>
             <tbody>
-              {(expanded === "pay" ? payItems : collectItems).map((o: any) => (
-                <tr key={o.id} className="border-t border-border/40">
-                  <td className="py-1.5">{o.recurring_transactions?.name ?? "—"}</td>
-                  <td className="py-1.5">{o.priority}</td>
-                  <td className="py-1.5">{o.days_overdue}</td>
-                  <td className="py-1.5 text-right num">{fmtMoney(o.forecast_amount)}</td>
-                  <td className="py-1.5 text-right">
-                    <Link to="/app/recurring/$id" params={{ id: o.recurring_id }} className="text-primary hover:underline">
-                      {t("common.view", "View")}
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+              {(expanded === "pay" ? payItems : collectItems).map((o: any) => {
+                const isDoc = o.source === "bill" || o.source === "invoice";
+                return (
+                  <tr key={o.id} className="border-t border-border/40">
+                    <td className="py-1.5">
+                      <span className="inline-flex items-center gap-1.5">
+                        <SourceBadge source={o.source} t={t} />
+                        {isDoc ? o.name : (o.recurring_transactions?.name ?? "—")}
+                        {isDoc && <span className="text-muted-foreground">{o.doc_no}</span>}
+                      </span>
+                    </td>
+                    <td className="py-1.5">{isDoc ? String(o.doc_status).replace(/_/g, " ") : o.priority}</td>
+                    <td className="py-1.5">{o.days_overdue}</td>
+                    <td className="py-1.5 text-right num">{fmtMoney(o.remaining ?? o.forecast_amount)}</td>
+                    <td className="py-1.5 text-right">
+                      <ItemLink item={o} t={t} />
+                    </td>
+                  </tr>
+                );
+              })}
+
             </tbody>
           </table>
         </div>
