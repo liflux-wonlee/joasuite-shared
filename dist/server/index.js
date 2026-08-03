@@ -9,23 +9,13 @@ var SubInput = z.object({
   plan: z.string().min(1).max(64).default("basic")
 });
 async function assertOwner(deps, supabase, tenantId, userId) {
-  if (deps.supabaseAdmin && deps.appCode) {
-    const { data, error } = await deps.supabaseAdmin.from("user_roles").select("role, app_code").eq("tenant_id", tenantId).eq("user_id", userId);
-    if (error) throw new Error(error.message);
-    const ok2 = (data ?? []).some((r) => {
-      const role = r.role;
-      const appCode = r.app_code;
-      if (appCode === null) return role === "owner" || role === "super_admin";
-      return appCode === deps.appCode && role === "admin";
-    });
-    if (!ok2) throw new Error("Forbidden");
-    return;
-  }
-  const { data: ok } = await supabase.rpc("has_any_role", {
+  const { data: ok, error } = await supabase.rpc("has_any_role_scoped", {
     _tenant: tenantId,
     _user: userId,
-    _roles: ["owner", "super_admin"]
+    _roles: ["owner", "super_admin"],
+    _app_code: deps.appCode
   });
+  if (error) throw new Error(error.message);
   if (!ok) throw new Error("Forbidden");
 }
 function createListSuiteApps(deps) {
@@ -79,7 +69,7 @@ function createCancelApp(deps) {
     (d) => z.object({ tenantId: z.string().uuid(), appCode: z.string().min(1).max(64) }).parse(d)
   ).handler(async ({ data, context }) => {
     await assertOwner(deps, context.supabase, data.tenantId, context.userId);
-    if (data.appCode === (deps.appCode ?? "joabooks")) {
+    if (data.appCode === deps.appCode) {
       throw new Error("This app cannot be canceled here");
     }
     const { error } = await context.supabase.from("tenant_apps").update({ status: "canceled", canceled_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("tenant_id", data.tenantId).eq("app_code", data.appCode);
@@ -96,23 +86,13 @@ var APP_URL_KEYS = [
   "app_url.joasop"
 ];
 async function assertOwnerOrAdmin(deps, supabase, tenantId, userId) {
-  if (deps.supabaseAdmin && deps.appCode) {
-    const { data, error } = await deps.supabaseAdmin.from("user_roles").select("role, app_code").eq("tenant_id", tenantId).eq("user_id", userId);
-    if (error) throw new Error(error.message);
-    const ok2 = (data ?? []).some((r) => {
-      const role = r.role;
-      const appCode = r.app_code;
-      if (appCode === null) return role === "owner" || role === "super_admin";
-      return appCode === deps.appCode && role === "admin";
-    });
-    if (!ok2) throw new Error("Forbidden");
-    return;
-  }
-  const { data: ok } = await supabase.rpc("has_any_role", {
+  const { data: ok, error } = await supabase.rpc("has_any_role_scoped", {
     _tenant: tenantId,
     _user: userId,
-    _roles: ["owner", "super_admin"]
+    _roles: ["owner", "super_admin", "admin"],
+    _app_code: deps.appCode
   });
+  if (error) throw new Error(error.message);
   if (!ok) throw new Error("Forbidden");
 }
 function createGetSuiteHome(deps) {
@@ -723,22 +703,6 @@ async function updateMyDefaultTenantServer(input, context, deps) {
 
 // src/server/team.server.ts
 var MAX_DEPARTMENT_DEPTH = 4;
-async function assertCanReadTeam(supabase, tenantId, userId) {
-  const { data: ok, error } = await supabase.rpc("is_internal_staff", {
-    _tenant: tenantId,
-    _user: userId
-  });
-  if (error) throw new Error(error.message);
-  if (!ok) throw new Error("Forbidden");
-}
-async function assertCanWriteTeam(supabase, tenantId, userId) {
-  const { data, error } = await supabase.from("user_roles").select("role").eq("tenant_id", tenantId).eq("user_id", userId);
-  if (error) throw new Error(error.message);
-  const roles = (data ?? []).map((r) => r.role);
-  if (!roles.some((r) => ["owner", "super_admin", "admin", "hr_manager"].includes(r))) {
-    throw new Error("Forbidden: owner, super_admin, admin, or hr_manager required");
-  }
-}
 async function loadDeptPosNames(supabase, tenantId, deptIds, posIds) {
   const [{ data: depts, error: deptErr }, { data: positions, error: posErr }] = await Promise.all([
     deptIds.length ? supabase.from("departments").select("id, name").eq("tenant_id", tenantId).in("id", deptIds) : Promise.resolve({ data: [], error: null }),
@@ -786,8 +750,8 @@ function collectDescendants(all, id) {
   }
   return out;
 }
-async function listTeamMembersServer(input, context) {
-  await assertCanReadTeam(context.supabase, input.tenant_id, context.userId);
+async function listTeamMembersServer(input, context, deps) {
+  await deps.assertCanReadTeam(context.supabase, input.tenant_id, context.userId);
   let query = context.supabase.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active").eq("tenant_id", input.tenant_id).eq("is_employee", true).order("name_en");
   if (input.search?.trim()) {
     const search = input.search.trim().replace(/[%,()]/g, "");
@@ -831,8 +795,8 @@ async function listTeamMembersServer(input, context) {
   }
   return { rows };
 }
-async function getTeamMemberServer(input, context) {
-  await assertCanReadTeam(context.supabase, input.tenant_id, context.userId);
+async function getTeamMemberServer(input, context, deps) {
+  await deps.assertCanReadTeam(context.supabase, input.tenant_id, context.userId);
   const { data: party, error } = await context.supabase.from("parties").select("id, linked_user_id, name_en, contact_email, contact_phone, active, is_employee").eq("tenant_id", input.tenant_id).eq("id", input.party_id).maybeSingle();
   if (error) throw new Error(error.message);
   if (!party || !party.is_employee) throw new Error("Team member not found");
@@ -862,8 +826,8 @@ async function getTeamMemberServer(input, context) {
     worker_type: profile?.worker_type ?? null
   };
 }
-async function upsertTeamMemberServer(input, context, appCode) {
-  await assertCanWriteTeam(context.supabase, input.tenant_id, context.userId);
+async function upsertTeamMemberServer(input, context, deps, appCode) {
+  await deps.assertCanWriteTeam(context.supabase, input.tenant_id, context.userId);
   let partyId;
   let created = false;
   if (input.party_id) {
@@ -2044,25 +2008,30 @@ var PLAN_CODES = ["free", "basic", "pro", "business"];
 var INTERVALS = ["month", "year"];
 var SOURCE_APP = "joasuite-core";
 async function getRoles(supabase, tenantId, userId) {
-  const { data, error } = await supabase.from("user_roles").select("role").eq("tenant_id", tenantId).eq("user_id", userId);
+  const { data, error } = await supabase.from("user_roles").select("role, app_code").eq("tenant_id", tenantId).eq("user_id", userId);
   if (error) throw new Error(error.message);
-  return (data ?? []).map((r) => r.role);
+  return data ?? [];
 }
-function canManage(roles) {
-  return roles.some((r) => r === "owner" || r === "super_admin" || r === "billing_admin");
+function canManage(roles, appCode) {
+  return roles.some((r) => {
+    if (r.role === "owner" || r.role === "super_admin") return true;
+    if (r.role === "billing_admin") return r.app_code === null || r.app_code === appCode;
+    return false;
+  });
 }
-function canView(roles) {
-  return canManage(roles) || roles.includes("finance_manager");
+function canView(roles, appCode) {
+  if (canManage(roles, appCode)) return true;
+  return roles.some((r) => r.role === "finance_manager" && (r.app_code === null || r.app_code === appCode));
 }
-async function assertView(supabase, tenantId, userId) {
+async function assertView(supabase, tenantId, userId, appCode) {
   const roles = await getRoles(supabase, tenantId, userId);
-  if (!canView(roles)) throw new Error("Forbidden: billing access not allowed for this role");
-  return roles;
+  if (!canView(roles, appCode)) throw new Error("Forbidden: billing access not allowed for this role");
+  return roles.map((r) => r.role);
 }
-async function assertManage(supabase, tenantId, userId) {
+async function assertManage(supabase, tenantId, userId, appCode) {
   const roles = await getRoles(supabase, tenantId, userId);
-  if (!canManage(roles)) throw new Error("Forbidden: billing management requires Owner, Super Admin, or Billing Admin");
-  return roles;
+  if (!canManage(roles, appCode)) throw new Error("Forbidden: billing management requires Owner, Super Admin, or Billing Admin");
+  return roles.map((r) => r.role);
 }
 async function writeAudit(deps, opts) {
   try {
@@ -2078,13 +2047,19 @@ async function writeAudit(deps, opts) {
   } catch {
   }
 }
-async function canManageBillingFnServer(input, context) {
+async function canManageBillingFnServer(input, context, deps) {
   const roles = await getRoles(context.supabase, input.tenant_id, context.userId);
-  return { can_manage: canManage(roles), can_view: canView(roles), roles };
+  return {
+    can_manage: canManage(roles, deps.appCode),
+    can_view: canView(roles, deps.appCode),
+    roles: roles.map((r) => r.role)
+  };
 }
-async function getBillingOverviewServer(input, context) {
+async function getBillingOverviewServer(input, context, deps) {
   const userId = context.userId;
-  const roles = await assertView(context.supabase, input.tenant_id, userId);
+  const rawRoles = await getRoles(context.supabase, input.tenant_id, userId);
+  if (!canView(rawRoles, deps.appCode)) throw new Error("Forbidden: billing access not allowed for this role");
+  const roles = rawRoles.map((r) => r.role);
   const [customerQ, subsQ, pmQ, tenantAppsQ, tenantQ] = await Promise.all([
     context.supabase.from("billing_customers").select("*").eq("tenant_id", input.tenant_id).maybeSingle(),
     context.supabase.from("billing_subscriptions").select("*").eq("tenant_id", input.tenant_id),
@@ -2131,13 +2106,13 @@ async function getBillingOverviewServer(input, context) {
     default_payment_method: defaultPm,
     next_invoice_estimate_cents: estimateCents,
     roles,
-    can_manage: canManage(roles),
-    can_view: canView(roles)
+    can_manage: canManage(rawRoles, deps.appCode),
+    can_view: canView(rawRoles, deps.appCode)
   };
 }
 async function updateBillingCustomerServer(input, context, deps) {
   const userId = context.userId;
-  await assertManage(context.supabase, input.tenant_id, userId);
+  await assertManage(context.supabase, input.tenant_id, userId, deps.appCode);
   const { tenant_id, ...patch } = input;
   const { data: row, error } = await context.supabase.from("billing_customers").upsert({ tenant_id, ...patch }, { onConflict: "tenant_id" }).select().single();
   if (error) throw new Error(error.message);
@@ -2154,7 +2129,7 @@ async function listBillingPlansServer(input, deps) {
 }
 async function changeSubscriptionPlanServer(input, context, deps) {
   const userId = context.userId;
-  await assertManage(context.supabase, input.tenant_id, userId);
+  await assertManage(context.supabase, input.tenant_id, userId, deps.appCode);
   const now = /* @__PURE__ */ new Date();
   const end = new Date(now);
   if (input.interval === "year") end.setFullYear(end.getFullYear() + 1);
@@ -2189,7 +2164,7 @@ async function changeSubscriptionPlanServer(input, context, deps) {
 }
 async function cancelSubscriptionServer(input, context, deps) {
   const userId = context.userId;
-  await assertManage(context.supabase, input.tenant_id, userId);
+  await assertManage(context.supabase, input.tenant_id, userId, deps.appCode);
   const update = input.at_period_end ? { cancel_at_period_end: true } : { cancel_at_period_end: true, status: "canceled" };
   const { data: row, error } = await context.supabase.from("billing_subscriptions").update(update).eq("tenant_id", input.tenant_id).eq("app_code", input.app_code).select().maybeSingle();
   if (error) throw new Error(error.message);
@@ -2202,21 +2177,21 @@ async function cancelSubscriptionServer(input, context, deps) {
   });
   return { ok: true, mock: true, subscription: row };
 }
-async function listBillingInvoicesServer(input, context) {
-  await assertView(context.supabase, input.tenant_id, context.userId);
+async function listBillingInvoicesServer(input, context, deps) {
+  await assertView(context.supabase, input.tenant_id, context.userId, deps.appCode);
   const { data: rows, error } = await context.supabase.from("billing_invoices").select("*").eq("tenant_id", input.tenant_id).order("issued_at", { ascending: false }).limit(input.limit);
   if (error) throw new Error(error.message);
   return rows ?? [];
 }
-async function getBillingInvoiceServer(input, context) {
-  await assertView(context.supabase, input.tenant_id, context.userId);
+async function getBillingInvoiceServer(input, context, deps) {
+  await assertView(context.supabase, input.tenant_id, context.userId, deps.appCode);
   const { data: row, error } = await context.supabase.from("billing_invoices").select("*").eq("tenant_id", input.tenant_id).eq("id", input.id).single();
   if (error) throw new Error(error.message);
   return row;
 }
 async function retryInvoicePaymentServer(input, context, deps) {
   const userId = context.userId;
-  await assertManage(context.supabase, input.tenant_id, userId);
+  await assertManage(context.supabase, input.tenant_id, userId, deps.appCode);
   await writeAudit(deps, {
     tenant_id: input.tenant_id,
     user_id: userId,
@@ -2228,7 +2203,7 @@ async function retryInvoicePaymentServer(input, context, deps) {
 }
 async function seedSampleBillingInvoicesServer(input, context, deps) {
   const userId = context.userId;
-  await assertManage(context.supabase, input.tenant_id, userId);
+  await assertManage(context.supabase, input.tenant_id, userId, deps.appCode);
   const { count } = await context.supabase.from("billing_invoices").select("id", { count: "exact", head: true }).eq("tenant_id", input.tenant_id);
   if ((count ?? 0) > 0) return { ok: true, inserted: 0, skipped: true };
   const now = /* @__PURE__ */ new Date();
@@ -2308,15 +2283,15 @@ async function seedSampleBillingInvoicesServer(input, context, deps) {
   await writeAudit(deps, { tenant_id: input.tenant_id, user_id: userId, action: "billing.invoices_seeded", payload: { count: rows.length } });
   return { ok: true, inserted: rows.length };
 }
-async function listBillingPaymentMethodsServer(input, context) {
-  await assertView(context.supabase, input.tenant_id, context.userId);
+async function listBillingPaymentMethodsServer(input, context, deps) {
+  await assertView(context.supabase, input.tenant_id, context.userId, deps.appCode);
   const { data: rows, error } = await context.supabase.from("billing_payment_methods").select("*").eq("tenant_id", input.tenant_id).order("is_default", { ascending: false }).order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   return rows ?? [];
 }
 async function addMockPaymentMethodServer(input, context, deps) {
   const userId = context.userId;
-  await assertManage(context.supabase, input.tenant_id, userId);
+  await assertManage(context.supabase, input.tenant_id, userId, deps.appCode);
   if (input.make_default) {
     await context.supabase.from("billing_payment_methods").update({ is_default: false }).eq("tenant_id", input.tenant_id);
   }
@@ -2334,7 +2309,7 @@ async function addMockPaymentMethodServer(input, context, deps) {
 }
 async function setDefaultPaymentMethodServer(input, context, deps) {
   const userId = context.userId;
-  await assertManage(context.supabase, input.tenant_id, userId);
+  await assertManage(context.supabase, input.tenant_id, userId, deps.appCode);
   await context.supabase.from("billing_payment_methods").update({ is_default: false }).eq("tenant_id", input.tenant_id);
   const { error } = await context.supabase.from("billing_payment_methods").update({ is_default: true }).eq("tenant_id", input.tenant_id).eq("id", input.id);
   if (error) throw new Error(error.message);
@@ -2343,7 +2318,7 @@ async function setDefaultPaymentMethodServer(input, context, deps) {
 }
 async function removePaymentMethodServer(input, context, deps) {
   const userId = context.userId;
-  await assertManage(context.supabase, input.tenant_id, userId);
+  await assertManage(context.supabase, input.tenant_id, userId, deps.appCode);
   const { error } = await context.supabase.from("billing_payment_methods").delete().eq("tenant_id", input.tenant_id).eq("id", input.id);
   if (error) throw new Error(error.message);
   await writeAudit(deps, { tenant_id: input.tenant_id, user_id: userId, action: "billing.payment_method_removed", record_id: input.id });
@@ -2351,7 +2326,7 @@ async function removePaymentMethodServer(input, context, deps) {
 }
 async function startTrialServer(input, context, deps) {
   const userId = context.userId;
-  await assertManage(context.supabase, input.tenant_id, userId);
+  await assertManage(context.supabase, input.tenant_id, userId, deps.appCode);
   const now = /* @__PURE__ */ new Date();
   const end = new Date(now.getTime() + input.trial_days * 864e5);
   const { data: row, error } = await context.supabase.from("billing_subscriptions").upsert(
@@ -2387,7 +2362,7 @@ async function startTrialServer(input, context, deps) {
 }
 async function reactivateSubscriptionServer(input, context, deps) {
   const userId = context.userId;
-  await assertManage(context.supabase, input.tenant_id, userId);
+  await assertManage(context.supabase, input.tenant_id, userId, deps.appCode);
   const { data: row, error } = await context.supabase.from("billing_subscriptions").update({ status: "active", cancel_at_period_end: false }).eq("tenant_id", input.tenant_id).eq("app_code", input.app_code).select().maybeSingle();
   if (error) throw new Error(error.message);
   await context.supabase.from("tenant_apps").update({ status: "active", canceled_at: null, deletion_scheduled_at: null }).eq("tenant_id", input.tenant_id).eq("app_code", input.app_code);
@@ -2396,7 +2371,7 @@ async function reactivateSubscriptionServer(input, context, deps) {
 }
 async function addAppSubscriptionServer(input, context, deps) {
   const userId = context.userId;
-  await assertManage(context.supabase, input.tenant_id, userId);
+  await assertManage(context.supabase, input.tenant_id, userId, deps.appCode);
   const now = /* @__PURE__ */ new Date();
   const end = new Date(now);
   if (input.interval === "year") end.setFullYear(end.getFullYear() + 1);
@@ -2433,7 +2408,7 @@ async function addAppSubscriptionServer(input, context, deps) {
 }
 async function removeAppSubscriptionServer(input, context, deps) {
   const userId = context.userId;
-  await assertManage(context.supabase, input.tenant_id, userId);
+  await assertManage(context.supabase, input.tenant_id, userId, deps.appCode);
   if (input.app_code === "joabooks") throw new Error("JoaBooks cannot be removed");
   await context.supabase.from("billing_subscriptions").delete().eq("tenant_id", input.tenant_id).eq("app_code", input.app_code);
   await context.supabase.from("tenant_apps").update({ status: "canceled", canceled_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("tenant_id", input.tenant_id).eq("app_code", input.app_code);
@@ -2447,21 +2422,21 @@ function computePromoStatus(p) {
   if (p.ends_at && new Date(p.ends_at).getTime() < now) return "expired";
   return "active";
 }
-async function listAvailablePromotionsServer(input, context) {
-  await assertView(context.supabase, input.tenant_id, context.userId);
+async function listAvailablePromotionsServer(input, context, deps) {
+  await assertView(context.supabase, input.tenant_id, context.userId, deps.appCode);
   const { data: rows, error } = await context.supabase.from("promotion_codes").select("*").order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   return (rows ?? []).map((r) => ({ ...r, computed_status: computePromoStatus(r) }));
 }
-async function listTenantDiscountsServer(input, context) {
-  await assertView(context.supabase, input.tenant_id, context.userId);
+async function listTenantDiscountsServer(input, context, deps) {
+  await assertView(context.supabase, input.tenant_id, context.userId, deps.appCode);
   const { data: rows, error } = await context.supabase.from("billing_discounts").select("*").eq("tenant_id", input.tenant_id).order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   return rows ?? [];
 }
 async function redeemPromoCodeServer(input, context, deps) {
   const userId = context.userId;
-  await assertManage(context.supabase, input.tenant_id, userId);
+  await assertManage(context.supabase, input.tenant_id, userId, deps.appCode);
   const code = input.code.trim().toUpperCase();
   const { data: promo, error: pErr } = await context.supabase.from("promotion_codes").select("*").eq("code", code).maybeSingle();
   if (pErr) throw new Error(pErr.message);
@@ -2506,7 +2481,7 @@ async function redeemPromoCodeServer(input, context, deps) {
 }
 async function removeTenantDiscountServer(input, context, deps) {
   const userId = context.userId;
-  await assertManage(context.supabase, input.tenant_id, userId);
+  await assertManage(context.supabase, input.tenant_id, userId, deps.appCode);
   const { error } = await context.supabase.from("billing_discounts").update({ status: "canceled", ends_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("tenant_id", input.tenant_id).eq("id", input.discount_id);
   if (error) throw new Error(error.message);
   await writeAudit(deps, { tenant_id: input.tenant_id, user_id: userId, action: "billing.discount_removed", record_id: input.discount_id });
@@ -2519,9 +2494,9 @@ function genReferralCode(orgName) {
   const code = `${base}-${rnd}-${yr}`;
   return { code, slug: code.toLowerCase() };
 }
-async function getReferralProgramServer(input, context) {
+async function getReferralProgramServer(input, context, deps) {
   const userId = context.userId;
-  await assertView(context.supabase, input.tenant_id, userId);
+  await assertView(context.supabase, input.tenant_id, userId, deps.appCode);
   let { data: prog, error } = await context.supabase.from("referral_programs").select("*").eq("tenant_id", input.tenant_id).maybeSingle();
   if (error) throw new Error(error.message);
   if (!prog) {
@@ -2538,7 +2513,7 @@ async function getReferralProgramServer(input, context) {
 }
 async function addMockReferralServer(input, context, deps) {
   const userId = context.userId;
-  await assertManage(context.supabase, input.tenant_id, userId);
+  await assertManage(context.supabase, input.tenant_id, userId, deps.appCode);
   const { data: prog } = await context.supabase.from("referral_programs").select("*").eq("tenant_id", input.tenant_id).maybeSingle();
   if (!prog) throw new Error("Referral program not initialized");
   const now = (/* @__PURE__ */ new Date()).toISOString();
@@ -2569,7 +2544,7 @@ async function addMockReferralServer(input, context, deps) {
 }
 async function updateReferralStatusServer(input, context, deps) {
   const userId = context.userId;
-  await assertManage(context.supabase, input.tenant_id, userId);
+  await assertManage(context.supabase, input.tenant_id, userId, deps.appCode);
   const { data: existing } = await context.supabase.from("referrals").select("*").eq("id", input.referral_id).eq("referrer_tenant_id", input.tenant_id).maybeSingle();
   if (!existing) throw new Error("Referral not found");
   const { data: prog } = await context.supabase.from("referral_programs").select("*").eq("tenant_id", input.tenant_id).maybeSingle();
@@ -2613,8 +2588,8 @@ function limitsFor(appCode, planCode) {
     attachments: 200
   };
 }
-async function getTenantUsageServer(input, context) {
-  await assertView(context.supabase, input.tenant_id, context.userId);
+async function getTenantUsageServer(input, context, deps) {
+  await assertView(context.supabase, input.tenant_id, context.userId, deps.appCode);
   const appCode = input.app_code ?? "joabooks";
   const { data: sub } = await context.supabase.from("billing_subscriptions").select("plan_code,status").eq("tenant_id", input.tenant_id).eq("app_code", appCode).maybeSingle();
   const planCode = sub?.plan_code ?? "free";
