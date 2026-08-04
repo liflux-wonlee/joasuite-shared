@@ -290,6 +290,7 @@ declare function accountSendPasswordResetServer(input: AccountUserIdInput, conte
 }>;
 declare function accountUpdateUserProfileServer(input: AccountUpdateUserProfileInput, context: AccountContext, deps: AccountDeps): Promise<{
     ok: boolean;
+    email_change_requested: boolean;
 }>;
 declare function getMyProfileServer(context: AccountContext, deps: AccountDeps): Promise<{
     default_tenant_id: string | null;

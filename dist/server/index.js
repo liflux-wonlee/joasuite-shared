@@ -651,23 +651,41 @@ async function accountSendPasswordResetServer(input, context, deps) {
 async function accountUpdateUserProfileServer(input, context, deps) {
   const supabaseAdmin = deps.supabaseAdmin;
   const sharedTenantIds = await assertCallerCanManageUser(supabaseAdmin, context.userId, input.user_id);
-  if (input.email) {
-    await assertCallerCanChangeUserEmail(supabaseAdmin, context.userId, input.user_id);
-  }
   const patch = {
     display_name: input.display_name
   };
-  if (input.email) patch.email = input.email;
   if (input.position !== void 0) patch.position = input.position;
   const { error } = await supabaseAdmin.from("tenant_users").update(patch).eq("user_id", input.user_id).in("tenant_id", sharedTenantIds);
   if (error) throw new Error(error.message);
+  let emailChangeRequested = false;
   if (input.email) {
-    const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(input.user_id, {
-      email: input.email
-    });
-    if (authErr) throw new Error(authErr.message);
+    await assertCallerCanChangeUserEmail(supabaseAdmin, context.userId, input.user_id);
+    const { email: currentEmail, display_name } = await getTargetEmail(supabaseAdmin, input.user_id);
+    if (currentEmail.toLowerCase() !== input.email.toLowerCase()) {
+      const { data: link, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+        type: "email_change_new",
+        email: currentEmail,
+        newEmail: input.email,
+        options: { redirectTo: `${resolveAppBaseUrl(deps)}/app` }
+      });
+      if (linkErr) throw new Error(linkErr.message);
+      const url = link?.properties?.action_link ?? "";
+      const subject = `Confirm your new ${deps.appName} sign-in email`;
+      const html = `
+      <div style="font-family:Inter,Arial,sans-serif;max-width:540px;margin:0 auto;padding:24px;color:#1a1f36">
+        <h2 style="margin:0 0 12px 0">${deps.appName}</h2>
+        <p>Hi${display_name ? " " + display_name : ""},</p>
+        <p>A workspace administrator requested that your sign-in email be changed to this address.</p>
+        <p style="margin:24px 0">
+          <a href="${url}" style="background:#2647c2;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;display:inline-block">Confirm email change</a>
+        </p>
+        <p style="color:#677084;font-size:13px">If you didn't expect this, you can ignore this email and your sign-in email stays unchanged.</p>
+      </div>`;
+      await deps.sendEmail({ to: input.email, subject, html });
+      emailChangeRequested = true;
+    }
   }
-  return { ok: true };
+  return { ok: true, email_change_requested: emailChangeRequested };
 }
 async function getMyProfileServer(context, deps) {
   const { data, error } = await deps.supabaseAdmin.from("profiles").select("id, default_tenant_id, timezone").eq("id", context.userId).maybeSingle();
