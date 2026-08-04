@@ -579,10 +579,10 @@ async function setUserAppRolesServer(input, context, deps) {
   const supabaseAdmin = deps.supabaseAdmin;
   const callerId = context.userId;
   await assertCallerManagesTenant(supabaseAdmin, input.tenant_id, callerId);
-  if (input.roles.includes("owner")) {
+  if (input.roles.includes("owner") || input.roles.includes("super_admin")) {
     const isOwner = await callerIsOwner(supabaseAdmin, input.tenant_id, callerId);
     if (!isOwner) {
-      throw new Error("Only an Owner can grant the Owner role.");
+      throw new Error("Only an Owner can grant the Owner or Super Admin role.");
     }
   }
   if (input.roles.length > 0) {
@@ -1129,8 +1129,8 @@ async function assertCanAssignRoles(supabaseAdmin, tenantId, callerId, roles) {
   if (!isOwner && !isSuperAdmin) {
     throw new Error("Forbidden: owner or super_admin required to assign roles");
   }
-  if (roles.includes("owner") && !isOwner) {
-    throw new Error("Only an Owner can grant the Owner role.");
+  if ((roles.includes("owner") || roles.includes("super_admin")) && !isOwner) {
+    throw new Error("Only an Owner can grant the Owner or Super Admin role.");
   }
 }
 async function assertCanEditVendor(supabaseAdmin, appCode, tenantId, userId) {
