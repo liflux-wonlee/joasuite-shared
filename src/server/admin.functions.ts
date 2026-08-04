@@ -89,8 +89,9 @@ async function assertOwnerOrAdmin(supabaseAdmin: any, appCode: string, tenantId:
 // yourself) -- an app-scoped admin has no business doing that. Matches the
 // caller bar setUserAppRolesServer (account.server.ts) already uses.
 // Independently requires the caller already be tenant-wide Owner before any
-// grant may include "owner", so a Super Admin can't grant themselves (or
-// anyone) Owner.
+// grant may include "owner" OR "super_admin", so a Super Admin can't mint
+// themselves (or anyone else) Owner or another Super Admin -- only an Owner
+// controls who else reaches that trust level.
 async function assertCanAssignRoles(supabaseAdmin: any, tenantId: string, callerId: string, roles: string[]) {
   const { data, error } = await supabaseAdmin
     .from("user_roles")
@@ -104,8 +105,8 @@ async function assertCanAssignRoles(supabaseAdmin: any, tenantId: string, caller
   if (!isOwner && !isSuperAdmin) {
     throw new Error("Forbidden: owner or super_admin required to assign roles");
   }
-  if (roles.includes("owner") && !isOwner) {
-    throw new Error("Only an Owner can grant the Owner role.");
+  if ((roles.includes("owner") || roles.includes("super_admin")) && !isOwner) {
+    throw new Error("Only an Owner can grant the Owner or Super Admin role.");
   }
 }
 

@@ -569,10 +569,13 @@ export async function setUserAppRolesServer(input: SetUserAppRolesInput, context
   const supabaseAdmin = deps.supabaseAdmin;
   const callerId = context.userId;
   await assertCallerManagesTenant(supabaseAdmin, input.tenant_id, callerId);
-  if (input.roles.includes("owner")) {
+  if (input.roles.includes("owner") || input.roles.includes("super_admin")) {
+    // Only an Owner controls who else reaches Owner/Super Admin trust level
+    // -- a Super Admin caller passes assertCallerManagesTenant above but
+    // must not be able to mint themselves (or anyone) another Super Admin.
     const isOwner = await callerIsOwner(supabaseAdmin, input.tenant_id, callerId);
     if (!isOwner) {
-      throw new Error("Only an Owner can grant the Owner role.");
+      throw new Error("Only an Owner can grant the Owner or Super Admin role.");
     }
   }
   if (input.roles.length > 0) {
