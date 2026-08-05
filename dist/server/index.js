@@ -502,11 +502,13 @@ async function inviteUserToWorkspacesServer(input, context, deps) {
   const callerId = context.userId;
   for (const a of input.assignments) {
     await assertCallerManagesTenant(supabaseAdmin, a.tenant_id, callerId);
-    const wantsOwner = a.apps.some((ap) => ap.roles.includes("owner"));
-    if (wantsOwner) {
+    const wantsOwnerOrSuperAdmin = a.apps.some(
+      (ap) => ap.roles.some((r) => r === "owner" || r === "super_admin")
+    );
+    if (wantsOwnerOrSuperAdmin) {
       const isOwner = await callerIsOwner(supabaseAdmin, a.tenant_id, callerId);
       if (!isOwner) {
-        throw new Error("Only an Owner can grant the Owner role to another user.");
+        throw new Error("Only an Owner can grant the Owner or Super Admin role to another user.");
       }
     }
     if (a.apps.length > 0) {
