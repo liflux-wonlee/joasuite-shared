@@ -1135,6 +1135,15 @@ async function assertCanAssignRoles(supabaseAdmin, tenantId, callerId, roles) {
     throw new Error("Only an Owner can grant the Owner or Super Admin role.");
   }
 }
+async function assertOwnerIfGrantingPrivilegedRole(supabaseAdmin, tenantId, callerId, roles) {
+  if (!roles.includes("owner") && !roles.includes("super_admin")) return;
+  const { data, error } = await supabaseAdmin.from("user_roles").select("role").eq("tenant_id", tenantId).eq("user_id", callerId);
+  if (error) throw new Error(error.message);
+  const isOwner = (data ?? []).some((r) => r.role === "owner");
+  if (!isOwner) {
+    throw new Error("Only an Owner can grant the Owner or Super Admin role.");
+  }
+}
 async function assertCanEditVendor(supabaseAdmin, appCode, tenantId, userId) {
   const { data, error } = await supabaseAdmin.from("user_roles").select("role, app_code").eq("tenant_id", tenantId).eq("user_id", userId);
   if (error) throw new Error(error.message);
@@ -1301,6 +1310,7 @@ function createInviteTenantUser(deps) {
     } else {
       await assertOwnerOrAdmin2(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
     }
+    await assertOwnerIfGrantingPrivilegedRole(deps.supabaseAdmin, data.tenant_id, context.userId, data.roles);
     const invited = await findOrInviteUser(deps, data.email, data.display_name);
     const { data: tenantRow } = await deps.supabaseAdmin.from("tenants").select("name").eq("id", data.tenant_id).single();
     const tenantName = tenantRow?.name ?? "your workspace";
