@@ -110,6 +110,30 @@ async function assertCanAssignRoles(supabaseAdmin: any, tenantId: string, caller
   }
 }
 
+// Same restriction as assertCanAssignRoles above, factored out so callers
+// that already ran their own base authorization (e.g. createInviteTenantUser's
+// assertOwnerOrAdmin/assertCanEditVendor, which also accept an app-scoped
+// "admin") don't have to re-run assertCanAssignRoles's stricter owner/
+// super_admin-only base check just to get this owner-or-super_admin gate.
+async function assertOwnerIfGrantingPrivilegedRole(
+  supabaseAdmin: any,
+  tenantId: string,
+  callerId: string,
+  roles: string[],
+) {
+  if (!roles.includes("owner") && !roles.includes("super_admin")) return;
+  const { data, error } = await supabaseAdmin
+    .from("user_roles")
+    .select("role")
+    .eq("tenant_id", tenantId)
+    .eq("user_id", callerId);
+  if (error) throw new Error(error.message);
+  const isOwner = (data ?? []).some((r: any) => r.role === "owner");
+  if (!isOwner) {
+    throw new Error("Only an Owner can grant the Owner or Super Admin role.");
+  }
+}
+
 async function assertCanEditVendor(supabaseAdmin: any, appCode: string, tenantId: string, userId: string) {
   const { data, error } = await supabaseAdmin
     .from("user_roles")
@@ -391,6 +415,11 @@ export function createInviteTenantUser(deps: AdminDeps) {
       } else {
         await assertOwnerOrAdmin(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
       }
+      // assertOwnerOrAdmin/assertCanEditVendor above also pass for an
+      // app-scoped "admin", who must not be able to invite someone straight
+      // in as Owner/Super Admin -- matches setUserAppRolesServer/
+      // inviteUserToWorkspacesServer's gate on the same roles.
+      await assertOwnerIfGrantingPrivilegedRole(deps.supabaseAdmin, data.tenant_id, context.userId, data.roles);
       const invited = await findOrInviteUser(deps, data.email, data.display_name);
 
       const { data: tenantRow } = await deps.supabaseAdmin
