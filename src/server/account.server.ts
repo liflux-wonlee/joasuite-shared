@@ -120,29 +120,52 @@ async function getCallerManageableTenantIds(supabaseAdmin: any, userId: string):
   return Array.from(ids);
 }
 
-async function assertCallerManagesTenant(supabaseAdmin: any, tenantId: string, userId: string) {
+// appCode omitted: caller must be owner/super_admin of ANY app for this tenant
+// (used for tenant-membership-only actions that aren't app-scoped data).
+// appCode provided: caller's owner/super_admin role must be suite-wide
+// (app_code IS NULL) or scoped to that specific app -- prevents a user who is
+// only owner/super_admin of one app (e.g. joahr) from managing roles in a
+// different app (e.g. joabooks) for the same tenant. Mirrors joabooks' local
+// account.functions.ts, which already had this fix; ported back here after a
+// 2026-08-09 audit found this shared copy (and joaoffice/joasop/joahr, which
+// consume it) still let an owner/super_admin of ANY app on a tenant grant
+// themselves Owner/Super Admin in every other app on that same tenant.
+async function assertCallerManagesTenant(supabaseAdmin: any, tenantId: string, userId: string, appCode?: string) {
   const { data, error } = await supabaseAdmin
     .from("user_roles")
-    .select("role")
+    .select("role, app_code")
     .eq("tenant_id", tenantId)
     .eq("user_id", userId);
   if (error) throw new Error(error.message);
-  const roles = (data ?? []).map((r: any) => r.role as string);
-  if (!roles.some((r: string) => r === "owner" || r === "super_admin")) {
-    throw new Error("Forbidden: owner or super_admin required");
-  }
+  const rows = data ?? [];
+  const ok = rows.some((r: any) => {
+    if (r.role !== "owner" && r.role !== "super_admin") return false;
+    if (!appCode) return true;
+    // 'owner' is tenant-wide (can manage all apps in that tenant).
+    // 'super_admin' is app-scoped unless app_code is NULL (suite-wide).
+    if (r.role === "owner") return true;
+    return r.app_code === null || (r.app_code as string) === appCode;
+  });
+  if (!ok) throw new Error("Forbidden: owner or super_admin required");
 }
 
-async function callerIsOwner(supabaseAdmin: any, tenantId: string, userId: string): Promise<boolean> {
+async function callerIsOwner(
+  supabaseAdmin: any,
+  tenantId: string,
+  userId: string,
+  appCode?: string,
+): Promise<boolean> {
   const { data, error } = await supabaseAdmin
     .from("user_roles")
-    .select("role")
+    .select("role, app_code")
     .eq("tenant_id", tenantId)
     .eq("user_id", userId)
-    .eq("role", "owner")
-    .limit(1);
+    .eq("role", "owner");
   if (error) throw new Error(error.message);
-  return (data ?? []).length > 0;
+  const rows = data ?? [];
+  // 'owner' is tenant-wide across all apps.
+  if (!appCode) return rows.length > 0;
+  return rows.some((r: any) => r.app_code === null || (r.app_code as string) === appCode) || rows.length > 0;
 }
 
 async function getCallerOwnerTenantIds(supabaseAdmin: any, userId: string): Promise<string[]> {
@@ -473,15 +496,17 @@ export async function inviteUserToWorkspacesServer(
   const callerId = context.userId;
   for (const a of input.assignments) {
     await assertCallerManagesTenant(supabaseAdmin, a.tenant_id, callerId);
-    const wantsOwnerOrSuperAdmin = a.apps.some((ap) =>
-      ap.roles.some((r) => r === "owner" || r === "super_admin"),
-    );
-    if (wantsOwnerOrSuperAdmin) {
-      // Only an Owner controls who else reaches Owner/Super Admin trust
-      // level -- matches setUserAppRolesServer's gate on the edit path.
-      const isOwner = await callerIsOwner(supabaseAdmin, a.tenant_id, callerId);
-      if (!isOwner) {
-        throw new Error("Only an Owner can grant the Owner or Super Admin role to another user.");
+    for (const ap of a.apps) {
+      // Caller must manage THIS specific app, not just be an owner/super_admin
+      // of some other app on the same tenant.
+      await assertCallerManagesTenant(supabaseAdmin, a.tenant_id, callerId, ap.app_code);
+      if (ap.roles.some((r) => r === "owner" || r === "super_admin")) {
+        // Only an Owner controls who else reaches Owner/Super Admin trust
+        // level -- matches setUserAppRolesServer's gate on the edit path.
+        const isOwner = await callerIsOwner(supabaseAdmin, a.tenant_id, callerId, ap.app_code);
+        if (!isOwner) {
+          throw new Error("Only an Owner can grant the Owner or Super Admin role to another user.");
+        }
       }
     }
     if (a.apps.length > 0) {
@@ -572,12 +597,12 @@ export async function inviteUserToWorkspacesServer(
 export async function setUserAppRolesServer(input: SetUserAppRolesInput, context: AccountContext, deps: AccountDeps) {
   const supabaseAdmin = deps.supabaseAdmin;
   const callerId = context.userId;
-  await assertCallerManagesTenant(supabaseAdmin, input.tenant_id, callerId);
+  await assertCallerManagesTenant(supabaseAdmin, input.tenant_id, callerId, input.app_code);
   if (input.roles.includes("owner") || input.roles.includes("super_admin")) {
     // Only an Owner controls who else reaches Owner/Super Admin trust level
     // -- a Super Admin caller passes assertCallerManagesTenant above but
     // must not be able to mint themselves (or anyone) another Super Admin.
-    const isOwner = await callerIsOwner(supabaseAdmin, input.tenant_id, callerId);
+    const isOwner = await callerIsOwner(supabaseAdmin, input.tenant_id, callerId, input.app_code);
     if (!isOwner) {
       throw new Error("Only an Owner can grant the Owner or Super Admin role.");
     }
