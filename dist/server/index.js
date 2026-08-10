@@ -291,18 +291,24 @@ async function getCallerManageableTenantIds(supabaseAdmin, userId) {
   (data ?? []).forEach((r) => ids.add(r.tenant_id));
   return Array.from(ids);
 }
-async function assertCallerManagesTenant(supabaseAdmin, tenantId, userId) {
-  const { data, error } = await supabaseAdmin.from("user_roles").select("role").eq("tenant_id", tenantId).eq("user_id", userId);
+async function assertCallerManagesTenant(supabaseAdmin, tenantId, userId, appCode) {
+  const { data, error } = await supabaseAdmin.from("user_roles").select("role, app_code").eq("tenant_id", tenantId).eq("user_id", userId);
   if (error) throw new Error(error.message);
-  const roles = (data ?? []).map((r) => r.role);
-  if (!roles.some((r) => r === "owner" || r === "super_admin")) {
-    throw new Error("Forbidden: owner or super_admin required");
-  }
+  const rows = data ?? [];
+  const ok = rows.some((r) => {
+    if (r.role !== "owner" && r.role !== "super_admin") return false;
+    if (!appCode) return true;
+    if (r.role === "owner") return true;
+    return r.app_code === null || r.app_code === appCode;
+  });
+  if (!ok) throw new Error("Forbidden: owner or super_admin required");
 }
-async function callerIsOwner(supabaseAdmin, tenantId, userId) {
-  const { data, error } = await supabaseAdmin.from("user_roles").select("role").eq("tenant_id", tenantId).eq("user_id", userId).eq("role", "owner").limit(1);
+async function callerIsOwner(supabaseAdmin, tenantId, userId, appCode) {
+  const { data, error } = await supabaseAdmin.from("user_roles").select("role, app_code").eq("tenant_id", tenantId).eq("user_id", userId).eq("role", "owner");
   if (error) throw new Error(error.message);
-  return (data ?? []).length > 0;
+  const rows = data ?? [];
+  if (!appCode) return rows.length > 0;
+  return rows.some((r) => r.app_code === null || r.app_code === appCode) || rows.length > 0;
 }
 async function getCallerOwnerTenantIds(supabaseAdmin, userId) {
   const { data, error } = await supabaseAdmin.from("user_roles").select("tenant_id").eq("user_id", userId).eq("role", "owner");
@@ -502,13 +508,13 @@ async function inviteUserToWorkspacesServer(input, context, deps) {
   const callerId = context.userId;
   for (const a of input.assignments) {
     await assertCallerManagesTenant(supabaseAdmin, a.tenant_id, callerId);
-    const wantsOwnerOrSuperAdmin = a.apps.some(
-      (ap) => ap.roles.some((r) => r === "owner" || r === "super_admin")
-    );
-    if (wantsOwnerOrSuperAdmin) {
-      const isOwner = await callerIsOwner(supabaseAdmin, a.tenant_id, callerId);
-      if (!isOwner) {
-        throw new Error("Only an Owner can grant the Owner or Super Admin role to another user.");
+    for (const ap of a.apps) {
+      await assertCallerManagesTenant(supabaseAdmin, a.tenant_id, callerId, ap.app_code);
+      if (ap.roles.some((r) => r === "owner" || r === "super_admin")) {
+        const isOwner = await callerIsOwner(supabaseAdmin, a.tenant_id, callerId, ap.app_code);
+        if (!isOwner) {
+          throw new Error("Only an Owner can grant the Owner or Super Admin role to another user.");
+        }
       }
     }
     if (a.apps.length > 0) {
@@ -580,9 +586,9 @@ async function inviteUserToWorkspacesServer(input, context, deps) {
 async function setUserAppRolesServer(input, context, deps) {
   const supabaseAdmin = deps.supabaseAdmin;
   const callerId = context.userId;
-  await assertCallerManagesTenant(supabaseAdmin, input.tenant_id, callerId);
+  await assertCallerManagesTenant(supabaseAdmin, input.tenant_id, callerId, input.app_code);
   if (input.roles.includes("owner") || input.roles.includes("super_admin")) {
-    const isOwner = await callerIsOwner(supabaseAdmin, input.tenant_id, callerId);
+    const isOwner = await callerIsOwner(supabaseAdmin, input.tenant_id, callerId, input.app_code);
     if (!isOwner) {
       throw new Error("Only an Owner can grant the Owner or Super Admin role.");
     }
