@@ -21,6 +21,13 @@ export type AdminDeps = {
    * role granted in a different suite app never satisfies this app's checks.
    */
   appCode: string;
+  /**
+   * App-scoped roles (beyond the universal owner/super_admin) allowed to
+   * write/delete parties -- e.g. JoaBooks also wants finance_manager/
+   * finance_ap/accountant, JoaOffice wants its broader "directory" roles
+   * (hr_manager/manager). Defaults to ["admin"] when omitted.
+   */
+  vendorEditRoles?: string[];
 };
 
 export type MergePartiesDeps = AdminDeps & {
@@ -28,6 +35,18 @@ export type MergePartiesDeps = AdminDeps & {
   partyDocRefTables: PartyRefTable[];
   /** Owned sub-record tables that get REASSIGNED on merge and cascade (don't block) on delete. */
   partyChildTables: PartyRefTable[];
+};
+
+export type DeletePartyDeps = AdminDeps & {
+  /** Tables that BLOCK a party delete. See each app's party-references.ts. */
+  partyDocRefTables: PartyRefTable[];
+  /** Optional pre-delete audit snapshot hook -- e.g. JoaOffice's auditHardDelete. */
+  auditHardDelete?: (row: {
+    tenant_id: string;
+    actor_user_id: string;
+    record_type: string;
+    record_id: string;
+  }) => Promise<void>;
 };
 
 function resolveAppBaseUrl(deps: AdminDeps) {
@@ -134,7 +153,13 @@ async function assertOwnerIfGrantingPrivilegedRole(
   }
 }
 
-async function assertCanEditVendor(supabaseAdmin: any, appCode: string, tenantId: string, userId: string) {
+async function assertCanEditVendor(
+  supabaseAdmin: any,
+  appCode: string,
+  tenantId: string,
+  userId: string,
+  extraRoles: string[] = ["admin"],
+) {
   const { data, error } = await supabaseAdmin
     .from("user_roles")
     .select("role, app_code")
@@ -146,7 +171,7 @@ async function assertCanEditVendor(supabaseAdmin: any, appCode: string, tenantId
     const role = r.role as string;
     const rowAppCode = r.app_code as string | null;
     if (rowAppCode === null) return role === "owner" || role === "super_admin";
-    return rowAppCode === appCode && role === "admin";
+    return rowAppCode === appCode && extraRoles.includes(role);
   });
   if (!ok) throw new Error("Forbidden: vendor edit role required");
 }
@@ -727,7 +752,9 @@ export function createListParties(deps: AdminDeps) {
     .inputValidator((i) =>
       z.object({
         tenant_id: z.string().uuid(),
-        kind: z.enum(["all", "vendor", "customer"]).default("all"),
+        kind: z.enum(["all", "vendor", "customer", "payee"]).default("all"),
+        include_archived: z.boolean().default(false),
+        only_archived: z.boolean().default(false),
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
@@ -739,10 +766,17 @@ export function createListParties(deps: AdminDeps) {
         .order("name_en");
       if (data.kind === "vendor") q = q.eq("is_vendor", true);
       if (data.kind === "customer") q = q.eq("is_customer", true);
+      // "payee" = anyone we might pay: vendors OR employees/contractors.
+      if (data.kind === "payee") q = q.or("is_vendor.eq.true,is_employee.eq.true");
+      if (data.only_archived) q = q.not("archived_at", "is", null);
+      else if (!data.include_archived) q = q.is("archived_at", null);
       const { data: rows, error } = await q;
       if (error) throw new Error(error.message);
       const list = rows ?? [];
 
+      // Enrich with sign-in status so the UI can distinguish
+      // "Invited" (linked_user_id set but never signed in) from
+      // "Linked" (the user has actually signed in at least once).
       const linkedIds = Array.from(
         new Set(list.map((p: any) => p.linked_user_id).filter((x: any): x is string => !!x)),
       );
@@ -758,9 +792,25 @@ export function createListParties(deps: AdminDeps) {
           }
         }
       }
+      // Enrich payees with worker_type from employee_profiles so callers can
+      // split the "payee" list into vendor / employee / contractor buckets.
+      const employeePartyIds = list
+        .filter((p: any) => p.is_employee)
+        .map((p: any) => p.id);
+      const workerTypeMap = new Map<string, string | null>();
+      if (employeePartyIds.length > 0) {
+        const { data: profiles } = await deps.supabaseAdmin
+          .from("employee_profiles")
+          .select("party_id, worker_type")
+          .in("party_id", employeePartyIds);
+        for (const row of profiles ?? []) {
+          workerTypeMap.set((row as any).party_id, (row as any).worker_type ?? null);
+        }
+      }
       return list.map((p: any) => ({
         ...p,
         linked_signed_in: p.linked_user_id ? signedInMap.get(p.linked_user_id) ?? false : false,
+        worker_type: workerTypeMap.get(p.id) ?? null,
       }));
     });
 }
@@ -778,6 +828,7 @@ export function createUpsertParty(deps: AdminDeps) {
         payee_type: z.enum(["business", "individual"]).default("business"),
         is_vendor: z.boolean().default(true),
         is_customer: z.boolean().default(false),
+        is_employee: z.boolean().default(false),
         is_payee: z.boolean().default(true),
         is_payer: z.boolean().default(false),
         legal_address: z.string().max(500).optional().nullable(),
@@ -804,20 +855,28 @@ export function createUpsertParty(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
-      const { id, ...rest } = data;
+      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId, deps.vendorEditRoles);
+      // tenant_id/id are routing, not writable columns -- keep them out of
+      // the row payload so an update can never move a party into a
+      // different tenant than the one the caller was just authorized for
+      // (this table is written via the service-role client, bypassing RLS).
+      const { id, tenant_id, ...rest } = data;
       const row = {
         ...rest,
         contact_email: rest.contact_email === "" ? null : rest.contact_email,
       };
       if (id) {
-        const { error } = await deps.supabaseAdmin.from("parties").update(row).eq("id", id);
+        const { error } = await deps.supabaseAdmin
+          .from("parties")
+          .update(row)
+          .eq("id", id)
+          .eq("tenant_id", tenant_id);
         if (error) throw new Error(error.message);
         return { id };
       }
       const { data: ins, error } = await deps.supabaseAdmin
         .from("parties")
-        .insert({ ...row, created_by: context.userId })
+        .insert({ ...row, tenant_id, source_app: deps.appCode, created_by: context.userId })
         .select("id")
         .single();
       if (error) throw new Error(error.message);
@@ -825,7 +884,7 @@ export function createUpsertParty(deps: AdminDeps) {
     });
 }
 
-export function createDeleteParty(deps: AdminDeps) {
+export function createDeleteParty(deps: DeletePartyDeps) {
   return createServerFn({ method: "POST" })
     .middleware([deps.requireSupabaseAuth])
     .inputValidator((i) =>
@@ -835,7 +894,35 @@ export function createDeleteParty(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
+      await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId, deps.vendorEditRoles);
+
+      // Reference guard: refuse deletion if the party is still referenced by
+      // any business document. See each app's party-references.ts.
+      const blockers: string[] = [];
+      for (const ref of deps.partyDocRefTables) {
+        const { count, error } = await deps.supabaseAdmin
+          .from(ref.table)
+          .select("id", { count: "exact", head: true })
+          .eq("tenant_id", data.tenant_id)
+          .eq(ref.column, data.party_id);
+        if (error) throw new Error(`${ref.table}: ${error.message}`);
+        if ((count ?? 0) > 0) blockers.push(`${ref.label ?? ref.table} (${count})`);
+      }
+      if (blockers.length > 0) {
+        throw new Error(
+          `Cannot delete: still referenced by ${blockers.join(", ")}. Merge or reassign first.`,
+        );
+      }
+
+      if (deps.auditHardDelete) {
+        await deps.auditHardDelete({
+          tenant_id: data.tenant_id,
+          actor_user_id: context.userId,
+          record_type: "parties",
+          record_id: data.party_id,
+        });
+      }
+
       const { error } = await deps.supabaseAdmin
         .from("parties")
         .delete()
@@ -856,7 +943,30 @@ export function createGetParty(deps: AdminDeps) {
       }).parse(i),
     )
     .handler(async ({ data, context }) => {
-      await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+      const member = await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+      if (member.portal !== "internal") {
+        // Vendor/customer/approver portal: only allow fetching the caller's
+        // own linked party record -- this returns bank accounts and
+        // contacts, which must not be readable for any other party in the
+        // tenant just by knowing/guessing its id.
+        const [{ data: direct }, { data: viaContacts }] = await Promise.all([
+          deps.supabaseAdmin
+            .from("parties")
+            .select("id")
+            .eq("tenant_id", data.tenant_id)
+            .eq("id", data.party_id)
+            .eq("linked_user_id", context.userId)
+            .maybeSingle(),
+          deps.supabaseAdmin
+            .from("party_contacts")
+            .select("party_id")
+            .eq("tenant_id", data.tenant_id)
+            .eq("party_id", data.party_id)
+            .eq("linked_user_id", context.userId)
+            .maybeSingle(),
+        ]);
+        if (!direct && !viaContacts) throw new Error("Forbidden: not your party record");
+      }
       const { data: row, error } = await deps.supabaseAdmin
         .from("parties")
         .select("*")
