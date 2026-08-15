@@ -774,6 +774,7 @@ export function createUpsertParty(deps: AdminDeps) {
         id: z.string().uuid().optional(),
         name_en: z.string().min(1).max(200),
         nick_name: z.string().max(200).optional().nullable(),
+        role_service: z.string().min(1).max(2000),
         payee_type: z.enum(["business", "individual"]).default("business"),
         is_vendor: z.boolean().default(true),
         is_customer: z.boolean().default(false),
