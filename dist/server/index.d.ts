@@ -515,12 +515,30 @@ type AdminDeps = {
      * role granted in a different suite app never satisfies this app's checks.
      */
     appCode: string;
+    /**
+     * App-scoped roles (beyond the universal owner/super_admin) allowed to
+     * write/delete parties -- e.g. JoaBooks also wants finance_manager/
+     * finance_ap/accountant, JoaOffice wants its broader "directory" roles
+     * (hr_manager/manager). Defaults to ["admin"] when omitted.
+     */
+    vendorEditRoles?: string[];
 };
 type MergePartiesDeps = AdminDeps & {
     /** Tables that BLOCK a party delete and get REASSIGNED on merge. See each app's party-references.ts. */
     partyDocRefTables: PartyRefTable[];
     /** Owned sub-record tables that get REASSIGNED on merge and cascade (don't block) on delete. */
     partyChildTables: PartyRefTable[];
+};
+type DeletePartyDeps = AdminDeps & {
+    /** Tables that BLOCK a party delete. See each app's party-references.ts. */
+    partyDocRefTables: PartyRefTable[];
+    /** Optional pre-delete audit snapshot hook -- e.g. JoaOffice's auditHardDelete. */
+    auditHardDelete?: (row: {
+        tenant_id: string;
+        actor_user_id: string;
+        record_type: string;
+        record_id: string;
+    }) => Promise<void>;
 };
 declare function createGetTenantSettings(deps: AdminDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
     tenant_id: string;
@@ -607,14 +625,18 @@ declare function createRemoveTenantUser(deps: AdminDeps): _tanstack_start_client
 }>>;
 declare function createListParties(deps: AdminDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
     tenant_id: string;
-    kind: "vendor" | "customer" | "all";
+    kind: "vendor" | "customer" | "all" | "payee";
+    include_archived: boolean;
+    only_archived: boolean;
 }, Promise<any>>;
 declare function createUpsertParty(deps: AdminDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
     tenant_id: string;
     name_en: string;
+    role_service: string;
     payee_type: "business" | "individual";
     is_vendor: boolean;
     is_customer: boolean;
+    is_employee: boolean;
     is_payee: boolean;
     is_payer: boolean;
     active: boolean;
@@ -643,7 +665,7 @@ declare function createUpsertParty(deps: AdminDeps): _tanstack_start_client_core
 }, Promise<{
     id: any;
 }>>;
-declare function createDeleteParty(deps: AdminDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
+declare function createDeleteParty(deps: DeletePartyDeps): _tanstack_start_client_core.OptionalFetcher<readonly [any], (i: unknown) => {
     tenant_id: string;
     party_id: string;
 }, Promise<{

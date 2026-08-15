@@ -1150,7 +1150,7 @@ async function assertOwnerIfGrantingPrivilegedRole(supabaseAdmin, tenantId, call
     throw new Error("Only an Owner can grant the Owner or Super Admin role.");
   }
 }
-async function assertCanEditVendor(supabaseAdmin, appCode, tenantId, userId) {
+async function assertCanEditVendor(supabaseAdmin, appCode, tenantId, userId, extraRoles = ["admin"]) {
   const { data, error } = await supabaseAdmin.from("user_roles").select("role, app_code").eq("tenant_id", tenantId).eq("user_id", userId);
   if (error) throw new Error(error.message);
   const rows = data ?? [];
@@ -1158,7 +1158,7 @@ async function assertCanEditVendor(supabaseAdmin, appCode, tenantId, userId) {
     const role = r.role;
     const rowAppCode = r.app_code;
     if (rowAppCode === null) return role === "owner" || role === "super_admin";
-    return rowAppCode === appCode && role === "admin";
+    return rowAppCode === appCode && extraRoles.includes(role);
   });
   if (!ok) throw new Error("Forbidden: vendor edit role required");
 }
@@ -1509,13 +1509,18 @@ function createListParties(deps) {
   return createServerFn({ method: "POST" }).middleware([deps.requireSupabaseAuth]).inputValidator(
     (i) => z.object({
       tenant_id: z.string().uuid(),
-      kind: z.enum(["all", "vendor", "customer"]).default("all")
+      kind: z.enum(["all", "vendor", "customer", "payee"]).default("all"),
+      include_archived: z.boolean().default(false),
+      only_archived: z.boolean().default(false)
     }).parse(i)
   ).handler(async ({ data, context }) => {
     await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
     let q = deps.supabaseAdmin.from("parties").select("*").eq("tenant_id", data.tenant_id).order("name_en");
     if (data.kind === "vendor") q = q.eq("is_vendor", true);
     if (data.kind === "customer") q = q.eq("is_customer", true);
+    if (data.kind === "payee") q = q.or("is_vendor.eq.true,is_employee.eq.true");
+    if (data.only_archived) q = q.not("archived_at", "is", null);
+    else if (!data.include_archived) q = q.is("archived_at", null);
     const { data: rows, error } = await q;
     if (error) throw new Error(error.message);
     const list = rows ?? [];
@@ -1534,9 +1539,18 @@ function createListParties(deps) {
         }
       }
     }
+    const employeePartyIds = list.filter((p) => p.is_employee).map((p) => p.id);
+    const workerTypeMap = /* @__PURE__ */ new Map();
+    if (employeePartyIds.length > 0) {
+      const { data: profiles } = await deps.supabaseAdmin.from("employee_profiles").select("party_id, worker_type").in("party_id", employeePartyIds);
+      for (const row of profiles ?? []) {
+        workerTypeMap.set(row.party_id, row.worker_type ?? null);
+      }
+    }
     return list.map((p) => ({
       ...p,
-      linked_signed_in: p.linked_user_id ? signedInMap.get(p.linked_user_id) ?? false : false
+      linked_signed_in: p.linked_user_id ? signedInMap.get(p.linked_user_id) ?? false : false,
+      worker_type: workerTypeMap.get(p.id) ?? null
     }));
   });
 }
@@ -1547,9 +1561,11 @@ function createUpsertParty(deps) {
       id: z.string().uuid().optional(),
       name_en: z.string().min(1).max(200),
       nick_name: z.string().max(200).optional().nullable(),
+      role_service: z.string().min(1).max(2e3),
       payee_type: z.enum(["business", "individual"]).default("business"),
       is_vendor: z.boolean().default(true),
       is_customer: z.boolean().default(false),
+      is_employee: z.boolean().default(false),
       is_payee: z.boolean().default(true),
       is_payer: z.boolean().default(false),
       legal_address: z.string().max(500).optional().nullable(),
@@ -1575,18 +1591,18 @@ function createUpsertParty(deps) {
       internal_notes: z.string().max(2e3).optional().nullable()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
-    const { id, ...rest } = data;
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId, deps.vendorEditRoles);
+    const { id, tenant_id, ...rest } = data;
     const row = {
       ...rest,
       contact_email: rest.contact_email === "" ? null : rest.contact_email
     };
     if (id) {
-      const { error: error2 } = await deps.supabaseAdmin.from("parties").update(row).eq("id", id);
+      const { error: error2 } = await deps.supabaseAdmin.from("parties").update(row).eq("id", id).eq("tenant_id", tenant_id);
       if (error2) throw new Error(error2.message);
       return { id };
     }
-    const { data: ins, error } = await deps.supabaseAdmin.from("parties").insert({ ...row, created_by: context.userId }).select("id").single();
+    const { data: ins, error } = await deps.supabaseAdmin.from("parties").insert({ ...row, tenant_id, source_app: deps.appCode, created_by: context.userId }).select("id").single();
     if (error) throw new Error(error.message);
     return { id: ins.id };
   });
@@ -1598,7 +1614,26 @@ function createDeleteParty(deps) {
       party_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId);
+    await assertCanEditVendor(deps.supabaseAdmin, deps.appCode, data.tenant_id, context.userId, deps.vendorEditRoles);
+    const blockers = [];
+    for (const ref of deps.partyDocRefTables) {
+      const { count, error: error2 } = await deps.supabaseAdmin.from(ref.table).select("id", { count: "exact", head: true }).eq("tenant_id", data.tenant_id).eq(ref.column, data.party_id);
+      if (error2) throw new Error(`${ref.table}: ${error2.message}`);
+      if ((count ?? 0) > 0) blockers.push(`${ref.label ?? ref.table} (${count})`);
+    }
+    if (blockers.length > 0) {
+      throw new Error(
+        `Cannot delete: still referenced by ${blockers.join(", ")}. Merge or reassign first.`
+      );
+    }
+    if (deps.auditHardDelete) {
+      await deps.auditHardDelete({
+        tenant_id: data.tenant_id,
+        actor_user_id: context.userId,
+        record_type: "parties",
+        record_id: data.party_id
+      });
+    }
     const { error } = await deps.supabaseAdmin.from("parties").delete().eq("id", data.party_id).eq("tenant_id", data.tenant_id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -1611,7 +1646,14 @@ function createGetParty(deps) {
       party_id: z.string().uuid()
     }).parse(i)
   ).handler(async ({ data, context }) => {
-    await assertInternalTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    const member = await assertTenantMember(deps.supabaseAdmin, data.tenant_id, context.userId);
+    if (member.portal !== "internal") {
+      const [{ data: direct }, { data: viaContacts }] = await Promise.all([
+        deps.supabaseAdmin.from("parties").select("id").eq("tenant_id", data.tenant_id).eq("id", data.party_id).eq("linked_user_id", context.userId).maybeSingle(),
+        deps.supabaseAdmin.from("party_contacts").select("party_id").eq("tenant_id", data.tenant_id).eq("party_id", data.party_id).eq("linked_user_id", context.userId).maybeSingle()
+      ]);
+      if (!direct && !viaContacts) throw new Error("Forbidden: not your party record");
+    }
     const { data: row, error } = await deps.supabaseAdmin.from("parties").select("*").eq("tenant_id", data.tenant_id).eq("id", data.party_id).single();
     if (error) throw new Error(error.message);
     const [{ data: banks }, { data: contacts }] = await Promise.all([
