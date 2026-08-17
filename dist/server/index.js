@@ -1123,7 +1123,7 @@ async function assertOwnerOrAdmin2(supabaseAdmin, appCode, tenantId, userId) {
   const ok = rows.some((r) => {
     const role = r.role;
     const rowAppCode = r.app_code;
-    if (rowAppCode === null) return role === "owner" || role === "super_admin";
+    if (role === "owner" || role === "super_admin") return rowAppCode === null || rowAppCode === appCode;
     return rowAppCode === appCode && role === "admin";
   });
   if (!ok) throw new Error("Forbidden: admin role required");
@@ -1157,7 +1157,7 @@ async function assertCanEditVendor(supabaseAdmin, appCode, tenantId, userId, ext
   const ok = rows.some((r) => {
     const role = r.role;
     const rowAppCode = r.app_code;
-    if (rowAppCode === null) return role === "owner" || role === "super_admin";
+    if (role === "owner" || role === "super_admin") return rowAppCode === null || rowAppCode === appCode;
     return rowAppCode === appCode && extraRoles.includes(role);
   });
   if (!ok) throw new Error("Forbidden: vendor edit role required");
