@@ -823,6 +823,93 @@ type DocumentLibraryTableProps = {
  */
 declare function DocumentLibraryTable({ rows, loading, formatSize, formatDate, onOpen, onNavigate, onDelete, }: DocumentLibraryTableProps): react.JSX.Element;
 
+/**
+ * Shared Content Core — relation-provider contract.
+ *
+ * A relation provider tells the generic Link-to-record UI what entity types
+ * an app supports and how to search/resolve them, WITHOUT the shared
+ * package ever knowing about Bills, Vendors, or any app-specific table.
+ * Each app supplies its own provider; JoaOffice can supply none at all
+ * (no financial linking controls exist there even if the tenant also has
+ * JoaBooks -- see the "current-app capability" rule).
+ *
+ * entityType values are deliberately the same strings as this suite's
+ * existing public.doc_kind enum (e.g. "party", "payment_request",
+ * "joahr.worker_document") -- see the content_relations migration's own
+ * comment for why: it lets content_relations rows be authorized by calling
+ * the already-unified public.user_can_view_doc() directly.
+ */
+type RelationEntityTypeOption = {
+    /** Same value space as public.doc_kind, e.g. "party", "payment_request". */
+    entityType: string;
+    /** Display label, e.g. "Vendor", "Bill". Pass pre-translated. */
+    label: string;
+};
+type RelationSearchResult = {
+    entityId: string;
+    /** Primary line, e.g. "BILL-2026-0182". */
+    label: string;
+    /** Secondary line with useful context, e.g. "Comcast · $328.42 · Aug 2026". */
+    sublabel?: string;
+};
+type ContentRelationProvider = {
+    getEntityTypes(): RelationEntityTypeOption[];
+    searchEntities(entityType: string, query: string): Promise<RelationSearchResult[]>;
+    /**
+     * Batch-resolve display info for already-linked entities (e.g. to render
+     * "Related Records"), keyed by `${entityType}:${entityId}`. Only entries
+     * the caller can actually see need to be present in the result.
+     */
+    resolveEntities(refs: Array<{
+        entityType: string;
+        entityId: string;
+    }>): Promise<Record<string, RelationSearchResult>>;
+    /** Where clicking a search result / an existing relation should navigate. Return null if there's no detail page. */
+    getEntityHref(entityType: string, entityId: string): string | null;
+};
+type ContentRelationRow = {
+    id: string;
+    contentItemId: string;
+    appCode: string;
+    entityType: string;
+    entityId: string;
+    relationType: string;
+    createdAt: string;
+};
+
+type LinkToRecordDialogProps = {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    provider: ContentRelationProvider;
+    /** Called when the user picks a search result. Resolve to close the dialog on success. */
+    onLink: (entityType: string, result: RelationSearchResult) => Promise<void>;
+};
+/**
+ * "Link to record" — deliberately not "Assign" (per the JoaBooks UX rule:
+ * a content item may relate to many records, many-to-many). Presentational
+ * + a search callback; the host app owns what entity types exist and how
+ * to search them via `provider`.
+ */
+declare function LinkToRecordDialog({ open, onOpenChange, provider, onLink }: LinkToRecordDialogProps): react.JSX.Element;
+
+type RelatedRecordsPanelProps = {
+    relations: ContentRelationRow[];
+    provider: ContentRelationProvider;
+    onLink: (entityType: string, result: RelationSearchResult) => Promise<void>;
+    onUnlink?: (relation: ContentRelationRow) => Promise<void>;
+    onNavigate?: (href: string) => void;
+    loading?: boolean;
+};
+/**
+ * "Related Records" -- the many-to-many relationship section (per the
+ * JoaBooks UX rule: never "Assigned to"). Shows every current relation for
+ * one content item and a button to add another. Bidirectional visibility
+ * (a Bill showing which content items relate to IT) is the host app's own
+ * page composing this same data from the other direction -- this component
+ * only renders the content-item side.
+ */
+declare function RelatedRecordsPanel({ relations, provider, onLink, onUnlink, onNavigate, loading }: RelatedRecordsPanelProps): react.JSX.Element;
+
 declare function OrgStructureSettingsPage({ tenantId }: {
     tenantId: string;
 }): react.JSX.Element;
@@ -901,4 +988,4 @@ declare function BillingComparePage({ appCode }: {
  */
 declare function useOrgScope(): [string[], (tenantIds: string[]) => void];
 
-export { type AppCatalogEntry, AppCode, AppOverviewSection, type AppSummaryTile, type ApprovalSummary, AttachmentPreviewDialog, type AttachmentPreviewDialogProps, type AttachmentPreviewKind, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type Department, type DocumentLibraryRow, DocumentLibraryTable, type DocumentLibraryTableProps, FieldGroup, FieldRow, InviteAsUserBanner, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, type OrgChartDepartmentT, type OrgChartPersonT, type OrgChartPositionT, OrgChartView, type OrgChartViewProps, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, type RouterAdapter, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, type TeamMemberInput, type TeamMemberRow, TeamMemberView, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, guessAttachmentKind, mergeSharedResources, useJoaSuite, useOrgScope };
+export { type AppCatalogEntry, AppCode, AppOverviewSection, type AppSummaryTile, type ApprovalSummary, AttachmentPreviewDialog, type AttachmentPreviewDialogProps, type AttachmentPreviewKind, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type ContentRelationProvider, type ContentRelationRow, type Department, type DocumentLibraryRow, DocumentLibraryTable, type DocumentLibraryTableProps, FieldGroup, FieldRow, InviteAsUserBanner, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, LinkToRecordDialog, type LinkToRecordDialogProps, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, type OrgChartDepartmentT, type OrgChartPersonT, type OrgChartPositionT, OrgChartView, type OrgChartViewProps, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, RelatedRecordsPanel, type RelatedRecordsPanelProps, type RelationEntityTypeOption, type RelationSearchResult, type RouterAdapter, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, type TeamMemberInput, type TeamMemberRow, TeamMemberView, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, guessAttachmentKind, mergeSharedResources, useJoaSuite, useOrgScope };

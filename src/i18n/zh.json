@@ -348,5 +348,13 @@
     "empty": "暂无文档。",
     "open": "打开",
     "delete": "删除"
+  },
+  "content_core": {
+    "link_to_record": "关联记录",
+    "search_records": "搜索记录…",
+    "no_results": "没有匹配的记录。",
+    "related_records": "关联记录",
+    "no_related_records": "尚未关联任何记录。",
+    "unlink": "取消关联"
   }
 }

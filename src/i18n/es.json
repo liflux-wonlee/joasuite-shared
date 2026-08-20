@@ -351,5 +351,13 @@
     "empty": "Aún no hay documentos.",
     "open": "Abrir",
     "delete": "Eliminar"
+  },
+  "content_core": {
+    "link_to_record": "Vincular a un registro",
+    "search_records": "Buscar registros…",
+    "no_results": "No hay registros coincidentes.",
+    "related_records": "Registros relacionados",
+    "no_related_records": "Aún no está vinculado a ningún registro.",
+    "unlink": "Desvincular"
   }
 }

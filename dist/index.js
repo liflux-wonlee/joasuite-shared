@@ -430,6 +430,14 @@ var en_default = {
     empty: "No documents yet.",
     open: "Open",
     delete: "Delete"
+  },
+  content_core: {
+    link_to_record: "Link to record",
+    search_records: "Search records\u2026",
+    no_results: "No matching records.",
+    related_records: "Related Records",
+    no_related_records: "Not linked to any record yet.",
+    unlink: "Unlink"
   }
 };
 
@@ -799,6 +807,14 @@ var ko_default = {
     empty: "\uC544\uC9C1 \uBB38\uC11C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
     open: "\uC5F4\uAE30",
     delete: "\uC0AD\uC81C"
+  },
+  content_core: {
+    link_to_record: "\uB808\uCF54\uB4DC\uC5D0 \uC5F0\uACB0",
+    search_records: "\uB808\uCF54\uB4DC \uAC80\uC0C9\u2026",
+    no_results: "\uC77C\uCE58\uD558\uB294 \uB808\uCF54\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    related_records: "\uC5F0\uACB0\uB41C \uB808\uCF54\uB4DC",
+    no_related_records: "\uC544\uC9C1 \uC5F0\uACB0\uB41C \uB808\uCF54\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    unlink: "\uC5F0\uACB0 \uD574\uC81C"
   }
 };
 
@@ -1153,6 +1169,14 @@ var zh_default = {
     empty: "\u6682\u65E0\u6587\u6863\u3002",
     open: "\u6253\u5F00",
     delete: "\u5220\u9664"
+  },
+  content_core: {
+    link_to_record: "\u5173\u8054\u8BB0\u5F55",
+    search_records: "\u641C\u7D22\u8BB0\u5F55\u2026",
+    no_results: "\u6CA1\u6709\u5339\u914D\u7684\u8BB0\u5F55\u3002",
+    related_records: "\u5173\u8054\u8BB0\u5F55",
+    no_related_records: "\u5C1A\u672A\u5173\u8054\u4EFB\u4F55\u8BB0\u5F55\u3002",
+    unlink: "\u53D6\u6D88\u5173\u8054"
   }
 };
 
@@ -1510,6 +1534,14 @@ var es_default = {
     empty: "A\xFAn no hay documentos.",
     open: "Abrir",
     delete: "Eliminar"
+  },
+  content_core: {
+    link_to_record: "Vincular a un registro",
+    search_records: "Buscar registros\u2026",
+    no_results: "No hay registros coincidentes.",
+    related_records: "Registros relacionados",
+    no_related_records: "A\xFAn no est\xE1 vinculado a ning\xFAn registro.",
+    unlink: "Desvincular"
   }
 };
 
@@ -1867,6 +1899,14 @@ var vi_default = {
     empty: "Ch\u01B0a c\xF3 t\xE0i li\u1EC7u n\xE0o.",
     open: "M\u1EDF",
     delete: "X\xF3a"
+  },
+  content_core: {
+    link_to_record: "Li\xEAn k\u1EBFt \u0111\u1EBFn b\u1EA3n ghi",
+    search_records: "T\xECm ki\u1EBFm b\u1EA3n ghi\u2026",
+    no_results: "Kh\xF4ng c\xF3 b\u1EA3n ghi ph\xF9 h\u1EE3p.",
+    related_records: "B\u1EA3n ghi li\xEAn quan",
+    no_related_records: "Ch\u01B0a li\xEAn k\u1EBFt v\u1EDBi b\u1EA3n ghi n\xE0o.",
+    unlink: "H\u1EE7y li\xEAn k\u1EBFt"
   }
 };
 
@@ -4549,6 +4589,159 @@ function DocumentLibraryTable({
     ] })
   ] }) });
 }
+function LinkToRecordDialog({ open, onOpenChange, provider, onLink }) {
+  const { t } = useTranslation();
+  const { ui } = useJoaSuite();
+  const { Dialog, DialogContent, DialogHeader, DialogTitle, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Button } = ui;
+  const entityTypes = provider.getEntityTypes();
+  const [entityType, setEntityType] = useState(entityTypes[0]?.entityType ?? "");
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [linkingId, setLinkingId] = useState(null);
+  useEffect(() => {
+    if (!open) return;
+    setEntityType(entityTypes[0]?.entityType ?? "");
+    setQuery("");
+    setResults([]);
+  }, [open]);
+  useEffect(() => {
+    if (!open || !entityType) return;
+    let cancelled = false;
+    setLoading(true);
+    const handle = setTimeout(() => {
+      provider.searchEntities(entityType, query).then((rows) => {
+        if (!cancelled) setResults(rows);
+      }).finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [open, entityType, query, provider]);
+  async function handlePick(result) {
+    setLinkingId(result.entityId);
+    try {
+      await onLink(entityType, result);
+      onOpenChange(false);
+    } finally {
+      setLinkingId(null);
+    }
+  }
+  return /* @__PURE__ */ jsx(Dialog, { open, onOpenChange, children: /* @__PURE__ */ jsxs(DialogContent, { className: "max-w-lg w-[92vw] flex flex-col gap-4 p-5 max-h-[80vh]", children: [
+    /* @__PURE__ */ jsx(DialogHeader, { children: /* @__PURE__ */ jsx(DialogTitle, { children: t("content_core.link_to_record", "Link to record") }) }),
+    entityTypes.length > 1 && /* @__PURE__ */ jsxs(Select, { value: entityType, onValueChange: setEntityType, children: [
+      /* @__PURE__ */ jsx(SelectTrigger, { children: /* @__PURE__ */ jsx(SelectValue, {}) }),
+      /* @__PURE__ */ jsx(SelectContent, { children: entityTypes.map((et) => /* @__PURE__ */ jsx(SelectItem, { value: et.entityType, children: et.label }, et.entityType)) })
+    ] }),
+    /* @__PURE__ */ jsx(
+      Input,
+      {
+        autoFocus: true,
+        value: query,
+        onChange: (e) => setQuery(e.target.value),
+        placeholder: t("content_core.search_records", "Search records\u2026")
+      }
+    ),
+    /* @__PURE__ */ jsxs("div", { className: "flex-1 min-h-0 overflow-y-auto border rounded-md divide-y", children: [
+      loading && /* @__PURE__ */ jsx("div", { className: "px-3 py-6 text-center text-sm text-muted-foreground", children: t("common.loading", "Loading\u2026") }),
+      !loading && results.length === 0 && /* @__PURE__ */ jsx("div", { className: "px-3 py-6 text-center text-sm text-muted-foreground", children: t("content_core.no_results", "No matching records.") }),
+      !loading && results.map((r) => /* @__PURE__ */ jsxs(
+        "button",
+        {
+          type: "button",
+          disabled: linkingId === r.entityId,
+          onClick: () => handlePick(r),
+          className: "w-full text-left px-3 py-2.5 hover:bg-muted/60 disabled:opacity-50 flex flex-col gap-0.5",
+          children: [
+            /* @__PURE__ */ jsx("span", { className: "text-sm font-medium", children: r.label }),
+            r.sublabel && /* @__PURE__ */ jsx("span", { className: "text-xs text-muted-foreground", children: r.sublabel })
+          ]
+        },
+        r.entityId
+      ))
+    ] })
+  ] }) });
+}
+function RelatedRecordsPanel({ relations, provider, onLink, onUnlink, onNavigate, loading }) {
+  const { t } = useTranslation();
+  const { ui } = useJoaSuite();
+  const { Button } = ui;
+  const [resolved, setResolved] = useState({});
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [unlinkingId, setUnlinkingId] = useState(null);
+  useEffect(() => {
+    if (relations.length === 0) {
+      setResolved({});
+      return;
+    }
+    let cancelled = false;
+    provider.resolveEntities(relations.map((r) => ({ entityType: r.entityType, entityId: r.entityId }))).then((res) => {
+      if (!cancelled) setResolved(res);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [relations, provider]);
+  async function handleUnlink(r) {
+    if (!onUnlink) return;
+    setUnlinkingId(r.id);
+    try {
+      await onUnlink(r);
+    } finally {
+      setUnlinkingId(null);
+    }
+  }
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between", children: [
+      /* @__PURE__ */ jsx("h4", { className: "text-sm font-medium", children: t("content_core.related_records", "Related Records") }),
+      /* @__PURE__ */ jsx(Button, { size: "sm", variant: "outline", onClick: () => setDialogOpen(true), children: t("content_core.link_to_record", "Link to record") })
+    ] }),
+    loading && /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("common.loading", "Loading\u2026") }),
+    !loading && relations.length === 0 && /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("content_core.no_related_records", "Not linked to any record yet.") }),
+    !loading && relations.length > 0 && /* @__PURE__ */ jsx("ul", { className: "space-y-1", children: relations.map((r) => {
+      const key = `${r.entityType}:${r.entityId}`;
+      const info = resolved[key];
+      const href = provider.getEntityHref(r.entityType, r.entityId);
+      return /* @__PURE__ */ jsxs("li", { className: "flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm", children: [
+        href && onNavigate ? /* @__PURE__ */ jsxs(
+          "button",
+          {
+            type: "button",
+            onClick: () => onNavigate(href),
+            className: "text-left text-primary hover:underline truncate",
+            children: [
+              info?.label ?? r.entityType,
+              info?.sublabel ? /* @__PURE__ */ jsxs("span", { className: "text-muted-foreground", children: [
+                " \xB7 ",
+                info.sublabel
+              ] }) : null
+            ]
+          }
+        ) : /* @__PURE__ */ jsxs("span", { className: "truncate", children: [
+          info?.label ?? r.entityType,
+          info?.sublabel ? /* @__PURE__ */ jsxs("span", { className: "text-muted-foreground", children: [
+            " \xB7 ",
+            info.sublabel
+          ] }) : null
+        ] }),
+        onUnlink && /* @__PURE__ */ jsx(
+          Button,
+          {
+            size: "sm",
+            variant: "ghost",
+            disabled: unlinkingId === r.id,
+            onClick: () => handleUnlink(r),
+            children: t("content_core.unlink", "Unlink")
+          }
+        )
+      ] }, r.id);
+    }) }),
+    /* @__PURE__ */ jsx(LinkToRecordDialog, { open: dialogOpen, onOpenChange: setDialogOpen, provider, onLink })
+  ] });
+}
 function initials(name) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
@@ -6956,6 +7149,6 @@ function BillingComparePage({ appCode }) {
   ] });
 }
 
-export { APP_CODES, APP_DISPLAY, AppOverviewSection, AttachmentPreviewDialog, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, DocumentLibraryTable, FieldGroup, FieldRow, InviteAsUserBanner, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgChartView, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, TeamMemberView, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, guessAttachmentKind, mergeSharedResources, roleLabel, useJoaSuite, useOrgScope };
+export { APP_CODES, APP_DISPLAY, AppOverviewSection, AttachmentPreviewDialog, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, DocumentLibraryTable, FieldGroup, FieldRow, InviteAsUserBanner, JoaSuiteProvider, LanguageSwitcher, LinkToRecordDialog, NotificationsBell, OrgChartView, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, RelatedRecordsPanel, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, TeamMemberView, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, guessAttachmentKind, mergeSharedResources, roleLabel, useJoaSuite, useOrgScope };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

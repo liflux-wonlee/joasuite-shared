@@ -51,6 +51,14 @@ export {
   type DocumentLibraryRow,
   type DocumentLibraryTableProps,
 } from "./components/DocumentLibraryTable";
+export {
+  type ContentRelationProvider,
+  type ContentRelationRow,
+  type RelationEntityTypeOption,
+  type RelationSearchResult,
+} from "./lib/content-relations";
+export { LinkToRecordDialog, type LinkToRecordDialogProps } from "./components/LinkToRecordDialog";
+export { RelatedRecordsPanel, type RelatedRecordsPanelProps } from "./components/RelatedRecordsPanel";
 export { OrgStructureSettingsPage } from "./components/org-structure/OrgStructureSettingsPage";
 export { OrgChartView } from "./components/org-structure/OrgChartView";
 export type {

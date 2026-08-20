@@ -366,5 +366,13 @@
     "empty": "No documents yet.",
     "open": "Open",
     "delete": "Delete"
+  },
+  "content_core": {
+    "link_to_record": "Link to record",
+    "search_records": "Search records…",
+    "no_results": "No matching records.",
+    "related_records": "Related Records",
+    "no_related_records": "Not linked to any record yet.",
+    "unlink": "Unlink"
   }
 }

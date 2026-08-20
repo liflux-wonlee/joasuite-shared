@@ -351,5 +351,13 @@
     "empty": "Chưa có tài liệu nào.",
     "open": "Mở",
     "delete": "Xóa"
+  },
+  "content_core": {
+    "link_to_record": "Liên kết đến bản ghi",
+    "search_records": "Tìm kiếm bản ghi…",
+    "no_results": "Không có bản ghi phù hợp.",
+    "related_records": "Bản ghi liên quan",
+    "no_related_records": "Chưa liên kết với bản ghi nào.",
+    "unlink": "Hủy liên kết"
   }
 }
