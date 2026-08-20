@@ -131,3 +131,18 @@ src/routes/app.recurring.new.tsx
 #     from Planned Transactions (@/lib/recurring-v2.functions). Explicitly
 #     out of scope for JoaOffice per the original migration docs - not a
 #     gap.
+
+# Shared public-schema SQL migrations (Shared Content Core, 2026-08-20) --
+# extends this same push/pull mechanism to supabase/migrations/*.sql. These
+# scripts are plain path-driven file copies, no code change was needed to
+# support .sql alongside .ts. Migration-ownership decision (Content Core
+# Phase 0 report): public.attachments/parties/user_can_view_doc() already
+# lived in JoaBooks' migration history, so JoaBooks stays canonical here
+# too, rather than inventing a separate mechanism. Unlike the recurring
+# files above, these are NOT app-specific -- pull the exact same file into
+# every app repo's own supabase/migrations/ with an identical filename, no
+# post-pull edits. A repo that doesn't apply the migration to its own live
+# DB (only one physical DB is shared) still needs the file committed, so
+# its own migration history stays an accurate, replayable record.
+supabase/migrations/20260820130000_user_can_view_doc_canonical_sync.sql
+supabase/migrations/20260820140000_content_core_schema_foundation.sql
