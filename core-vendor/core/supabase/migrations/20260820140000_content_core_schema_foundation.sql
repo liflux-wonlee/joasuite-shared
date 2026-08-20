@@ -111,13 +111,27 @@ CREATE TABLE public.content_relations (
 CREATE INDEX content_relations_item_idx ON public.content_relations(content_item_id);
 CREATE INDEX content_relations_entity_idx ON public.content_relations(tenant_id, entity_type, entity_id);
 
--- ── Authorization: visible if creator OR any relation resolves visible ──
--- via the existing, already-unified per-app dispatcher. This is the ONLY
--- new authorization function Content Core needs -- it deliberately does not
--- reimplement any app's rules, only loops over relations and asks the real
--- dispatcher (which already knows how to delegate into
--- hr.can_view_worker_document / sop_can_view_document / etc.) whether each
--- one is visible.
+-- ── Authorization: AND across namespaces present, OR within a namespace ──
+-- via the existing, already-unified per-app dispatcher.
+--
+-- A naive "visible if ANY relation resolves visible" (plain OR across every
+-- relation) has a real cross-app leak: if a JoaHR tax_identity_restricted
+-- W-9 also gets a JoaBooks 'party' (vendor) relation, a JoaBooks-only
+-- finance_manager with zero HR access would pass the party-side check
+-- (ordinary is_joabooks_staff) and, under a plain OR, see the whole
+-- content item -- including the underlying HR-restricted file. That is
+-- exactly the leak Scenario C's "adding the JoaBooks relation must NOT
+-- automatically grant JoaBooks access" warns against.
+--
+-- Fix: group relations by namespace (the same LIKE-prefix grouping
+-- user_can_view_doc's own dispatch already uses -- joahr./joasop./
+-- joaoffice./shared./else-is-joabooks-family), and require the caller to
+-- pass at least one relation's check WITHIN EVERY namespace the item has a
+-- relation in. Within one namespace, OR is still correct and desired (two
+-- Bills in the same app: either being visible is enough, since they share
+-- the same app's trust boundary) -- it's only ACROSS namespaces that must
+-- be AND, so a viewer needs genuine access on every side the content has
+-- been explicitly related into, not just one.
 CREATE OR REPLACE FUNCTION public.user_can_view_content(_tenant uuid, _user uuid, _content_item_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -128,6 +142,9 @@ AS $$
 DECLARE
   _creator uuid;
   _found boolean;
+  _namespaces text[];
+  _ns text;
+  _ns_ok boolean;
   r record;
 BEGIN
   SELECT created_by INTO _creator FROM public.content_items
@@ -136,22 +153,49 @@ BEGIN
   IF NOT _found THEN RETURN false; END IF;
   IF _creator = _user THEN RETURN true; END IF;
 
-  FOR r IN
-    SELECT entity_type, entity_id FROM public.content_relations
-     WHERE content_item_id = _content_item_id AND tenant_id = _tenant
-  LOOP
-    BEGIN
-      IF public.user_can_view_doc(_tenant, _user, r.entity_type::public.doc_kind, r.entity_id) THEN
-        RETURN true;
-      END IF;
-    EXCEPTION WHEN invalid_text_representation THEN
-      -- entity_type isn't a known doc_kind value yet (e.g. a future app's
-      -- own entity space not mirrored into doc_kind) -- skip, don't error.
-      CONTINUE;
-    END;
+  SELECT array_agg(DISTINCT
+    CASE
+      WHEN entity_type LIKE 'joahr.%' THEN 'joahr'
+      WHEN entity_type LIKE 'joasop.%' THEN 'joasop'
+      WHEN entity_type LIKE 'joaoffice.%' THEN 'joaoffice'
+      WHEN entity_type LIKE 'shared.%' THEN 'shared'
+      ELSE 'joabooks'
+    END
+  ) INTO _namespaces
+  FROM public.content_relations
+  WHERE content_item_id = _content_item_id AND tenant_id = _tenant;
+
+  IF _namespaces IS NULL THEN RETURN false; END IF;
+
+  FOREACH _ns IN ARRAY _namespaces LOOP
+    _ns_ok := false;
+    FOR r IN
+      SELECT entity_type, entity_id FROM public.content_relations
+       WHERE content_item_id = _content_item_id AND tenant_id = _tenant
+         AND CASE
+               WHEN entity_type LIKE 'joahr.%' THEN 'joahr'
+               WHEN entity_type LIKE 'joasop.%' THEN 'joasop'
+               WHEN entity_type LIKE 'joaoffice.%' THEN 'joaoffice'
+               WHEN entity_type LIKE 'shared.%' THEN 'shared'
+               ELSE 'joabooks'
+             END = _ns
+    LOOP
+      BEGIN
+        IF public.user_can_view_doc(_tenant, _user, r.entity_type::public.doc_kind, r.entity_id) THEN
+          _ns_ok := true;
+          EXIT;
+        END IF;
+      EXCEPTION WHEN invalid_text_representation THEN
+        -- entity_type isn't a known doc_kind value yet (e.g. a future
+        -- app's own entity space not mirrored into doc_kind) -- skip this
+        -- one relation, don't error the whole check.
+        CONTINUE;
+      END;
+    END LOOP;
+    IF NOT _ns_ok THEN RETURN false; END IF;
   END LOOP;
 
-  RETURN false;
+  RETURN true;
 END
 $$;
 
