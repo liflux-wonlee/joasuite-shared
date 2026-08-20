@@ -339,5 +339,17 @@
     "org_chart_empty": "Aún no hay departamentos: agrega uno para ver el organigrama.",
     "org_chart_vacant": "Vacante",
     "team_group": "Equipo"
+  },
+  "doc_library": {
+    "col_type": "Tipo",
+    "col_filename": "Archivo",
+    "col_linked": "Registro vinculado",
+    "col_uploaded": "Subido",
+    "col_size": "Tamaño",
+    "col_actions": "Acciones",
+    "loading": "Cargando…",
+    "empty": "Aún no hay documentos.",
+    "open": "Abrir",
+    "delete": "Eliminar"
   }
 }

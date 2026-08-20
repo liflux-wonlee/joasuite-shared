@@ -418,6 +418,18 @@ var en_default = {
     org_chart_empty: "No departments yet \u2014 add one to see the org chart.",
     org_chart_vacant: "Vacant",
     team_group: "Team"
+  },
+  doc_library: {
+    col_type: "Type",
+    col_filename: "File",
+    col_linked: "Linked record",
+    col_uploaded: "Uploaded",
+    col_size: "Size",
+    col_actions: "Actions",
+    loading: "Loading\u2026",
+    empty: "No documents yet.",
+    open: "Open",
+    delete: "Delete"
   }
 };
 
@@ -775,6 +787,18 @@ var ko_default = {
     org_chart_empty: "\uC544\uC9C1 \uBD80\uC11C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4 \u2014 \uBD80\uC11C\uB97C \uCD94\uAC00\uD558\uBA74 \uC870\uC9C1\uB3C4\uAC00 \uD45C\uC2DC\uB429\uB2C8\uB2E4.",
     org_chart_vacant: "\uACF5\uC11D",
     team_group: "\uD300"
+  },
+  doc_library: {
+    col_type: "\uC720\uD615",
+    col_filename: "\uD30C\uC77C",
+    col_linked: "\uC5F0\uACB0\uB41C \uD56D\uBAA9",
+    col_uploaded: "\uC5C5\uB85C\uB4DC",
+    col_size: "\uD06C\uAE30",
+    col_actions: "\uC791\uC5C5",
+    loading: "\uBD88\uB7EC\uC624\uB294 \uC911\u2026",
+    empty: "\uC544\uC9C1 \uBB38\uC11C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    open: "\uC5F4\uAE30",
+    delete: "\uC0AD\uC81C"
   }
 };
 
@@ -1117,6 +1141,18 @@ var zh_default = {
     org_chart_empty: "\u8FD8\u6CA1\u6709\u90E8\u95E8 \u2014 \u6DFB\u52A0\u4E00\u4E2A\u90E8\u95E8\u5373\u53EF\u67E5\u770B\u7EC4\u7EC7\u67B6\u6784\u56FE\u3002",
     org_chart_vacant: "\u7A7A\u7F3A",
     team_group: "\u56E2\u961F"
+  },
+  doc_library: {
+    col_type: "\u7C7B\u578B",
+    col_filename: "\u6587\u4EF6",
+    col_linked: "\u5173\u8054\u8BB0\u5F55",
+    col_uploaded: "\u4E0A\u4F20\u65F6\u95F4",
+    col_size: "\u5927\u5C0F",
+    col_actions: "\u64CD\u4F5C",
+    loading: "\u52A0\u8F7D\u4E2D\u2026",
+    empty: "\u6682\u65E0\u6587\u6863\u3002",
+    open: "\u6253\u5F00",
+    delete: "\u5220\u9664"
   }
 };
 
@@ -1462,6 +1498,18 @@ var es_default = {
     org_chart_empty: "A\xFAn no hay departamentos: agrega uno para ver el organigrama.",
     org_chart_vacant: "Vacante",
     team_group: "Equipo"
+  },
+  doc_library: {
+    col_type: "Tipo",
+    col_filename: "Archivo",
+    col_linked: "Registro vinculado",
+    col_uploaded: "Subido",
+    col_size: "Tama\xF1o",
+    col_actions: "Acciones",
+    loading: "Cargando\u2026",
+    empty: "A\xFAn no hay documentos.",
+    open: "Abrir",
+    delete: "Eliminar"
   }
 };
 
@@ -1807,6 +1855,18 @@ var vi_default = {
     org_chart_empty: "Ch\u01B0a c\xF3 ph\xF2ng ban n\xE0o \u2014 h\xE3y th\xEAm m\u1ED9t ph\xF2ng ban \u0111\u1EC3 xem s\u01A1 \u0111\u1ED3 t\u1ED5 ch\u1EE9c.",
     org_chart_vacant: "C\xF2n tr\u1ED1ng",
     team_group: "Nh\xF3m"
+  },
+  doc_library: {
+    col_type: "Lo\u1EA1i",
+    col_filename: "T\u1EC7p",
+    col_linked: "B\u1EA3n ghi li\xEAn k\u1EBFt",
+    col_uploaded: "\u0110\xE3 t\u1EA3i l\xEAn",
+    col_size: "K\xEDch th\u01B0\u1EDBc",
+    col_actions: "H\xE0nh \u0111\u1ED9ng",
+    loading: "\u0110ang t\u1EA3i\u2026",
+    empty: "Ch\u01B0a c\xF3 t\xE0i li\u1EC7u n\xE0o.",
+    open: "M\u1EDF",
+    delete: "X\xF3a"
   }
 };
 
@@ -4384,6 +4444,111 @@ function TeamMemberView({ tenantId, partyId, onEdit }) {
     ] }) })
   ] });
 }
+function guessAttachmentKind(filename, mime) {
+  const m = (mime ?? "").toLowerCase();
+  if (m.startsWith("image/")) return "image";
+  if (m === "application/pdf") return "pdf";
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+  if (["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "heic"].includes(ext)) return "image";
+  if (ext === "pdf") return "pdf";
+  return "other";
+}
+function AttachmentPreviewDialog({
+  open,
+  onOpenChange,
+  filename,
+  kind,
+  previewUrl,
+  downloadUrl,
+  downloadLabel = "Download",
+  renderPdf
+}) {
+  const { ui } = useJoaSuite();
+  const { Dialog, DialogContent, DialogHeader, DialogTitle, Button } = ui;
+  return /* @__PURE__ */ jsx(Dialog, { open, onOpenChange, children: /* @__PURE__ */ jsxs(DialogContent, { className: "max-w-5xl w-[95vw] h-[90vh] flex flex-col p-4 gap-3", children: [
+    /* @__PURE__ */ jsxs(DialogHeader, { className: "flex-row items-center justify-between gap-3 space-y-0 pr-8", children: [
+      /* @__PURE__ */ jsx(DialogTitle, { className: "truncate text-sm font-medium", children: filename }),
+      downloadUrl && /* @__PURE__ */ jsx("a", { href: downloadUrl, download: filename, children: /* @__PURE__ */ jsx(Button, { size: "sm", variant: "outline", type: "button", children: downloadLabel }) })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "flex-1 min-h-0 bg-muted/30 rounded overflow-hidden flex items-center justify-center", children: [
+      kind === "image" && previewUrl && /* @__PURE__ */ jsx("img", { src: previewUrl, alt: filename, className: "max-h-full max-w-full object-contain" }),
+      kind === "pdf" && previewUrl && (renderPdf ? renderPdf(previewUrl) : /* @__PURE__ */ jsx("iframe", { src: previewUrl, title: filename, className: "w-full h-full border-0" }))
+    ] })
+  ] }) });
+}
+function defaultFormatSize(n) {
+  if (!n) return "";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+function defaultFormatDate(s) {
+  if (!s) return "";
+  try {
+    return new Date(s).toLocaleDateString();
+  } catch {
+    return s;
+  }
+}
+function DocumentLibraryTable({
+  rows,
+  loading,
+  formatSize = defaultFormatSize,
+  formatDate: formatDate3 = defaultFormatDate,
+  onOpen,
+  onNavigate,
+  onDelete
+}) {
+  const { t } = useTranslation();
+  const { ui } = useJoaSuite();
+  const { Button } = ui;
+  return /* @__PURE__ */ jsx("div", { className: "rounded-xl border bg-card overflow-x-auto", children: /* @__PURE__ */ jsxs("table", { className: "w-full text-sm", children: [
+    /* @__PURE__ */ jsx("thead", { children: /* @__PURE__ */ jsxs("tr", { className: "border-b text-left text-xs text-muted-foreground", children: [
+      /* @__PURE__ */ jsx("th", { className: "px-4 py-2.5 font-medium", children: t("doc_library.col_type", "Type") }),
+      /* @__PURE__ */ jsx("th", { className: "px-4 py-2.5 font-medium", children: t("doc_library.col_filename", "File") }),
+      /* @__PURE__ */ jsx("th", { className: "px-4 py-2.5 font-medium", children: t("doc_library.col_linked", "Linked record") }),
+      /* @__PURE__ */ jsx("th", { className: "px-4 py-2.5 font-medium", children: t("doc_library.col_uploaded", "Uploaded") }),
+      /* @__PURE__ */ jsx("th", { className: "px-4 py-2.5 font-medium", children: t("doc_library.col_size", "Size") }),
+      /* @__PURE__ */ jsx("th", { className: "px-4 py-2.5 font-medium text-right", children: t("doc_library.col_actions", "Actions") })
+    ] }) }),
+    /* @__PURE__ */ jsxs("tbody", { children: [
+      loading && /* @__PURE__ */ jsx("tr", { children: /* @__PURE__ */ jsx("td", { colSpan: 6, className: "px-4 py-8 text-center text-muted-foreground", children: t("doc_library.loading", "Loading\u2026") }) }),
+      !loading && rows.length === 0 && /* @__PURE__ */ jsx("tr", { children: /* @__PURE__ */ jsx("td", { colSpan: 6, className: "px-4 py-10 text-center text-muted-foreground", children: t("doc_library.empty", "No documents yet.") }) }),
+      !loading && rows.map((r) => /* @__PURE__ */ jsxs("tr", { className: "border-b last:border-0 hover:bg-muted/40", children: [
+        /* @__PURE__ */ jsx("td", { className: "px-4 py-2.5 whitespace-nowrap text-muted-foreground", children: r.docKindLabel }),
+        /* @__PURE__ */ jsx("td", { className: "px-4 py-2.5 max-w-[240px]", children: /* @__PURE__ */ jsx(
+          "button",
+          {
+            type: "button",
+            onClick: () => onOpen?.(r),
+            className: "truncate block text-left hover:text-primary hover:underline",
+            title: r.filename,
+            children: r.filename
+          }
+        ) }),
+        /* @__PURE__ */ jsx("td", { className: "px-4 py-2.5 max-w-[220px]", children: r.linkedHref ? /* @__PURE__ */ jsx(
+          "button",
+          {
+            type: "button",
+            onClick: () => onNavigate?.(r),
+            className: "truncate block text-left text-primary hover:underline",
+            title: r.linkedLabel ?? void 0,
+            children: r.linkedLabel ?? "\u2014"
+          }
+        ) : /* @__PURE__ */ jsx("span", { className: "truncate block text-muted-foreground", title: r.linkedLabel ?? void 0, children: r.linkedLabel ?? "\u2014" }) }),
+        /* @__PURE__ */ jsxs("td", { className: "px-4 py-2.5 whitespace-nowrap text-muted-foreground", children: [
+          formatDate3(r.createdAt),
+          r.uploadedByLabel ? ` \xB7 ${r.uploadedByLabel}` : ""
+        ] }),
+        /* @__PURE__ */ jsx("td", { className: "px-4 py-2.5 whitespace-nowrap text-muted-foreground", children: formatSize(r.size) }),
+        /* @__PURE__ */ jsx("td", { className: "px-4 py-2.5", children: /* @__PURE__ */ jsxs("div", { className: "flex justify-end gap-1", children: [
+          onOpen && /* @__PURE__ */ jsx(Button, { variant: "ghost", size: "sm", onClick: () => onOpen(r), children: t("doc_library.open", "Open") }),
+          onDelete && /* @__PURE__ */ jsx(Button, { variant: "ghost", size: "sm", onClick: () => onDelete(r), children: t("doc_library.delete", "Delete") })
+        ] }) })
+      ] }, r.id))
+    ] })
+  ] }) });
+}
 function initials(name) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
@@ -6791,6 +6956,6 @@ function BillingComparePage({ appCode }) {
   ] });
 }
 
-export { APP_CODES, APP_DISPLAY, AppOverviewSection, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, FieldGroup, FieldRow, InviteAsUserBanner, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgChartView, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, TeamMemberView, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, roleLabel, useJoaSuite, useOrgScope };
+export { APP_CODES, APP_DISPLAY, AppOverviewSection, AttachmentPreviewDialog, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, DocumentLibraryTable, FieldGroup, FieldRow, InviteAsUserBanner, JoaSuiteProvider, LanguageSwitcher, NotificationsBell, OrgChartView, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, TeamMemberView, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, guessAttachmentKind, mergeSharedResources, roleLabel, useJoaSuite, useOrgScope };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

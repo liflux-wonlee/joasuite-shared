@@ -336,5 +336,17 @@
     "org_chart_empty": "还没有部门 — 添加一个部门即可查看组织架构图。",
     "org_chart_vacant": "空缺",
     "team_group": "团队"
+  },
+  "doc_library": {
+    "col_type": "类型",
+    "col_filename": "文件",
+    "col_linked": "关联记录",
+    "col_uploaded": "上传时间",
+    "col_size": "大小",
+    "col_actions": "操作",
+    "loading": "加载中…",
+    "empty": "暂无文档。",
+    "open": "打开",
+    "delete": "删除"
   }
 }

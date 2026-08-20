@@ -339,5 +339,17 @@
     "org_chart_empty": "Chưa có phòng ban nào — hãy thêm một phòng ban để xem sơ đồ tổ chức.",
     "org_chart_vacant": "Còn trống",
     "team_group": "Nhóm"
+  },
+  "doc_library": {
+    "col_type": "Loại",
+    "col_filename": "Tệp",
+    "col_linked": "Bản ghi liên kết",
+    "col_uploaded": "Đã tải lên",
+    "col_size": "Kích thước",
+    "col_actions": "Hành động",
+    "loading": "Đang tải…",
+    "empty": "Chưa có tài liệu nào.",
+    "open": "Mở",
+    "delete": "Xóa"
   }
 }
