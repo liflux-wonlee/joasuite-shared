@@ -749,6 +749,80 @@ declare function FieldRow({ label, value }: {
     value: ReactNode;
 }): react.JSX.Element;
 
+type AttachmentPreviewKind = "image" | "pdf" | "other";
+/**
+ * Best-effort file-kind guess from filename/mime, shared so every app's
+ * attachment UI treats "what can we preview inline" the same way.
+ */
+declare function guessAttachmentKind(filename: string, mime?: string | null): AttachmentPreviewKind;
+type AttachmentPreviewDialogProps = {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    filename?: string;
+    kind: AttachmentPreviewKind;
+    /** Inline-viewable URL (signed URL or blob: URL) for image/pdf kinds. */
+    previewUrl?: string;
+    /** Download URL/href offered next to the filename. */
+    downloadUrl?: string;
+    downloadLabel?: string;
+    /**
+     * Render a PDF viewer for `previewUrl`. Falls back to a plain <iframe>
+     * when omitted -- pass your app's own richer viewer (e.g. a react-pdf
+     * component) to upgrade it without forking this dialog.
+     */
+    renderPdf?: (url: string) => ReactNode;
+};
+/**
+ * Presentational image/PDF preview modal, factored out of JoaBooks'
+ * AttachmentsPanel so JoaBooks' new Document Library page (and any future
+ * per-app attachment UI) can reuse the same "click a file, see it inline"
+ * behavior instead of re-implementing it. Uses only the ui.Dialog/Button
+ * primitives every app already supplies via JoaSuiteProvider -- no new
+ * UiAdapter fields, no server-function DI, so adopting this doesn't
+ * require any change to an app's provider wiring.
+ */
+declare function AttachmentPreviewDialog({ open, onOpenChange, filename, kind, previewUrl, downloadUrl, downloadLabel, renderPdf, }: AttachmentPreviewDialogProps): react.JSX.Element;
+
+type DocumentLibraryRow = {
+    id: string;
+    filename: string;
+    /** Attachment kind (receipt/contract/w9/...), shown as a secondary tag. */
+    kind?: string | null;
+    /** Human label for the doc_kind this attachment belongs to, e.g. "Bill", "Invoice". Pass pre-translated. */
+    docKindLabel: string;
+    /** Display label for the record this file is attached to, e.g. a Bill number or vendor name. */
+    linkedLabel?: string | null;
+    /** Where clicking the linked-record cell should navigate, if anywhere. */
+    linkedHref?: string | null;
+    size?: number | null;
+    createdAt?: string | null;
+    uploadedByLabel?: string | null;
+};
+type DocumentLibraryTableProps = {
+    rows: DocumentLibraryRow[];
+    loading?: boolean;
+    formatSize?: (n: number | null | undefined) => string;
+    formatDate?: (s: string | null | undefined) => string;
+    /** Open the file for preview/download. */
+    onOpen?: (row: DocumentLibraryRow) => void;
+    /** Navigate to the row's linked record (linkedHref). */
+    onNavigate?: (row: DocumentLibraryRow) => void;
+    onDelete?: (row: DocumentLibraryRow) => void;
+};
+/**
+ * Presentational cross-record file table -- the browse/search surface for
+ * an app's "Document Library"-style page (as opposed to AttachmentsPanel,
+ * which is scoped to one record). Every row's data and every action is
+ * supplied by the host app (server-function calls, routing, deletion
+ * confirmation) rather than this component reaching into app-specific
+ * state, matching the plain presentational pattern already used by
+ * FieldGroup/FieldRow rather than the fns-DI pattern used by pages like
+ * TeamListPage -- this keeps adoption a zero-wiring drop-in for any app
+ * that already calls JoaSuiteProvider, since it only touches the
+ * ui.Button primitive every app already supplies.
+ */
+declare function DocumentLibraryTable({ rows, loading, formatSize, formatDate, onOpen, onNavigate, onDelete, }: DocumentLibraryTableProps): react.JSX.Element;
+
 declare function OrgStructureSettingsPage({ tenantId }: {
     tenantId: string;
 }): react.JSX.Element;
@@ -827,4 +901,4 @@ declare function BillingComparePage({ appCode }: {
  */
 declare function useOrgScope(): [string[], (tenantIds: string[]) => void];
 
-export { type AppCatalogEntry, AppCode, AppOverviewSection, type AppSummaryTile, type ApprovalSummary, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type Department, FieldGroup, FieldRow, InviteAsUserBanner, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, type OrgChartDepartmentT, type OrgChartPersonT, type OrgChartPositionT, OrgChartView, type OrgChartViewProps, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, type RouterAdapter, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, type TeamMemberInput, type TeamMemberRow, TeamMemberView, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, mergeSharedResources, useJoaSuite, useOrgScope };
+export { type AppCatalogEntry, AppCode, AppOverviewSection, type AppSummaryTile, type ApprovalSummary, AttachmentPreviewDialog, type AttachmentPreviewDialogProps, type AttachmentPreviewKind, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type Department, type DocumentLibraryRow, DocumentLibraryTable, type DocumentLibraryTableProps, FieldGroup, FieldRow, InviteAsUserBanner, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, type OrgChartDepartmentT, type OrgChartPersonT, type OrgChartPositionT, OrgChartView, type OrgChartViewProps, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, type RouterAdapter, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, type TeamMemberInput, type TeamMemberRow, TeamMemberView, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, guessAttachmentKind, mergeSharedResources, useJoaSuite, useOrgScope };

@@ -354,5 +354,17 @@
     "org_chart_empty": "No departments yet — add one to see the org chart.",
     "org_chart_vacant": "Vacant",
     "team_group": "Team"
+  },
+  "doc_library": {
+    "col_type": "Type",
+    "col_filename": "File",
+    "col_linked": "Linked record",
+    "col_uploaded": "Uploaded",
+    "col_size": "Size",
+    "col_actions": "Actions",
+    "loading": "Loading…",
+    "empty": "No documents yet.",
+    "open": "Open",
+    "delete": "Delete"
   }
 }

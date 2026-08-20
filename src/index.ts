@@ -40,6 +40,17 @@ export { TeamMemberForm } from "./components/team/TeamMemberForm";
 export { TeamMemberView } from "./components/team/TeamMemberView";
 export { InviteAsUserBanner } from "./components/team/InviteAsUserBanner";
 export { FieldGroup, FieldRow } from "./components/FieldGroup";
+export {
+  AttachmentPreviewDialog,
+  guessAttachmentKind,
+  type AttachmentPreviewKind,
+  type AttachmentPreviewDialogProps,
+} from "./components/AttachmentPreviewDialog";
+export {
+  DocumentLibraryTable,
+  type DocumentLibraryRow,
+  type DocumentLibraryTableProps,
+} from "./components/DocumentLibraryTable";
 export { OrgStructureSettingsPage } from "./components/org-structure/OrgStructureSettingsPage";
 export { OrgChartView } from "./components/org-structure/OrgChartView";
 export type {

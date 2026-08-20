@@ -351,5 +351,17 @@
     "org_chart_empty": "아직 부서가 없습니다 — 부서를 추가하면 조직도가 표시됩니다.",
     "org_chart_vacant": "공석",
     "team_group": "팀"
+  },
+  "doc_library": {
+    "col_type": "유형",
+    "col_filename": "파일",
+    "col_linked": "연결된 항목",
+    "col_uploaded": "업로드",
+    "col_size": "크기",
+    "col_actions": "작업",
+    "loading": "불러오는 중…",
+    "empty": "아직 문서가 없습니다.",
+    "open": "열기",
+    "delete": "삭제"
   }
 }
