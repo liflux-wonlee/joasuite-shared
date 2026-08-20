@@ -808,6 +808,8 @@ type DocumentLibraryTableProps = {
     /** Navigate to the row's linked record (linkedHref). */
     onNavigate?: (row: DocumentLibraryRow) => void;
     onDelete?: (row: DocumentLibraryRow) => void;
+    /** Open the Related Records / Link-to-record flow for this row. */
+    onLink?: (row: DocumentLibraryRow) => void;
 };
 /**
  * Presentational cross-record file table -- the browse/search surface for
@@ -821,7 +823,7 @@ type DocumentLibraryTableProps = {
  * that already calls JoaSuiteProvider, since it only touches the
  * ui.Button primitive every app already supplies.
  */
-declare function DocumentLibraryTable({ rows, loading, formatSize, formatDate, onOpen, onNavigate, onDelete, }: DocumentLibraryTableProps): react.JSX.Element;
+declare function DocumentLibraryTable({ rows, loading, formatSize, formatDate, onOpen, onNavigate, onDelete, onLink, }: DocumentLibraryTableProps): react.JSX.Element;
 
 /**
  * Shared Content Core — relation-provider contract.

@@ -27,6 +27,8 @@ export type DocumentLibraryTableProps = {
   /** Navigate to the row's linked record (linkedHref). */
   onNavigate?: (row: DocumentLibraryRow) => void;
   onDelete?: (row: DocumentLibraryRow) => void;
+  /** Open the Related Records / Link-to-record flow for this row. */
+  onLink?: (row: DocumentLibraryRow) => void;
 };
 
 function defaultFormatSize(n: number | null | undefined): string {
@@ -65,6 +67,7 @@ export function DocumentLibraryTable({
   onOpen,
   onNavigate,
   onDelete,
+  onLink,
 }: DocumentLibraryTableProps) {
   const { t } = useTranslation();
   const { ui } = useJoaSuite();
@@ -138,6 +141,11 @@ export function DocumentLibraryTable({
                     {onOpen && (
                       <Button variant="ghost" size="sm" onClick={() => onOpen(r)}>
                         {t("doc_library.open", "Open")}
+                      </Button>
+                    )}
+                    {onLink && (
+                      <Button variant="ghost" size="sm" onClick={() => onLink(r)}>
+                        {t("content_core.link_to_record", "Link to record")}
                       </Button>
                     )}
                     {onDelete && (

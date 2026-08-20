@@ -4537,7 +4537,8 @@ function DocumentLibraryTable({
   formatDate: formatDate3 = defaultFormatDate,
   onOpen,
   onNavigate,
-  onDelete
+  onDelete,
+  onLink
 }) {
   const { t } = useTranslation();
   const { ui } = useJoaSuite();
@@ -4583,6 +4584,7 @@ function DocumentLibraryTable({
         /* @__PURE__ */ jsx("td", { className: "px-4 py-2.5 whitespace-nowrap text-muted-foreground", children: formatSize(r.size) }),
         /* @__PURE__ */ jsx("td", { className: "px-4 py-2.5", children: /* @__PURE__ */ jsxs("div", { className: "flex justify-end gap-1", children: [
           onOpen && /* @__PURE__ */ jsx(Button, { variant: "ghost", size: "sm", onClick: () => onOpen(r), children: t("doc_library.open", "Open") }),
+          onLink && /* @__PURE__ */ jsx(Button, { variant: "ghost", size: "sm", onClick: () => onLink(r), children: t("content_core.link_to_record", "Link to record") }),
           onDelete && /* @__PURE__ */ jsx(Button, { variant: "ghost", size: "sm", onClick: () => onDelete(r), children: t("doc_library.delete", "Delete") })
         ] }) })
       ] }, r.id))
