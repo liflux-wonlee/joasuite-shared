@@ -79,10 +79,19 @@ const APP_ROLES = [
 ] as const;
 const AppRole = z.enum(APP_ROLES);
 
-// Suite-wide roles (owner/super_admin, app_code IS NULL) satisfy every
-// app's checks. App-scoped roles (e.g. 'admin') only count when scoped to
-// the CALLING app's own appCode - a role held in a different suite app
-// must not grant this app's admin access. appCode comes from the
+// Suite-wide roles (owner/super_admin) satisfy every app's checks whether
+// their user_roles row has app_code NULL or scoped to the CALLING app --
+// matching has_any_role_scoped()'s own `app_code IS NULL OR app_code =
+// _app_code`, which this table's RLS policies already rely on. A NULL
+// app_code isn't the only way a suite-wide grant is stored: a tenant's very
+// first owner/super_admin, created by create_tenant_for_self's `INSERT INTO
+// user_roles(tenant_id, user_id, role) VALUES (..., 'owner'), (...,
+// 'super_admin')`, omits app_code entirely and so gets that column's own
+// DEFAULT (e.g. 'joabooks' in that app's schema) -- not NULL. Requiring
+// app_code IS NULL here (found 2026-08-19) rejected every such tenant's
+// owner outright. App-scoped roles (e.g. 'admin') still only count when
+// scoped to the CALLING app's own appCode - a role held in a different
+// suite app must not grant this app's admin access. appCode comes from the
 // consuming app's AdminDeps (each app passes its own canonical app_code
 // when instantiating these factories).
 async function assertOwnerOrAdmin(supabaseAdmin: any, appCode: string, tenantId: string, userId: string) {
@@ -96,7 +105,7 @@ async function assertOwnerOrAdmin(supabaseAdmin: any, appCode: string, tenantId:
   const ok = rows.some((r: any) => {
     const role = r.role as string;
     const rowAppCode = r.app_code as string | null;
-    if (rowAppCode === null) return role === "owner" || role === "super_admin";
+    if (role === "owner" || role === "super_admin") return rowAppCode === null || rowAppCode === appCode;
     return rowAppCode === appCode && role === "admin";
   });
   if (!ok) throw new Error("Forbidden: admin role required");
@@ -153,6 +162,8 @@ async function assertOwnerIfGrantingPrivilegedRole(
   }
 }
 
+// See assertOwnerOrAdmin above for why owner/super_admin must pass with
+// EITHER a null or an appCode-matching app_code, not null only.
 async function assertCanEditVendor(
   supabaseAdmin: any,
   appCode: string,
@@ -170,7 +181,7 @@ async function assertCanEditVendor(
   const ok = rows.some((r: any) => {
     const role = r.role as string;
     const rowAppCode = r.app_code as string | null;
-    if (rowAppCode === null) return role === "owner" || role === "super_admin";
+    if (role === "owner" || role === "super_admin") return rowAppCode === null || rowAppCode === appCode;
     return rowAppCode === appCode && extraRoles.includes(role);
   });
   if (!ok) throw new Error("Forbidden: vendor edit role required");
