@@ -146,3 +146,4 @@ src/routes/app.recurring.new.tsx
 # its own migration history stays an accurate, replayable record.
 supabase/migrations/20260820130000_user_can_view_doc_canonical_sync.sql
 supabase/migrations/20260820140000_content_core_schema_foundation.sql
+supabase/migrations/20260821010000_content_core_phase1_hardening.sql
