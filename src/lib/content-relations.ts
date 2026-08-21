@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 /**
  * Shared Content Core — relation-provider contract.
  *
@@ -20,6 +22,8 @@ export type RelationEntityTypeOption = {
   entityType: string;
   /** Display label, e.g. "Vendor", "Bill". Pass pre-translated. */
   label: string;
+  /** Optional icon element for the entity-type picker. Rendered as-is, no default. */
+  icon?: ReactNode;
 };
 
 export type RelationSearchResult = {
@@ -41,6 +45,15 @@ export type ContentRelationProvider = {
   resolveEntities(refs: Array<{ entityType: string; entityId: string }>): Promise<Record<string, RelationSearchResult>>;
   /** Where clicking a search result / an existing relation should navigate. Return null if there's no detail page. */
   getEntityHref(entityType: string, entityId: string): string | null;
+  /**
+   * UI-presentation hints only (e.g. disable/grey out one search result) --
+   * the server (content_relations RLS + createContentRelation's explicit
+   * user_can_view_doc check) is the real, authoritative gate regardless of
+   * what these return. Omit either method to mean "always show the
+   * control, let the server reject if it must" -- neither is required.
+   */
+  canLink?(entityType: string, entityId: string): Promise<boolean>;
+  canUnlink?(entityType: string, entityId: string): Promise<boolean>;
 };
 
 export type ContentRelationRow = {

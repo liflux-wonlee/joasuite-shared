@@ -1,10 +1,14 @@
 # Shared Content Core — architecture
 
-Status: Phase 1 (database/data-access foundation) implemented. No app UI
-has been redesigned around this yet except JoaBooks' Document Library
-(pilot) and the JoaHR↔JoaBooks W-9 relation (pilot). JoaOffice's Document
-Vault has been migrated onto this foundation. JoaSOP integration is
-deliberately deferred (see "Deferred: JoaSOP" below).
+Status: Phase 1 (database/data-access foundation) and Phase 2 (reusable
+application-facing UI layer in this package) implemented. No existing
+JoaOffice or JoaBooks screen has been *replaced* by the Phase 2 components
+yet — that is explicitly out of scope until a later phase ("Do NOT yet
+remove existing JoaOffice or JoaBooks components"). JoaBooks' Document
+Library and the JoaHR↔JoaBooks W-9 relation remain the only two live
+pilots. JoaOffice's Document Vault has been migrated onto the Phase 1
+schema. JoaSOP integration is deliberately deferred (see "Deferred:
+JoaSOP" below).
 
 This document is the canonical reference for anyone extending the Shared
 Content Core. When in doubt about a design decision, this file — not
@@ -434,6 +438,173 @@ the dispatch-side work is already done; what remains is JoaSOP's own
 `joasop.document`) and, if desired, a "insert existing content as
 supporting material" UI affordance on the policy editor.
 
+## Phase 2 — reusable UI layer (this package)
+
+Everything in this section lives in `joasuite-shared/src/` and ships in
+the published `dist/` — no app-specific domain logic (Bill APIs, worker
+APIs, contract APIs, JoaSOP APIs) exists anywhere in this package; every
+piece below is either a neutral type, a DI contract an app implements, or
+a presentational component that receives its data/behavior via props.
+
+### Neutral types (`src/lib/content-core-types.ts`)
+
+`ContentType`, `ContentItem`, `ContentVersion`, `ContentOrigin`,
+`ContentItemDetail`, `ContentSearchFilters` — camelCase mirrors of the
+`content_items`/`content_versions` columns (DB-facing app code stays
+snake_case; the mapping happens inside each app's own `ContentProvider`
+implementation, not in this package). **No `ContentAccessScope` type
+exists** — same deviation as Phase 1's schema: visibility is derived at
+query time via `user_can_view_content()`, never stored as a scope record,
+so there is nothing for a type to represent. See "Deviation: no
+`content_access_scopes` table" above; this is the same decision, not a
+new one.
+
+### Provider contracts (DI seams)
+
+- **`ContentRelationProvider`** (`src/lib/content-relations.ts`) — already
+  existed from the JoaBooks/JoaHR pilots; extended this phase with two
+  *optional* methods, `canLink(entityType, entityId)`/
+  `canUnlink(entityType, entityId)`, plus an optional `icon` field on
+  `RelationEntityTypeOption`. Both are UI-presentation hints only (e.g.
+  grey out one search result) — omitting either means "always show the
+  control, let the server reject if it must." `resolveEntities` stays
+  batch-shaped (`resolveEntity` singular, as the prompt's literal example
+  named it, was not built — a batch call is what `RelatedRecordsPanel`
+  actually needs to resolve a whole list of relations at once, and JoaBooks'
+  existing `resolveContentRelationEntities` server fn already returns a
+  batch; adding a singular variant on top would be pure duplication for no
+  real caller).
+- **`ContentProvider`** (`src/lib/content-core-provider.ts`, new) — the
+  DI seam for "list / get / upload / add external link / add version /
+  archive." **This is the "Shared Content Service" the Phase 2 prompt's
+  Section 3 asks for.** Deviation worth calling out explicitly: the
+  prompt's wording ("Shared Content Service," "expose reusable
+  operations") could be read as asking for a stateful service object/class
+  that shared UI components pull from a context. That is **not** what was
+  built. Instead `ContentProvider` is a plain interface, passed as an
+  ordinary prop into whichever component needs it — the same
+  "presentational component + injected provider prop" pattern already
+  established by `ContentRelationProvider`/`DocumentLibraryTable`/
+  `RelatedRecordsPanel` before this phase, rather than introducing a
+  second, heavier DI mechanism alongside the first one. Reasoning: this
+  package has no precedent anywhere for a stateful cross-component service
+  singleton (the closest thing, `BoundServerFns`/`fns`, is deliberately
+  NOT used by any Content Core component either — see the pre-existing
+  `DocumentLibraryTable` comment: "matching the plain presentational
+  pattern... rather than the fns-DI pattern used by pages like
+  TeamListPage... keeps adoption a zero-wiring drop-in"). Every
+  `ContentProvider` method an app implements is a thin wrapper around that
+  app's own local `createServerFn(...)` call, per the suite-wide
+  app-local rule.
+- **`ContentAuthorizationProvider`** (same file) — `canView`/`canModify`,
+  plus optional `canDeletePermanently`. Explicitly UI-presentation-only:
+  "the UI may use it for presentation, but server enforcement remains
+  authoritative" (Section 5's own words) — a component with none injected
+  simply shows its controls and lets the server reject, rather than
+  becoming insecure by omission. No component in this package calls this
+  provider internally to *decide* whether to render itself except where
+  documented (`DeletePermanentlyAction` is rendered by the HOST APP only
+  after checking `canDeletePermanently` itself — the component does not
+  call the provider on its own; see that component's own doc comment).
+
+### Shared UI components (`src/components/`)
+
+| Component | Maps to prompt's Section 6 name | Notes |
+|---|---|---|
+| `DocumentLibraryTable` | `ContentTable` | Pre-existing (JoaBooks pilot). Kept its established name rather than renamed to `ContentTable` — "use names appropriate to the actual code style" per the prompt itself, and renaming a component already wired into a live JoaBooks route for no functional change is exactly the kind of churn "do not rewrite stable systems merely for elegance" (this phase's own closing instruction) warns against. |
+| — | `ContentGrid` | Not built — "if needed," and no current consumer needs a grid layout over a table. |
+| `ContentDetail` | `ContentDetail` | New. Composes `ContentVersionsPanel` + `RelatedRecordsPanel` + `ArchiveContentAction` + optional `DeletePermanentlyAction` + header metadata. An app can use the smaller pieces directly instead if its own detail page layout differs — this composition is a convenience, not a required entry point. |
+| `ContentUploader` | `ContentUploader` | New. Neutral "pick a file / add a link" shell — the actual upload mechanics (storage bucket, signed URL) stay in the app's own `onUploadFile` callback; this component never touches storage. |
+| `AddExternalLinkDialog` | `AddExternalLinkDialog` | New. Client-side scheme validation for immediate feedback only — server-side validation (JoaBooks' `assertSafeExternalUrl`) is the real boundary. |
+| `RelatedRecordsPanel` | `ContentRelationsPanel` | Pre-existing (JoaBooks/JoaHR pilots), kept its name for the same reason as `DocumentLibraryTable`. **Fixed this phase**: `provider` is now optional (was required) — see "Library works without a relationProvider" below, a real gap against Section 4's explicit requirement. |
+| `LinkToRecordDialog` | `LinkToRecordDialog` | Pre-existing, unchanged. |
+| `ContentVersionsPanel` | `ContentVersionsPanel` | New. Renders correctly today even for a content item with exactly one version. |
+| `ArchiveContentAction` | `ArchiveContentAction` | New. Confirm-then-call-back; the "Archive" tier. |
+| — | (no direct equivalent named) | `DeletePermanentlyAction` — new, added for symmetry with `ArchiveContentAction` and because Section 9 explicitly requires the UI to distinguish this third tier visually, even though there is deliberately no shared primitive for *performing* the deletion (see Phase 1's "Safe delete semantics" table above — that decision is unchanged by this phase). |
+
+### UI terminology is injectable (Section 7)
+
+No new component in this phase hardcodes a page-level name like "File
+Library" or "Document Vault." Every component that has a title-ish string
+accepts an override prop (`ContentVersionsPanel.title`,
+`AddExternalLinkDialog.title`, `ContentUploader.uploadLabel`/`linkLabel`/
+`linkDialogTitle`, `ContentDetail.labels`) and otherwise falls back to an
+i18n key under the `content_core.*` namespace with an English default —
+an app can override the *value* of that key in its own locale files
+without ever touching this package's source, exactly like every other
+i18n key in this suite (see JoaBooks' Bill/PR rename for the established
+"never rename the key, only its value" convention). Column-header-level
+strings on `DocumentLibraryTable` (a pre-existing component, not touched
+this phase) work the same way already.
+
+### Content search/filter contract (Section 8)
+
+`ContentSearchFilters` (types file) is the shared *shape* apps agree to
+accept in `ContentProvider.listContent`. There is no shared filter-bar UI
+component — Section 8 asks for a contract, not necessarily a widget, and
+the one real consumer so far (JoaBooks' Document Library page) already
+has its own filter UI composed at the page level calling
+`listContentRelations`/etc. directly; a generic filter-bar component has
+no second consumer yet to prove out its shape, so it was not built
+("avoid overbuilding"). "Do not leak results the user cannot access" is
+satisfied structurally: every `ContentProvider.listContent` implementation
+queries through `content_items_select` RLS (or an equivalent
+already-RLS'd path), never through `service_role` for a read a UI
+displays back to the user.
+
+### Delete/Archive UX (Section 9)
+
+No shared component anywhere in this package exposes a single ambiguous
+"Delete" action. Three distinct, separately-labeled controls exist:
+`RelatedRecordsPanel`'s per-relation "Unlink" button, `ArchiveContentAction`
+("Archive"/"Restore"), and `DeletePermanentlyAction` ("Delete
+permanently," destructive-styled, host-app-gated as described above).
+`DocumentLibraryTable`'s pre-existing generic `onDelete` prop (labeled
+"Delete" via `doc_library.delete`) predates Content Core and is **not**
+one of these three — it is JoaBooks' own file-row delete action against
+the underlying attachment directly, unrelated to a content item's
+relation/archive/permanent-delete tiers. Left as-is since changing its
+meaning is exactly the "do not yet redesign JoaOffice or JoaBooks screens"
+scope boundary this phase was told to respect.
+
+### Testing status (extends Phase 1's honest accounting)
+
+Same structural situation as Phase 1: no test framework is configured in
+this package (`package.json` has no `test` script). What Section 10 asks
+for is mostly pure frontend logic (mock providers, no live DB needed) —
+unlike Phase 1's DB/RLS behavioral matrix, these genuinely could run
+without touching `supabase.co` — but introducing a whole new test
+framework/config to a package that has never had one is a real
+architectural addition, not a quick add, so it was not done unilaterally
+this phase. Manual/structural verification performed instead:
+
+- [x] **Library works without a relationProvider** — fixed as part of this
+      phase: `RelatedRecordsPanel.provider` is now optional; verified by
+      reading the component's own conditional rendering (the "Link to
+      record" button and `LinkToRecordDialog` only mount when `provider`
+      is truthy) and by `tsc`/`tsup`'s DTS build succeeding with the
+      updated (optional) prop type.
+- [x] **Relations appear only when provider exists** — same fix; without a
+      provider, existing `relations` still render (label falls back to
+      the raw `entityType` string), just with no way to add a new one or
+      resolve a friendlier label — matches "function without relationship
+      controls," not "hide relations entirely."
+- [x] **App-specific entity knowledge does not leak into generic
+      components** — verified by inspection: no file under `src/` (this
+      phase's additions or pre-existing) references `party`,
+      `payment_request`, `bill`, `worker_document`, or any other
+      app-specific `doc_kind`/entity-type literal. Every such string is
+      supplied by the host app through `ContentRelationProvider`/
+      `ContentProvider` at runtime.
+- [ ] **Unauthorized actions are not shown** / **server rejection handled
+      correctly** / **archive differs from unlink** / **external links
+      work** / **existing attachment-backed content works** — these need
+      a real running app + live DB session to verify meaningfully (mock
+      providers can prove the component *calls* the right callback, but
+      not that the callback's real implementation behaves correctly) —
+      deferred to whichever app first wires these components into a real
+      page, same limitation as Phase 1's behavioral checklist.
+
 ## Known remaining risks (as of this writing)
 
 - The manual QA checklist above has not been executed against the live
@@ -452,3 +623,14 @@ supporting material" UI affordance on the policy editor.
   view (no separate editor tier) — acceptable for the current
   Unlink/Archive-only write surface, called out explicitly in the schema
   migration's own comment as an intentional, revisit-later simplification.
+- None of the Phase 2 shared UI components have a real consuming app yet
+  (this phase's own scope boundary explicitly forbids wiring them into
+  JoaOffice/JoaBooks screens) — they are built, typechecked, and exported,
+  but the first real integration is the point at which layout/prop-shape
+  assumptions made without a live consumer will actually get tested.
+- `ContentProvider`/`ContentAuthorizationProvider` are contracts only, no
+  reference implementation exists in any app repo yet (unlike
+  `ContentRelationProvider`, which JoaBooks already implements for real).
+  The first app to adopt `ContentDetail`/`ContentUploader` will be
+  writing the first real `ContentProvider`, which may surface a shape
+  mismatch this design didn't anticipate.

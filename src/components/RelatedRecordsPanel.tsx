@@ -6,7 +6,15 @@ import type { ContentRelationProvider, ContentRelationRow, RelationSearchResult 
 
 export type RelatedRecordsPanelProps = {
   relations: ContentRelationRow[];
-  provider: ContentRelationProvider;
+  /**
+   * Optional -- per the Shared Content Core contract, an app that supplies
+   * no relation provider still gets a fully working library, just without
+   * relationship controls: this panel then renders existing relations
+   * (label falls back to the raw entityType, since there's no provider to
+   * resolve a display label/href from) but hides the "Link to record"
+   * button entirely rather than rendering broken/no-op controls.
+   */
+  provider?: ContentRelationProvider;
   onLink: (entityType: string, result: RelationSearchResult) => Promise<void>;
   onUnlink?: (relation: ContentRelationRow) => Promise<void>;
   onNavigate?: (href: string) => void;
@@ -31,7 +39,7 @@ export function RelatedRecordsPanel({ relations, provider, onLink, onUnlink, onN
   const [unlinkingId, setUnlinkingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (relations.length === 0) {
+    if (relations.length === 0 || !provider) {
       setResolved({});
       return;
     }
@@ -60,9 +68,11 @@ export function RelatedRecordsPanel({ relations, provider, onLink, onUnlink, onN
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-medium">{t("content_core.related_records", "Related Records")}</h4>
-        <Button size="sm" variant="outline" onClick={() => setDialogOpen(true)}>
-          {t("content_core.link_to_record", "Link to record")}
-        </Button>
+        {provider && (
+          <Button size="sm" variant="outline" onClick={() => setDialogOpen(true)}>
+            {t("content_core.link_to_record", "Link to record")}
+          </Button>
+        )}
       </div>
 
       {loading && <div className="text-sm text-muted-foreground">{t("common.loading", "Loading…")}</div>}
@@ -78,7 +88,7 @@ export function RelatedRecordsPanel({ relations, provider, onLink, onUnlink, onN
           {relations.map((r) => {
             const key = `${r.entityType}:${r.entityId}`;
             const info = resolved[key];
-            const href = provider.getEntityHref(r.entityType, r.entityId);
+            const href = provider?.getEntityHref(r.entityType, r.entityId) ?? null;
             return (
               <li key={r.id} className="flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm">
                 {href && onNavigate ? (
@@ -112,7 +122,9 @@ export function RelatedRecordsPanel({ relations, provider, onLink, onUnlink, onN
         </ul>
       )}
 
-      <LinkToRecordDialog open={dialogOpen} onOpenChange={setDialogOpen} provider={provider} onLink={onLink} />
+      {provider && (
+        <LinkToRecordDialog open={dialogOpen} onOpenChange={setDialogOpen} provider={provider} onLink={onLink} />
+      )}
     </div>
   );
 }

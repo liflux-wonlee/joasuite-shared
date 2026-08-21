@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, useEffect, useMemo, useRef } from 'react';
 import { jsx, jsxs, Fragment } from 'react/jsx-runtime';
 import { Moon, Sun, Globe, User, Shield, Briefcase, CreditCard, LogOut, Bell, Check, Layers, Home, ChevronDown, UserCog, FileText, Users, ClipboardCheck, BookOpen, Lock, Settings2, ScrollText, Building2, LayoutGrid, AlertCircle, Inbox, Send, ArrowRight, Contact2, Link, Mail, EyeOff, Eye, Plus, Search, MoreHorizontal, KeyRound, ArrowLeft, Pencil, Trash2, AppWindow, ListTree, Network, CalendarClock, Zap, AlertTriangle, Sparkles, Clock, RefreshCw, XCircle, GitCompare, ShieldAlert, Package, Gift, Receipt, ExternalLink, Landmark, Star, Download, RefreshCcw, Ticket, Tag, DollarSign, Copy, ArrowUpRight, Activity, Info, ArrowUp, ArrowDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -437,7 +437,34 @@ var en_default = {
     no_results: "No matching records.",
     related_records: "Related Records",
     no_related_records: "Not linked to any record yet.",
-    unlink: "Unlink"
+    unlink: "Unlink",
+    archive: "Archive",
+    unarchive: "Restore",
+    archive_confirm_title: "Archive this document?",
+    archive_confirm_body: "It will be hidden from default lists but not deleted \u2014 every link and version stays intact, and you can restore it anytime.",
+    unarchive_confirm_title: "Restore this document?",
+    unarchive_confirm_body: "It will appear in default lists again.",
+    archived_badge: "Archived",
+    delete_permanently: "Delete permanently",
+    delete_permanently_confirm_title: "Delete permanently?",
+    delete_permanently_confirm_body: "This cannot be undone. The file and every link to it will be removed.",
+    cancel: "Cancel",
+    confirm: "Confirm",
+    versions_title: "Versions",
+    version_current: "Current",
+    version_open: "Open",
+    no_versions: "No versions yet.",
+    upload_file: "Upload file",
+    add_link: "Add link",
+    add_link_title: "Add an external link",
+    url_label: "URL",
+    url_placeholder: "https://\u2026",
+    title_label: "Title",
+    description_label: "Description",
+    invalid_url: "Enter a valid http(s) URL.",
+    add: "Add",
+    source_app_label: "Source",
+    created_label: "Created"
   }
 };
 
@@ -814,7 +841,34 @@ var ko_default = {
     no_results: "\uC77C\uCE58\uD558\uB294 \uB808\uCF54\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
     related_records: "\uC5F0\uACB0\uB41C \uB808\uCF54\uB4DC",
     no_related_records: "\uC544\uC9C1 \uC5F0\uACB0\uB41C \uB808\uCF54\uB4DC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
-    unlink: "\uC5F0\uACB0 \uD574\uC81C"
+    unlink: "\uC5F0\uACB0 \uD574\uC81C",
+    archive: "\uBCF4\uAD00",
+    unarchive: "\uBCF5\uC6D0",
+    archive_confirm_title: "\uC774 \uBB38\uC11C\uB97C \uBCF4\uAD00\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?",
+    archive_confirm_body: "\uAE30\uBCF8 \uBAA9\uB85D\uC5D0\uC11C \uC228\uACA8\uC9C0\uC9C0\uB9CC \uC0AD\uC81C\uB418\uC9C0\uB294 \uC54A\uC2B5\uB2C8\uB2E4 \u2014 \uBAA8\uB4E0 \uB9C1\uD06C\uC640 \uBC84\uC804\uC774 \uADF8\uB300\uB85C \uC720\uC9C0\uB418\uBA70 \uC5B8\uC81C\uB4E0 \uBCF5\uC6D0\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+    unarchive_confirm_title: "\uC774 \uBB38\uC11C\uB97C \uBCF5\uC6D0\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?",
+    unarchive_confirm_body: "\uB2E4\uC2DC \uAE30\uBCF8 \uBAA9\uB85D\uC5D0 \uD45C\uC2DC\uB429\uB2C8\uB2E4.",
+    archived_badge: "\uBCF4\uAD00\uB428",
+    delete_permanently: "\uC601\uAD6C \uC0AD\uC81C",
+    delete_permanently_confirm_title: "\uC601\uAD6C\uC801\uC73C\uB85C \uC0AD\uC81C\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?",
+    delete_permanently_confirm_body: "\uC774 \uC791\uC5C5\uC740 \uB418\uB3CC\uB9B4 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4. \uD30C\uC77C\uACFC \uC774 \uD30C\uC77C\uC5D0 \uB300\uD55C \uBAA8\uB4E0 \uC5F0\uACB0\uC774 \uC81C\uAC70\uB429\uB2C8\uB2E4.",
+    cancel: "\uCDE8\uC18C",
+    confirm: "\uD655\uC778",
+    versions_title: "\uBC84\uC804",
+    version_current: "\uD604\uC7AC",
+    version_open: "\uC5F4\uAE30",
+    no_versions: "\uC544\uC9C1 \uBC84\uC804\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    upload_file: "\uD30C\uC77C \uC5C5\uB85C\uB4DC",
+    add_link: "\uB9C1\uD06C \uCD94\uAC00",
+    add_link_title: "\uC678\uBD80 \uB9C1\uD06C \uCD94\uAC00",
+    url_label: "URL",
+    url_placeholder: "https://\u2026",
+    title_label: "\uC81C\uBAA9",
+    description_label: "\uC124\uBA85",
+    invalid_url: "\uC720\uD6A8\uD55C http(s) URL\uC744 \uC785\uB825\uD558\uC138\uC694.",
+    add: "\uCD94\uAC00",
+    source_app_label: "\uCD9C\uCC98",
+    created_label: "\uC0DD\uC131\uC77C"
   }
 };
 
@@ -1176,7 +1230,34 @@ var zh_default = {
     no_results: "\u6CA1\u6709\u5339\u914D\u7684\u8BB0\u5F55\u3002",
     related_records: "\u5173\u8054\u8BB0\u5F55",
     no_related_records: "\u5C1A\u672A\u5173\u8054\u4EFB\u4F55\u8BB0\u5F55\u3002",
-    unlink: "\u53D6\u6D88\u5173\u8054"
+    unlink: "\u53D6\u6D88\u5173\u8054",
+    archive: "\u5F52\u6863",
+    unarchive: "\u6062\u590D",
+    archive_confirm_title: "\u5F52\u6863\u6B64\u6587\u6863\uFF1F",
+    archive_confirm_body: "\u5B83\u5C06\u4ECE\u9ED8\u8BA4\u5217\u8868\u4E2D\u9690\u85CF\uFF0C\u4F46\u4E0D\u4F1A\u88AB\u5220\u9664 \u2014 \u6240\u6709\u94FE\u63A5\u548C\u7248\u672C\u90FD\u4F1A\u4FDD\u7559\uFF0C\u60A8\u53EF\u4EE5\u968F\u65F6\u6062\u590D\u3002",
+    unarchive_confirm_title: "\u6062\u590D\u6B64\u6587\u6863\uFF1F",
+    unarchive_confirm_body: "\u5B83\u5C06\u91CD\u65B0\u51FA\u73B0\u5728\u9ED8\u8BA4\u5217\u8868\u4E2D\u3002",
+    archived_badge: "\u5DF2\u5F52\u6863",
+    delete_permanently: "\u6C38\u4E45\u5220\u9664",
+    delete_permanently_confirm_title: "\u6C38\u4E45\u5220\u9664\uFF1F",
+    delete_permanently_confirm_body: "\u6B64\u64CD\u4F5C\u65E0\u6CD5\u64A4\u9500\u3002\u6587\u4EF6\u53CA\u5176\u6240\u6709\u94FE\u63A5\u90FD\u5C06\u88AB\u5220\u9664\u3002",
+    cancel: "\u53D6\u6D88",
+    confirm: "\u786E\u8BA4",
+    versions_title: "\u7248\u672C",
+    version_current: "\u5F53\u524D",
+    version_open: "\u6253\u5F00",
+    no_versions: "\u5C1A\u65E0\u7248\u672C\u3002",
+    upload_file: "\u4E0A\u4F20\u6587\u4EF6",
+    add_link: "\u6DFB\u52A0\u94FE\u63A5",
+    add_link_title: "\u6DFB\u52A0\u5916\u90E8\u94FE\u63A5",
+    url_label: "URL",
+    url_placeholder: "https://\u2026",
+    title_label: "\u6807\u9898",
+    description_label: "\u63CF\u8FF0",
+    invalid_url: "\u8BF7\u8F93\u5165\u6709\u6548\u7684 http(s) URL\u3002",
+    add: "\u6DFB\u52A0",
+    source_app_label: "\u6765\u6E90",
+    created_label: "\u521B\u5EFA\u65F6\u95F4"
   }
 };
 
@@ -1541,7 +1622,34 @@ var es_default = {
     no_results: "No hay registros coincidentes.",
     related_records: "Registros relacionados",
     no_related_records: "A\xFAn no est\xE1 vinculado a ning\xFAn registro.",
-    unlink: "Desvincular"
+    unlink: "Desvincular",
+    archive: "Archivar",
+    unarchive: "Restaurar",
+    archive_confirm_title: "\xBFArchivar este documento?",
+    archive_confirm_body: "Se ocultar\xE1 de las listas predeterminadas, pero no se eliminar\xE1 \u2014 todos los enlaces y versiones permanecen intactos y puede restaurarlo en cualquier momento.",
+    unarchive_confirm_title: "\xBFRestaurar este documento?",
+    unarchive_confirm_body: "Volver\xE1 a aparecer en las listas predeterminadas.",
+    archived_badge: "Archivado",
+    delete_permanently: "Eliminar permanentemente",
+    delete_permanently_confirm_title: "\xBFEliminar permanentemente?",
+    delete_permanently_confirm_body: "Esta acci\xF3n no se puede deshacer. El archivo y todos sus enlaces se eliminar\xE1n.",
+    cancel: "Cancelar",
+    confirm: "Confirmar",
+    versions_title: "Versiones",
+    version_current: "Actual",
+    version_open: "Abrir",
+    no_versions: "A\xFAn no hay versiones.",
+    upload_file: "Subir archivo",
+    add_link: "Agregar enlace",
+    add_link_title: "Agregar un enlace externo",
+    url_label: "URL",
+    url_placeholder: "https://\u2026",
+    title_label: "T\xEDtulo",
+    description_label: "Descripci\xF3n",
+    invalid_url: "Ingrese una URL http(s) v\xE1lida.",
+    add: "Agregar",
+    source_app_label: "Origen",
+    created_label: "Creado"
   }
 };
 
@@ -1906,7 +2014,34 @@ var vi_default = {
     no_results: "Kh\xF4ng c\xF3 b\u1EA3n ghi ph\xF9 h\u1EE3p.",
     related_records: "B\u1EA3n ghi li\xEAn quan",
     no_related_records: "Ch\u01B0a li\xEAn k\u1EBFt v\u1EDBi b\u1EA3n ghi n\xE0o.",
-    unlink: "H\u1EE7y li\xEAn k\u1EBFt"
+    unlink: "H\u1EE7y li\xEAn k\u1EBFt",
+    archive: "L\u01B0u tr\u1EEF",
+    unarchive: "Kh\xF4i ph\u1EE5c",
+    archive_confirm_title: "L\u01B0u tr\u1EEF t\xE0i li\u1EC7u n\xE0y?",
+    archive_confirm_body: "T\xE0i li\u1EC7u s\u1EBD b\u1ECB \u1EA9n kh\u1ECFi danh s\xE1ch m\u1EB7c \u0111\u1ECBnh nh\u01B0ng kh\xF4ng b\u1ECB x\xF3a \u2014 m\u1ECDi li\xEAn k\u1EBFt v\xE0 phi\xEAn b\u1EA3n v\u1EABn \u0111\u01B0\u1EE3c gi\u1EEF nguy\xEAn, b\u1EA1n c\xF3 th\u1EC3 kh\xF4i ph\u1EE5c b\u1EA5t c\u1EE9 l\xFAc n\xE0o.",
+    unarchive_confirm_title: "Kh\xF4i ph\u1EE5c t\xE0i li\u1EC7u n\xE0y?",
+    unarchive_confirm_body: "T\xE0i li\u1EC7u s\u1EBD xu\u1EA5t hi\u1EC7n l\u1EA1i trong danh s\xE1ch m\u1EB7c \u0111\u1ECBnh.",
+    archived_badge: "\u0110\xE3 l\u01B0u tr\u1EEF",
+    delete_permanently: "X\xF3a v\u0129nh vi\u1EC5n",
+    delete_permanently_confirm_title: "X\xF3a v\u0129nh vi\u1EC5n?",
+    delete_permanently_confirm_body: "Kh\xF4ng th\u1EC3 ho\xE0n t\xE1c. T\u1EC7p v\xE0 m\u1ECDi li\xEAn k\u1EBFt \u0111\u1EBFn t\u1EC7p s\u1EBD b\u1ECB x\xF3a.",
+    cancel: "H\u1EE7y",
+    confirm: "X\xE1c nh\u1EADn",
+    versions_title: "Phi\xEAn b\u1EA3n",
+    version_current: "Hi\u1EC7n t\u1EA1i",
+    version_open: "M\u1EDF",
+    no_versions: "Ch\u01B0a c\xF3 phi\xEAn b\u1EA3n n\xE0o.",
+    upload_file: "T\u1EA3i t\u1EC7p l\xEAn",
+    add_link: "Th\xEAm li\xEAn k\u1EBFt",
+    add_link_title: "Th\xEAm li\xEAn k\u1EBFt b\xEAn ngo\xE0i",
+    url_label: "URL",
+    url_placeholder: "https://\u2026",
+    title_label: "Ti\xEAu \u0111\u1EC1",
+    description_label: "M\xF4 t\u1EA3",
+    invalid_url: "Nh\u1EADp URL http(s) h\u1EE3p l\u1EC7.",
+    add: "Th\xEAm",
+    source_app_label: "Ngu\u1ED3n",
+    created_label: "Ng\xE0y t\u1EA1o"
   }
 };
 
@@ -4675,7 +4810,7 @@ function RelatedRecordsPanel({ relations, provider, onLink, onUnlink, onNavigate
   const [dialogOpen, setDialogOpen] = useState(false);
   const [unlinkingId, setUnlinkingId] = useState(null);
   useEffect(() => {
-    if (relations.length === 0) {
+    if (relations.length === 0 || !provider) {
       setResolved({});
       return;
     }
@@ -4699,14 +4834,14 @@ function RelatedRecordsPanel({ relations, provider, onLink, onUnlink, onNavigate
   return /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
     /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between", children: [
       /* @__PURE__ */ jsx("h4", { className: "text-sm font-medium", children: t("content_core.related_records", "Related Records") }),
-      /* @__PURE__ */ jsx(Button, { size: "sm", variant: "outline", onClick: () => setDialogOpen(true), children: t("content_core.link_to_record", "Link to record") })
+      provider && /* @__PURE__ */ jsx(Button, { size: "sm", variant: "outline", onClick: () => setDialogOpen(true), children: t("content_core.link_to_record", "Link to record") })
     ] }),
     loading && /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("common.loading", "Loading\u2026") }),
     !loading && relations.length === 0 && /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("content_core.no_related_records", "Not linked to any record yet.") }),
     !loading && relations.length > 0 && /* @__PURE__ */ jsx("ul", { className: "space-y-1", children: relations.map((r) => {
       const key = `${r.entityType}:${r.entityId}`;
       const info = resolved[key];
-      const href = provider.getEntityHref(r.entityType, r.entityId);
+      const href = provider?.getEntityHref(r.entityType, r.entityId) ?? null;
       return /* @__PURE__ */ jsxs("li", { className: "flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm", children: [
         href && onNavigate ? /* @__PURE__ */ jsxs(
           "button",
@@ -4741,7 +4876,291 @@ function RelatedRecordsPanel({ relations, provider, onLink, onUnlink, onNavigate
         )
       ] }, r.id);
     }) }),
-    /* @__PURE__ */ jsx(LinkToRecordDialog, { open: dialogOpen, onOpenChange: setDialogOpen, provider, onLink })
+    provider && /* @__PURE__ */ jsx(LinkToRecordDialog, { open: dialogOpen, onOpenChange: setDialogOpen, provider, onLink })
+  ] });
+}
+function ArchiveContentAction({ archived, onArchive, onUnarchive, disabled, size = "sm" }) {
+  const { t } = useTranslation();
+  const { ui } = useJoaSuite();
+  const { Button, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } = ui;
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  async function handleConfirm() {
+    setBusy(true);
+    try {
+      if (archived) {
+        await onUnarchive?.();
+      } else {
+        await onArchive();
+      }
+      setConfirmOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (archived && !onUnarchive) return null;
+  return /* @__PURE__ */ jsxs(Fragment, { children: [
+    /* @__PURE__ */ jsx(Button, { size, variant: "outline", disabled, onClick: () => setConfirmOpen(true), children: archived ? t("content_core.unarchive", "Restore") : t("content_core.archive", "Archive") }),
+    /* @__PURE__ */ jsx(Dialog, { open: confirmOpen, onOpenChange: setConfirmOpen, children: /* @__PURE__ */ jsxs(DialogContent, { className: "max-w-md", children: [
+      /* @__PURE__ */ jsx(DialogHeader, { children: /* @__PURE__ */ jsx(DialogTitle, { children: archived ? t("content_core.unarchive_confirm_title", "Restore this document?") : t("content_core.archive_confirm_title", "Archive this document?") }) }),
+      /* @__PURE__ */ jsx("p", { className: "text-sm text-muted-foreground", children: archived ? t("content_core.unarchive_confirm_body", "It will appear in default lists again.") : t(
+        "content_core.archive_confirm_body",
+        "It will be hidden from default lists but not deleted \u2014 every link and version stays intact, and you can restore it anytime."
+      ) }),
+      /* @__PURE__ */ jsxs(DialogFooter, { children: [
+        /* @__PURE__ */ jsx(Button, { variant: "outline", onClick: () => setConfirmOpen(false), disabled: busy, children: t("content_core.cancel", "Cancel") }),
+        /* @__PURE__ */ jsx(Button, { onClick: handleConfirm, disabled: busy, children: t("content_core.confirm", "Confirm") })
+      ] })
+    ] }) })
+  ] });
+}
+function DeletePermanentlyAction({ onDelete, disabled, size = "sm" }) {
+  const { t } = useTranslation();
+  const { ui } = useJoaSuite();
+  const { Button, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } = ui;
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  async function handleConfirm() {
+    setBusy(true);
+    try {
+      await onDelete();
+      setConfirmOpen(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return /* @__PURE__ */ jsxs(Fragment, { children: [
+    /* @__PURE__ */ jsx(Button, { size, variant: "destructive", disabled, onClick: () => setConfirmOpen(true), children: t("content_core.delete_permanently", "Delete permanently") }),
+    /* @__PURE__ */ jsx(Dialog, { open: confirmOpen, onOpenChange: setConfirmOpen, children: /* @__PURE__ */ jsxs(DialogContent, { className: "max-w-md", children: [
+      /* @__PURE__ */ jsx(DialogHeader, { children: /* @__PURE__ */ jsx(DialogTitle, { children: t("content_core.delete_permanently_confirm_title", "Delete permanently?") }) }),
+      /* @__PURE__ */ jsx("p", { className: "text-sm text-muted-foreground", children: t(
+        "content_core.delete_permanently_confirm_body",
+        "This cannot be undone. The file and every link to it will be removed."
+      ) }),
+      /* @__PURE__ */ jsxs(DialogFooter, { children: [
+        /* @__PURE__ */ jsx(Button, { variant: "outline", onClick: () => setConfirmOpen(false), disabled: busy, children: t("content_core.cancel", "Cancel") }),
+        /* @__PURE__ */ jsx(Button, { variant: "destructive", onClick: handleConfirm, disabled: busy, children: t("content_core.delete_permanently", "Delete permanently") })
+      ] })
+    ] }) })
+  ] });
+}
+var ALLOWED_SCHEMES = /* @__PURE__ */ new Set(["http:", "https:"]);
+function isSafeUrl(raw) {
+  try {
+    return ALLOWED_SCHEMES.has(new URL(raw).protocol);
+  } catch {
+    return false;
+  }
+}
+function AddExternalLinkDialog({ open, onOpenChange, onSubmit, title }) {
+  const { t } = useTranslation();
+  const { ui } = useJoaSuite();
+  const { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, Input, Textarea, Label, Button } = ui;
+  const [url, setUrl] = useState("");
+  const [linkTitle, setLinkTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [touched, setTouched] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    setUrl("");
+    setLinkTitle("");
+    setDescription("");
+    setTouched(false);
+  }, [open]);
+  const urlValid = url.trim().length === 0 || isSafeUrl(url.trim());
+  const canSubmit = url.trim().length > 0 && isSafeUrl(url.trim()) && linkTitle.trim().length > 0;
+  async function handleSubmit() {
+    setTouched(true);
+    if (!canSubmit) return;
+    setBusy(true);
+    try {
+      await onSubmit({ url: url.trim(), title: linkTitle.trim(), description: description.trim() || void 0 });
+      onOpenChange(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return /* @__PURE__ */ jsx(Dialog, { open, onOpenChange, children: /* @__PURE__ */ jsxs(DialogContent, { className: "max-w-md", children: [
+    /* @__PURE__ */ jsx(DialogHeader, { children: /* @__PURE__ */ jsx(DialogTitle, { children: title ?? t("content_core.add_link_title", "Add an external link") }) }),
+    /* @__PURE__ */ jsxs("div", { className: "space-y-3", children: [
+      /* @__PURE__ */ jsxs("div", { className: "space-y-1.5", children: [
+        /* @__PURE__ */ jsx(Label, { children: t("content_core.url_label", "URL") }),
+        /* @__PURE__ */ jsx(
+          Input,
+          {
+            autoFocus: true,
+            value: url,
+            onChange: (e) => setUrl(e.target.value),
+            placeholder: t("content_core.url_placeholder", "https://\u2026")
+          }
+        ),
+        touched && !urlValid && /* @__PURE__ */ jsx("p", { className: "text-xs text-destructive", children: t("content_core.invalid_url", "Enter a valid http(s) URL.") })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "space-y-1.5", children: [
+        /* @__PURE__ */ jsx(Label, { children: t("content_core.title_label", "Title") }),
+        /* @__PURE__ */ jsx(Input, { value: linkTitle, onChange: (e) => setLinkTitle(e.target.value) })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "space-y-1.5", children: [
+        /* @__PURE__ */ jsx(Label, { children: t("content_core.description_label", "Description") }),
+        /* @__PURE__ */ jsx(Textarea, { rows: 2, value: description, onChange: (e) => setDescription(e.target.value) })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs(DialogFooter, { children: [
+      /* @__PURE__ */ jsx(Button, { variant: "outline", onClick: () => onOpenChange(false), disabled: busy, children: t("content_core.cancel", "Cancel") }),
+      /* @__PURE__ */ jsx(Button, { onClick: handleSubmit, disabled: busy || touched && !canSubmit, children: t("content_core.add", "Add") })
+    ] })
+  ] }) });
+}
+function defaultFormatSize2(n) {
+  if (!n) return "";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+function defaultFormatDate2(s) {
+  if (!s) return "";
+  try {
+    return new Date(s).toLocaleDateString();
+  } catch {
+    return s;
+  }
+}
+function ContentVersionsPanel({
+  versions,
+  currentVersionId,
+  onOpen,
+  formatSize = defaultFormatSize2,
+  formatDate: formatDate3 = defaultFormatDate2,
+  title
+}) {
+  const { t } = useTranslation();
+  const { ui } = useJoaSuite();
+  const { Button, Badge } = ui;
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-2", children: [
+    /* @__PURE__ */ jsx("h4", { className: "text-sm font-medium", children: title ?? t("content_core.versions_title", "Versions") }),
+    versions.length === 0 ? /* @__PURE__ */ jsx("div", { className: "text-sm text-muted-foreground", children: t("content_core.no_versions", "No versions yet.") }) : /* @__PURE__ */ jsx("ul", { className: "space-y-1", children: versions.map((v) => /* @__PURE__ */ jsxs("li", { className: "flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm", children: [
+      /* @__PURE__ */ jsxs("div", { className: "min-w-0 flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx("span", { className: "truncate", children: v.versionLabel ?? v.fileName ?? v.externalUrl ?? `v${v.versionNumber}` }),
+        v.id === currentVersionId && /* @__PURE__ */ jsx(Badge, { variant: "secondary", children: t("content_core.version_current", "Current") }),
+        v.fileSize != null && /* @__PURE__ */ jsx("span", { className: "text-muted-foreground shrink-0", children: formatSize(v.fileSize) }),
+        /* @__PURE__ */ jsx("span", { className: "text-muted-foreground shrink-0", children: formatDate3(v.createdAt) })
+      ] }),
+      onOpen && /* @__PURE__ */ jsx(Button, { size: "sm", variant: "ghost", onClick: () => onOpen(v), children: t("content_core.version_open", "Open") })
+    ] }, v.id)) })
+  ] });
+}
+function ContentUploader({
+  onUploadFile,
+  onAddExternalLink,
+  accept,
+  uploadLabel,
+  linkLabel,
+  linkDialogTitle,
+  disabled
+}) {
+  const { t } = useTranslation();
+  const { ui } = useJoaSuite();
+  const { Button } = ui;
+  const fileInputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  async function handleFileChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    try {
+      await onUploadFile(file);
+    } finally {
+      setUploading(false);
+    }
+  }
+  return /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+    /* @__PURE__ */ jsx("input", { ref: fileInputRef, type: "file", accept, className: "hidden", onChange: handleFileChange }),
+    /* @__PURE__ */ jsx(
+      Button,
+      {
+        variant: "outline",
+        disabled: disabled || uploading,
+        onClick: () => fileInputRef.current?.click(),
+        children: uploadLabel ?? t("content_core.upload_file", "Upload file")
+      }
+    ),
+    onAddExternalLink && /* @__PURE__ */ jsxs(Fragment, { children: [
+      /* @__PURE__ */ jsx(Button, { variant: "outline", disabled, onClick: () => setLinkDialogOpen(true), children: linkLabel ?? t("content_core.add_link", "Add link") }),
+      /* @__PURE__ */ jsx(
+        AddExternalLinkDialog,
+        {
+          open: linkDialogOpen,
+          onOpenChange: setLinkDialogOpen,
+          onSubmit: onAddExternalLink,
+          title: linkDialogTitle
+        }
+      )
+    ] })
+  ] });
+}
+function ContentDetail({
+  item,
+  versions,
+  relations,
+  relationProvider,
+  onLinkRelation,
+  onUnlinkRelation,
+  onNavigateRelation,
+  onOpenVersion,
+  onArchive,
+  onUnarchive,
+  onDeletePermanently,
+  formatSize,
+  formatDate: formatDate3,
+  labels
+}) {
+  const { t } = useTranslation();
+  const { ui } = useJoaSuite();
+  const { Badge } = ui;
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-6", children: [
+    /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx("h3", { className: "text-lg font-semibold truncate", children: item.title ?? t("content_core.upload_file", "Untitled") }),
+        item.archivedAt && /* @__PURE__ */ jsx(Badge, { variant: "secondary", children: labels?.archivedBadge ?? t("content_core.archived_badge", "Archived") })
+      ] }),
+      item.description && /* @__PURE__ */ jsx("p", { className: "text-sm text-muted-foreground", children: item.description }),
+      /* @__PURE__ */ jsxs("p", { className: "text-xs text-muted-foreground", children: [
+        labels?.sourceAppLabel ?? t("content_core.source_app_label", "Source"),
+        ": ",
+        item.sourceApp,
+        " \xB7 ",
+        labels?.createdLabel ?? t("content_core.created_label", "Created"),
+        ": ",
+        formatDate3 ? formatDate3(item.createdAt) : item.createdAt
+      ] })
+    ] }),
+    (onArchive || onDeletePermanently) && /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+      onArchive && /* @__PURE__ */ jsx(ArchiveContentAction, { archived: !!item.archivedAt, onArchive, onUnarchive }),
+      onDeletePermanently && /* @__PURE__ */ jsx(DeletePermanentlyAction, { onDelete: onDeletePermanently })
+    ] }),
+    /* @__PURE__ */ jsx(
+      ContentVersionsPanel,
+      {
+        versions,
+        currentVersionId: item.currentVersionId,
+        onOpen: onOpenVersion,
+        formatSize,
+        formatDate: formatDate3
+      }
+    ),
+    /* @__PURE__ */ jsx(
+      RelatedRecordsPanel,
+      {
+        relations,
+        provider: relationProvider,
+        onLink: onLinkRelation,
+        onUnlink: onUnlinkRelation,
+        onNavigate: onNavigateRelation
+      }
+    )
   ] });
 }
 function initials(name) {
@@ -7151,6 +7570,6 @@ function BillingComparePage({ appCode }) {
   ] });
 }
 
-export { APP_CODES, APP_DISPLAY, AppOverviewSection, AttachmentPreviewDialog, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, DEFAULT_APP_URLS, DocumentLibraryTable, FieldGroup, FieldRow, InviteAsUserBanner, JoaSuiteProvider, LanguageSwitcher, LinkToRecordDialog, NotificationsBell, OrgChartView, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, RelatedRecordsPanel, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, TeamMemberView, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, guessAttachmentKind, mergeSharedResources, roleLabel, useJoaSuite, useOrgScope };
+export { APP_CODES, APP_DISPLAY, AddExternalLinkDialog, AppOverviewSection, ArchiveContentAction, AttachmentPreviewDialog, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, ContentDetail, ContentUploader, ContentVersionsPanel, DEFAULT_APP_URLS, DeletePermanentlyAction, DocumentLibraryTable, FieldGroup, FieldRow, InviteAsUserBanner, JoaSuiteProvider, LanguageSwitcher, LinkToRecordDialog, NotificationsBell, OrgChartView, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, RelatedRecordsPanel, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, TeamMemberView, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, guessAttachmentKind, mergeSharedResources, roleLabel, useJoaSuite, useOrgScope };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

@@ -846,6 +846,8 @@ type RelationEntityTypeOption = {
     entityType: string;
     /** Display label, e.g. "Vendor", "Bill". Pass pre-translated. */
     label: string;
+    /** Optional icon element for the entity-type picker. Rendered as-is, no default. */
+    icon?: ReactNode;
 };
 type RelationSearchResult = {
     entityId: string;
@@ -868,6 +870,15 @@ type ContentRelationProvider = {
     }>): Promise<Record<string, RelationSearchResult>>;
     /** Where clicking a search result / an existing relation should navigate. Return null if there's no detail page. */
     getEntityHref(entityType: string, entityId: string): string | null;
+    /**
+     * UI-presentation hints only (e.g. disable/grey out one search result) --
+     * the server (content_relations RLS + createContentRelation's explicit
+     * user_can_view_doc check) is the real, authoritative gate regardless of
+     * what these return. Omit either method to mean "always show the
+     * control, let the server reject if it must" -- neither is required.
+     */
+    canLink?(entityType: string, entityId: string): Promise<boolean>;
+    canUnlink?(entityType: string, entityId: string): Promise<boolean>;
 };
 type ContentRelationRow = {
     id: string;
@@ -877,6 +888,162 @@ type ContentRelationRow = {
     entityId: string;
     relationType: string;
     createdAt: string;
+};
+
+/**
+ * Shared Content Core — neutral data types.
+ *
+ * These mirror public.content_items / content_versions column-for-column
+ * (camelCase, per this package's own convention — DB-facing app code stays
+ * snake_case, shared-package-facing types are camelCase; see
+ * content-core-provider.ts for where that mapping happens). No
+ * ContentAccessScope type exists here — deliberately: see
+ * joasuite-shared/docs/shared-content-core.md's "Deviation: no
+ * content_access_scopes table" section. Visibility is derived at query
+ * time from content_relations via user_can_view_content(), never stored as
+ * a scope record, so there is nothing here for a type to represent.
+ */
+type ContentType = "file" | "external_link";
+type ContentItem = {
+    id: string;
+    tenantId: string;
+    contentType: ContentType;
+    title: string | null;
+    description: string | null;
+    documentDate: string | null;
+    expirationDate: string | null;
+    sourceApp: string;
+    originEntityType: string | null;
+    originEntityId: string | null;
+    currentVersionId: string | null;
+    createdBy: string | null;
+    createdAt: string;
+    updatedAt: string;
+    archivedAt: string | null;
+};
+type ContentVersion = {
+    id: string;
+    contentItemId: string;
+    versionNumber: number;
+    versionLabel: string | null;
+    /** Set for content_type='file'. Points at the wrapped public.attachments row -- never duplicated. */
+    attachmentId: string | null;
+    /** Set for content_type='external_link'. http(s) only, never fetched server-side. */
+    externalUrl: string | null;
+    fileName: string | null;
+    mimeType: string | null;
+    fileSize: number | null;
+    sha256: string | null;
+    createdBy: string | null;
+    createdAt: string;
+};
+/** Where a content item was first created from. Provenance only -- nothing checks this for authorization. */
+type ContentOrigin = {
+    sourceApp: string;
+    originEntityType: string | null;
+    originEntityId: string | null;
+};
+/**
+ * A ContentDetail-shaped bundle: one item with its versions and relations
+ * loaded together, the shape ContentProvider.getContent() returns.
+ */
+type ContentItemDetail = {
+    item: ContentItem;
+    versions: ContentVersion[];
+};
+/**
+ * Reusable search/filter contract (Section 8 of the Phase 2 prompt). This is
+ * a shape apps agree to accept in ContentProvider.listContent/searchContent
+ * -- the actual filtering always happens server-side, inside each app's own
+ * RLS-scoped query, so "do not leak results the user cannot access" is
+ * satisfied by content_items_select RLS, not by anything in this package.
+ */
+type ContentSearchFilters = {
+    /** Matches against title / file name. */
+    query?: string;
+    contentType?: ContentType;
+    documentDateFrom?: string;
+    documentDateTo?: string;
+    createdAtFrom?: string;
+    createdAtTo?: string;
+    createdBy?: string;
+    sourceApp?: string;
+    tags?: string[];
+    /** Only content related to this specific record, if the app tracks it this way. */
+    relatedEntityType?: string;
+    relatedEntityId?: string;
+    includeArchived?: boolean;
+};
+
+/**
+ * ContentProvider — the DI seam between the generic shared components and
+ * one app's own local server functions. This IS the "Shared Content
+ * Service" the Phase 2 prompt's Section 3 asks for: rather than a second,
+ * heavier stateful service/class layered on top (which this package
+ * deliberately has no precedent for -- see the deviation note below), it is
+ * a plain interface an app implements once, in its own local
+ * content-core.functions.ts-equivalent, and passes as a prop into whichever
+ * shared components it uses. This matches the plain "presentational
+ * component + injected provider prop" pattern already established by
+ * ContentRelationProvider/DocumentLibraryTable/RelatedRecordsPanel, rather
+ * than introducing a second DI mechanism alongside it.
+ *
+ * Every method here is a thin wrapper an app writes around its own local
+ * `createServerFn(...)` calls -- per the suite-wide rule, this package
+ * itself must never call `createServerFn()` (see any app's CLAUDE.md,
+ * "`createServerFn()` must be called app-local, never inside
+ * joasuite-shared"). This file only declares the shape; it contains no
+ * implementation and touches no Supabase client, router, or app-specific
+ * table.
+ */
+type ContentProvider = {
+    /** List content visible to the caller, optionally filtered. Server applies RLS -- never leaks inaccessible rows. */
+    listContent(filters: ContentSearchFilters): Promise<ContentItem[]>;
+    /** One content item plus its version history. Returns null if not found or not visible. */
+    getContent(contentItemId: string): Promise<ContentItemDetail | null>;
+    /** Wrap an existing attachment (already uploaded through the app's own upload flow) as a content item. */
+    uploadFile(params: {
+        attachmentId: string;
+    }): Promise<ContentItem>;
+    /** Create a Content-Core-native external link. Implementations must reject non-http(s) schemes and never fetch the URL. */
+    addExternalLink(params: {
+        url: string;
+        title: string;
+        description?: string;
+    }): Promise<ContentItem>;
+    /** Add a new version to an existing content item (file- or link-backed). */
+    addVersion(params: {
+        contentItemId: string;
+        attachmentId?: string;
+        externalUrl?: string;
+        versionLabel?: string;
+    }): Promise<ContentVersion>;
+    /** Archive tier only -- see docs/shared-content-core.md's delete-semantics table. Never deletes anything. */
+    archiveContent(contentItemId: string, archived: boolean): Promise<void>;
+};
+/**
+ * ContentAuthorizationProvider — UI-presentation-only capability checks
+ * (show/hide a button). Optional everywhere it's used: per the prompt's own
+ * Section 5 instruction ("the UI may use it for presentation, but server
+ * enforcement remains authoritative — do not treat UI adapter checks as
+ * security boundaries"), a shared component with no authorization provider
+ * injected simply shows its controls and lets the server-side RLS/explicit
+ * checks reject an unauthorized action -- it does not become insecure by
+ * omission, only less polished (a button that then errors instead of one
+ * that was never shown).
+ */
+type ContentAuthorizationProvider = {
+    canView(contentItemId: string): Promise<boolean>;
+    canModify(contentItemId: string): Promise<boolean>;
+    /**
+     * Optional -- only an app that has actually built a Delete Permanently
+     * tier (see docs/shared-content-core.md; JoaOffice's document-vault
+     * cascade is the only one today) needs to supply this. A shared
+     * component must never render a "Delete Permanently" control unless both
+     * (a) the app passed an onDeletePermanently callback AND (b) this
+     * resolves true -- see ArchiveContentAction's own contract.
+     */
+    canDeletePermanently?(contentItemId: string): Promise<boolean>;
 };
 
 type LinkToRecordDialogProps = {
@@ -896,7 +1063,15 @@ declare function LinkToRecordDialog({ open, onOpenChange, provider, onLink }: Li
 
 type RelatedRecordsPanelProps = {
     relations: ContentRelationRow[];
-    provider: ContentRelationProvider;
+    /**
+     * Optional -- per the Shared Content Core contract, an app that supplies
+     * no relation provider still gets a fully working library, just without
+     * relationship controls: this panel then renders existing relations
+     * (label falls back to the raw entityType, since there's no provider to
+     * resolve a display label/href from) but hides the "Link to record"
+     * button entirely rather than rendering broken/no-op controls.
+     */
+    provider?: ContentRelationProvider;
     onLink: (entityType: string, result: RelationSearchResult) => Promise<void>;
     onUnlink?: (relation: ContentRelationRow) => Promise<void>;
     onNavigate?: (href: string) => void;
@@ -911,6 +1086,154 @@ type RelatedRecordsPanelProps = {
  * only renders the content-item side.
  */
 declare function RelatedRecordsPanel({ relations, provider, onLink, onUnlink, onNavigate, loading }: RelatedRecordsPanelProps): react.JSX.Element;
+
+type ArchiveContentActionProps = {
+    archived: boolean;
+    onArchive: () => Promise<void>;
+    onUnarchive?: () => Promise<void>;
+    disabled?: boolean;
+    size?: "sm" | "default";
+};
+/**
+ * The middle tier of the three delete semantics (Unlink < Archive < Delete
+ * Permanently -- see docs/shared-content-core.md). Deliberately its own
+ * component, never folded into a generic "Delete" button: Section 9 of the
+ * Phase 2 prompt requires the UI to distinguish these, and a single
+ * ambiguous Delete action is exactly the failure mode that requirement
+ * exists to prevent. Confirms before acting since archiving changes what a
+ * user sees in every default list, even though nothing is destroyed.
+ */
+declare function ArchiveContentAction({ archived, onArchive, onUnarchive, disabled, size }: ArchiveContentActionProps): react.JSX.Element | null;
+
+type DeletePermanentlyActionProps = {
+    onDelete: () => Promise<void>;
+    disabled?: boolean;
+    size?: "sm" | "default";
+};
+/**
+ * The most destructive of the three delete tiers. There is deliberately no
+ * shared primitive for *performing* a permanent delete (see
+ * docs/shared-content-core.md -- whether "permanently delete" also removes
+ * the underlying attachment/storage object is an app-specific decision,
+ * JoaOffice's document-vault cascade being the only one built so far) --
+ * this component is only the confirm-and-invoke shell, identical in spirit
+ * to ArchiveContentAction. The caller (the host app) decides whether to
+ * render this at all: per Section 9 of the Phase 2 prompt, "permanent
+ * delete must display only when the server says it is legal," which means
+ * the app should only mount <DeletePermanentlyAction> after its own
+ * ContentAuthorizationProvider.canDeletePermanently() (or equivalent)
+ * resolved true -- this component does not call that check itself.
+ */
+declare function DeletePermanentlyAction({ onDelete, disabled, size }: DeletePermanentlyActionProps): react.JSX.Element;
+
+type AddExternalLinkDialogProps = {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onSubmit: (params: {
+        url: string;
+        title: string;
+        description?: string;
+    }) => Promise<void>;
+    /** Injectable dialog title (Section 7 -- never force "File Library"-style wording). */
+    title?: string;
+};
+/**
+ * Add a Content-Core-native external link (Google Drive/Docs/Sheets,
+ * Dropbox, SharePoint, or any other http(s) URL) -- no attachment, no
+ * upload, nothing fetched server-side. Presentational: onSubmit is the
+ * host app's own addExternalLink server-fn call.
+ */
+declare function AddExternalLinkDialog({ open, onOpenChange, onSubmit, title }: AddExternalLinkDialogProps): react.JSX.Element;
+
+type ContentVersionsPanelProps = {
+    versions: ContentVersion[];
+    currentVersionId?: string | null;
+    onOpen?: (version: ContentVersion) => void;
+    formatSize?: (n: number | null | undefined) => string;
+    formatDate?: (s: string | null | undefined) => string;
+    /** Injectable section title (Section 7). */
+    title?: string;
+};
+/**
+ * Version history for one content item. Works today even for apps with no
+ * version-management UI of their own -- every existing attachment-backed
+ * item already has exactly one version, so this just renders a
+ * single-row list; nothing here assumes more than one version exists (see
+ * docs/shared-content-core.md's "Version-ready design").
+ */
+declare function ContentVersionsPanel({ versions, currentVersionId, onOpen, formatSize, formatDate, title, }: ContentVersionsPanelProps): react.JSX.Element;
+
+type ContentUploaderProps = {
+    /**
+     * The host app owns the actual upload mechanics (storage bucket, signed
+     * URL, wrapping the resulting attachment as a content item) -- this
+     * component only captures the picked File and hands it off. Deliberately
+     * NOT a full re-implementation of each app's own AttachmentsPanel-style
+     * upload flow, which stays local per app since storage plumbing is
+     * genuinely app-specific.
+     */
+    onUploadFile: (file: File) => Promise<void>;
+    /** Omit to hide the "Add link" affordance entirely (e.g. an app with no external-link support). */
+    onAddExternalLink?: (params: {
+        url: string;
+        title: string;
+        description?: string;
+    }) => Promise<void>;
+    accept?: string;
+    uploadLabel?: string;
+    linkLabel?: string;
+    linkDialogTitle?: string;
+    disabled?: boolean;
+};
+/**
+ * Neutral "add content" shell: pick a file, or add an external link. No
+ * label here is hardcoded to any app's own terminology for this feature
+ * (e.g. JoaOffice's "Document Vault" vs JoaBooks' "Document Library") --
+ * every visible string is either overridable via the props above or an
+ * i18n key any app's own locale files can override.
+ */
+declare function ContentUploader({ onUploadFile, onAddExternalLink, accept, uploadLabel, linkLabel, linkDialogTitle, disabled, }: ContentUploaderProps): react.JSX.Element;
+
+type ContentDetailProps = {
+    item: ContentItem;
+    versions: ContentVersion[];
+    relations: ContentRelationRow[];
+    /** Omit for an app with no relation provider -- Related Records renders read-only-ish with no "Link to record" control. */
+    relationProvider?: ContentRelationProvider;
+    onLinkRelation: (entityType: string, result: RelationSearchResult) => Promise<void>;
+    onUnlinkRelation?: (relation: ContentRelationRow) => Promise<void>;
+    onNavigateRelation?: (href: string) => void;
+    onOpenVersion?: (version: ContentVersion) => void;
+    onArchive?: () => Promise<void>;
+    onUnarchive?: () => Promise<void>;
+    /**
+     * Only pass this once the host app's own authorization check has already
+     * confirmed permanent delete is legal for this item (see
+     * ContentAuthorizationProvider.canDeletePermanently) -- omitting it hides
+     * the control entirely, matching Section 9's "must display only when the
+     * server says it is legal."
+     */
+    onDeletePermanently?: () => Promise<void>;
+    formatSize?: (n: number | null | undefined) => string;
+    formatDate?: (s: string | null | undefined) => string;
+    /** Injectable terminology (Section 7) -- e.g. JoaOffice may want "Vault entry" instead of the default. */
+    labels?: {
+        sourceAppLabel?: string;
+        createdLabel?: string;
+        archivedBadge?: string;
+    };
+};
+/**
+ * Composed detail view for one content item: header metadata, versions,
+ * related records, and the three delete-tier actions (Unlink lives inside
+ * RelatedRecordsPanel per relation; Archive/Delete Permanently are
+ * top-level item actions). This is the first "big" shared component built
+ * on top of the smaller primitives (ContentVersionsPanel,
+ * RelatedRecordsPanel, ArchiveContentAction, DeletePermanentlyAction) --
+ * an app is free to use those smaller pieces directly instead of this
+ * composition if its own detail page layout differs.
+ */
+declare function ContentDetail({ item, versions, relations, relationProvider, onLinkRelation, onUnlinkRelation, onNavigateRelation, onOpenVersion, onArchive, onUnarchive, onDeletePermanently, formatSize, formatDate, labels, }: ContentDetailProps): react.JSX.Element;
 
 declare function OrgStructureSettingsPage({ tenantId }: {
     tenantId: string;
@@ -990,4 +1313,4 @@ declare function BillingComparePage({ appCode }: {
  */
 declare function useOrgScope(): [string[], (tenantIds: string[]) => void];
 
-export { type AppCatalogEntry, AppCode, AppOverviewSection, type AppSummaryTile, type ApprovalSummary, AttachmentPreviewDialog, type AttachmentPreviewDialogProps, type AttachmentPreviewKind, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type ContentRelationProvider, type ContentRelationRow, type Department, type DocumentLibraryRow, DocumentLibraryTable, type DocumentLibraryTableProps, FieldGroup, FieldRow, InviteAsUserBanner, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, LinkToRecordDialog, type LinkToRecordDialogProps, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, type OrgChartDepartmentT, type OrgChartPersonT, type OrgChartPositionT, OrgChartView, type OrgChartViewProps, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, RelatedRecordsPanel, type RelatedRecordsPanelProps, type RelationEntityTypeOption, type RelationSearchResult, type RouterAdapter, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, type TeamMemberInput, type TeamMemberRow, TeamMemberView, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, guessAttachmentKind, mergeSharedResources, useJoaSuite, useOrgScope };
+export { AddExternalLinkDialog, type AddExternalLinkDialogProps, type AppCatalogEntry, AppCode, AppOverviewSection, type AppSummaryTile, type ApprovalSummary, ArchiveContentAction, type ArchiveContentActionProps, AttachmentPreviewDialog, type AttachmentPreviewDialogProps, type AttachmentPreviewKind, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type ContentAuthorizationProvider, ContentDetail, type ContentDetailProps, type ContentItem, type ContentItemDetail, type ContentOrigin, type ContentProvider, type ContentRelationProvider, type ContentRelationRow, type ContentSearchFilters, type ContentType, ContentUploader, type ContentUploaderProps, type ContentVersion, ContentVersionsPanel, type ContentVersionsPanelProps, DeletePermanentlyAction, type DeletePermanentlyActionProps, type Department, type DocumentLibraryRow, DocumentLibraryTable, type DocumentLibraryTableProps, FieldGroup, FieldRow, InviteAsUserBanner, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, LinkToRecordDialog, type LinkToRecordDialogProps, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, type OrgChartDepartmentT, type OrgChartPersonT, type OrgChartPositionT, OrgChartView, type OrgChartViewProps, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, RelatedRecordsPanel, type RelatedRecordsPanelProps, type RelationEntityTypeOption, type RelationSearchResult, type RouterAdapter, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, type TeamMemberInput, type TeamMemberRow, TeamMemberView, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, guessAttachmentKind, mergeSharedResources, useJoaSuite, useOrgScope };
