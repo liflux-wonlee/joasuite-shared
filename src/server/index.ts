@@ -53,6 +53,8 @@ export { createGetSuiteHome, createSetAppUrl, type SuiteHomeData } from "./suite
 
 export { resolveScopedTenantIds } from "./org-scope.functions";
 
+export { assertSafeExternalUrl } from "./content-core-utils";
+
 export {
   createListNotifications,
   createMarkNotificationRead,
