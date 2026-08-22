@@ -665,13 +665,13 @@ content entirely):
 Still open:
 
 - The manual QA checklist above (Phase 1) has still not been executed
-  against the live DB from this sandbox (no `supabase.co` access, no test
-  framework existed until Phase 6 — see "Final security matrix" below,
-  which adds one, but it is also unexecuted from this sandbox for the same
-  reason). Structural pieces (RLS policies, unique constraints, function
-  bodies) have been read back and match design across every phase; no
-  live-user-session behavioral verification has happened from this
-  environment at any point in this project.
+  against the live DB from this sandbox (no `supabase.co` access). The
+  automated security matrix suite added in Phase 6 ("Final security
+  matrix" below) *has* now been run by the user, from their own machine,
+  against the live DB — 21/21 passed 2026-08-22 — but that only covers
+  the RPC-level authorization matrix, not real-browser/UI behavior. No
+  live-user-session behavioral verification (clicking through the actual
+  app) has happened from this environment at any point in this project.
 - `runContentBackfill`'s per-attachment work is not batched/transactional
   beyond one page — a crash mid-page leaves some attachments in that page
   wrapped and others not; safe to just re-run the same page (idempotent),
@@ -1037,16 +1037,24 @@ mean every member can see that app's content) and **relation != permission**
 anyone else, automatically gains access through it — access is still
 re-derived from `user_can_view_doc()` every time).
 
-**This suite is written but has not been executed** — this sandbox has no
+**Executed against the live DB 2026-08-22**: written from a sandbox with no
 network path to `supabase.co` (the same constraint disclosed in every app
 repo's own CLAUDE.md "DB migrations in this repo" section, and in this
-file's pre-Phase-6 "Testing status" sections above), so a suite that needs
-live DB fixtures (real test tenants/users/roles/content items, created
-and torn down per run) cannot be run from here. See the suite's own
-top-of-file comment for exact run instructions (`npm test`, required env
-vars) — ask the user to run it in an environment with live Supabase
-credentials (their own machine, or wherever this project's CI eventually
-lives) and report the results back.
+file's pre-Phase-6 "Testing status" sections above), so it could only be
+run by the user, from their own machine, with real `SUPABASE_URL`/
+`SUPABASE_SERVICE_ROLE_KEY` set (`npm run test:security` in joabooks). User
+ran it and reported back: **21/21 tests passed** — confirms
+`user_can_view_content()`/`user_can_view_doc()` actually enforce
+subscription != permission and relation != permission on the live,
+shared Supabase project, not just in the migration source read during
+Phase 6. Note this run predates confirmation that
+`20260822000000_fix_joaoffice_tenant_has_app_gap.sql`'s raw SQL was pasted
+into the live DB (see "Known remaining risks" below) — scenario 2
+("Office-only subscription") in this suite doesn't specifically construct
+a "has a joaoffice role but tenant isn't subscribed to joaoffice" case
+(unlike scenario 3's HR equivalent, which does), so this pass is not itself
+proof that specific fix landed live; ask the user to confirm separately via
+`select pg_get_functiondef('public.user_can_view_doc'::regproc)`.
 
 ## Final architecture diagrams
 
