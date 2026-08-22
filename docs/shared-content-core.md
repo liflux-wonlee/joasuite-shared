@@ -1047,14 +1047,15 @@ ran it and reported back: **21/21 tests passed** — confirms
 `user_can_view_content()`/`user_can_view_doc()` actually enforce
 subscription != permission and relation != permission on the live,
 shared Supabase project, not just in the migration source read during
-Phase 6. Note this run predates confirmation that
+Phase 6. Separately confirmed the same day:
 `20260822000000_fix_joaoffice_tenant_has_app_gap.sql`'s raw SQL was pasted
-into the live DB (see "Known remaining risks" below) — scenario 2
-("Office-only subscription") in this suite doesn't specifically construct
-a "has a joaoffice role but tenant isn't subscribed to joaoffice" case
-(unlike scenario 3's HR equivalent, which does), so this pass is not itself
-proof that specific fix landed live; ask the user to confirm separately via
-`select pg_get_functiondef('public.user_can_view_doc'::regproc)`.
+into the live DB and verified via `pg_get_functiondef('public.user_can_view_doc'::regproc)
+LIKE '%tenant_has_app(_tenant, ''joaoffice'')%'` returning `true` — this
+specific check matters because the 21/21 pass above doesn't by itself
+prove it: scenario 2 ("Office-only subscription") in this suite doesn't
+construct a "has a joaoffice role but tenant isn't subscribed to
+joaoffice" case (unlike scenario 3's HR equivalent, which does), so it
+needed its own separate confirmation.
 
 ## Final architecture diagrams
 
