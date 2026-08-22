@@ -51,6 +51,32 @@ export {
   type DocumentLibraryRow,
   type DocumentLibraryTableProps,
 } from "./components/DocumentLibraryTable";
+export {
+  type ContentRelationProvider,
+  type ContentRelationRow,
+  type RelationEntityTypeOption,
+  type RelationSearchResult,
+} from "./lib/content-relations";
+export {
+  type ContentType,
+  type ContentItem,
+  type ContentVersion,
+  type ContentOrigin,
+  type ContentItemDetail,
+  type ContentSearchFilters,
+} from "./lib/content-core-types";
+export {
+  type ContentProvider,
+  type ContentAuthorizationProvider,
+} from "./lib/content-core-provider";
+export { LinkToRecordDialog, type LinkToRecordDialogProps } from "./components/LinkToRecordDialog";
+export { RelatedRecordsPanel, type RelatedRecordsPanelProps } from "./components/RelatedRecordsPanel";
+export { ArchiveContentAction, type ArchiveContentActionProps } from "./components/ArchiveContentAction";
+export { DeletePermanentlyAction, type DeletePermanentlyActionProps } from "./components/DeletePermanentlyAction";
+export { AddExternalLinkDialog, type AddExternalLinkDialogProps } from "./components/AddExternalLinkDialog";
+export { ContentVersionsPanel, type ContentVersionsPanelProps } from "./components/ContentVersionsPanel";
+export { ContentUploader, type ContentUploaderProps } from "./components/ContentUploader";
+export { ContentDetail, type ContentDetailProps } from "./components/ContentDetail";
 export { OrgStructureSettingsPage } from "./components/org-structure/OrgStructureSettingsPage";
 export { OrgChartView } from "./components/org-structure/OrgChartView";
 export type {
