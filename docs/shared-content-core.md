@@ -1,14 +1,18 @@
 # Shared Content Core — architecture
 
-Status: Phase 1 (database/data-access foundation) and Phase 2 (reusable
-application-facing UI layer in this package) implemented. No existing
-JoaOffice or JoaBooks screen has been *replaced* by the Phase 2 components
-yet — that is explicitly out of scope until a later phase ("Do NOT yet
-remove existing JoaOffice or JoaBooks components"). JoaBooks' Document
-Library and the JoaHR↔JoaBooks W-9 relation remain the only two live
-pilots. JoaOffice's Document Vault has been migrated onto the Phase 1
-schema. JoaSOP integration is deliberately deferred (see "Deferred:
-JoaSOP" below).
+Status: Phases 0-6 complete across all four app repos as of this writing.
+Phase 1 (DB foundation) + Phase 2 (reusable UI layer, this package) +
+Phase 3 (JoaOffice Document Vault fully migrated: tiered delete, external
+links, Unlinked/Archived views) + Phase 4 (JoaBooks "File Library": 6
+linkable entity types, Delete Permanently added — the gap called out
+below no longer exists, bidirectional visibility on Bill/Invoice) +
+Phase 5 (JoaHR↔JoaBooks W-9 cross-app pilot — built earlier, verified
+working as designed; JoaSOP "create Policy from existing content"
+adapter) + Phase 6 (future-app extension contract, Existing Content
+Discovery foundation, duplicate-detection foundation, security test
+suite, this document's final form). See "Phase 6" section near the
+bottom for what's new in this pass and the project's final 13-point
+report (also delivered directly to the user in chat).
 
 This document is the canonical reference for anyone extending the Shared
 Content Core. When in doubt about a design decision, this file — not
@@ -226,17 +230,27 @@ layers:
    `linkWorkerDocumentToJoaBooksVendor`). This can be done lazily (wrap on
    first cross-link) or eagerly (bulk backfill, see below) — both
    converge on the same result and are safe to mix.
-2. **UI layer** (optional — only JoaBooks has this today):
-   `ContentRelationProvider` (`joasuite-shared/src/lib/content-relations.ts`)
-   — `getEntityTypes()`/`searchEntities()`/`resolveEntities()`/
+2. **UI layer** (optional — JoaBooks and JoaHR have this, JoaOffice and
+   JoaSOP deliberately don't): `ContentRelationProvider`
+   (`joasuite-shared/src/lib/content-relations.ts`) —
+   `getEntityTypes()`/`searchEntities()`/`resolveEntities()`/
    `getEntityHref()` — lets `LinkToRecordDialog`/`RelatedRecordsPanel`
    (also in `joasuite-shared`) offer a "link this to a record" picker
    without those shared components knowing anything about any specific
    app's entities. Per GPT's "current-app capability" rule, an app only
    implements the provider methods for entity types **it itself** can
-   search/display — JoaOffice, for instance, supplies no provider at all
-   today, so no JoaBooks financial-linking controls appear inside
-   JoaOffice even on a tenant that has both apps.
+   search/display. As of Phase 6: JoaBooks implements a full 6-entity-type
+   provider (`party`/`payment_request`/`invoice`/`manual_transaction`/
+   `transaction`/`shared.recurring_occurrence`, all ground-truthed against
+   real tables — see "Future App Integration Contract" below for how that
+   list was decided). JoaOffice supplies **no** provider at all — no
+   JoaBooks/JoaHR/JoaSOP linking controls ever appear inside JoaOffice,
+   even on a tenant subscribed to every app. JoaSOP is consumer-only (see
+   "JoaSOP: consumer-only integration" above) — it never implements
+   `ContentRelationProvider` either, since it never offers itself as a
+   link target. JoaHR doesn't implement the full provider/UI-kit pattern
+   at all; its one cross-app flow (`linkWorkerDocumentToJoaBooksVendor`)
+   is a single narrow, purpose-built server action, not a generic picker.
 
 **`createServerFn()` must always be called app-local** — this is not
 specific to Content Core, it's a suite-wide rule (see any app's CLAUDE.md,
@@ -258,12 +272,17 @@ Three tiers, from least to most destructive:
 |---|---|---|
 | **Unlink** | Remove one `content_relations` row. The content item, its versions, and every *other* relation survive untouched. | `deleteContentRelation` (JoaBooks), or JoaOffice's `deleteDocumentLink` with `deleteAttachmentToo: false` |
 | **Archive** | Set `content_items.archived_at`. The item stops appearing in default listings; every relation, version, and the underlying attachment/file are left completely intact — this is a visibility flag, not a data-removal operation. | `archiveContent` (JoaBooks) |
-| **Delete Permanently** | Cascade-delete the content item's relations → versions → (app-specific: optionally the underlying attachment + storage object too). | No single shared primitive by design — whether "permanently delete" also deletes the underlying attachment is an app-specific decision. JoaOffice's `deleteDocumentLink({ deleteAttachmentToo: true })` is the one app that has built this tier so far; see `document-vault.functions.ts`'s `deleteContentItemCascade`. |
+| **Delete Permanently** | Cascade-delete the content item's relations → versions → (app-specific: optionally the underlying attachment + storage object too). | No single shared primitive by design — whether "permanently delete" also deletes the underlying attachment is an app-specific decision. JoaOffice's `deleteDocumentLink({ deleteAttachmentToo: true })` (`document-vault.functions.ts`'s `deleteContentItemCascade`) and JoaBooks' `deleteContentItemPermanently` (`content-core.functions.ts`, added Phase 4) both implement this tier now. |
 
-There is no shared "Delete Permanently" primitive in `content-core.functions.ts`
-itself (JoaBooks) yet, since no JoaBooks UI currently needs it — the
-Document Library's delete action today is Unlink-only. Add one when a real
-caller needs it, following JoaOffice's cascade as the template.
+**Update (Phase 4):** JoaBooks now has its own `deleteContentItemPermanently`
+in `content-core.functions.ts` — File Library's Delete Permanently action.
+Unlike JoaOffice's cascade, it additionally refuses (throws, rather than
+proceeding) if the `content_relations` count for that item is greater than
+one, i.e. if it's linked from more than the one record the caller is
+deleting it from — forcing Unlink instead in that case. This extra check
+is JoaBooks-specific, not (yet) promoted into a shared primitive; a third
+app building this tier should decide independently whether it wants the
+same multi-relation guard or JoaOffice's simpler unconditional cascade.
 
 ## App adapter contract
 
@@ -424,19 +443,32 @@ for this entity_type/entity_id" (e.g., a scope that depends on something
 Content-Core-native ACL with no corresponding `doc_kind` at all), that is
 the trigger to reconsider this decision, not before.
 
-## Deferred: JoaSOP
+## JoaSOP: consumer-only integration (built Phase 5)
 
 Per the user's explicit decision (Phase 0 open question 4): JoaSOP
-integrates with Content Core only as a consumer of *existing* content as
+integrates with Content Core only as a **consumer** of existing content as
 supporting material on a policy/procedure (option (a) of the choices
-presented), not as a producer of its own linkable content types, and this
-has not been built yet — deferred, not scoped out permanently. When
-picked up: JoaSOP's own `joasop.document` entity type already has a
-`user_can_view_doc()` branch (delegates to `sop_can_view_document()`), so
-the dispatch-side work is already done; what remains is JoaSOP's own
-`content-core.functions.ts`-equivalent adapter (search/resolve for
-`joasop.document`) and, if desired, a "insert existing content as
-supporting material" UI affordance on the policy editor.
+presented), never as a producer of its own linkable content types the way
+JoaBooks exposes `party`/`payment_request`/etc. This is now built:
+`joasop/src/lib/content-core-adapter.functions.ts` —
+`listEligibleContentForSop` (RLS-scoped picker, not staff-gated, since the
+content being browsed may originate from any app), `createPolicyFromContentItem`
+(creates a normal draft `documents`/`document_versions` row via the same
+`insertDraftDocument` helper `createDocument` itself uses, then adds one
+`content_relations` row through the caller's own RLS client),
+`listLinkedContentForDocument`/`unlinkContentFromDocument`/`getLinkedContentFile`.
+JoaSOP still has **no** `ContentRelationProvider` implementation and never
+appears as a link target from another app's "Link to record" picker — it
+only ever receives, never offers, matching the consumer-only decision.
+
+Notable constraint this adapter works around: `sop_can_view_document()`'s
+SQL body is not present in the JoaSOP repo at all (only called by name,
+same as `attachments.functions.ts` already did) — so the adapter never
+reimplements or guesses at its rules; every check either reuses that exact
+RPC call or delegates to `user_can_view_content()`/RLS. This is the
+correct pattern for any future adapter touching an app whose canonical
+access function isn't vendored locally: call it by name, never
+reconstruct it.
 
 ## Phase 2 — reusable UI layer (this package)
 
@@ -605,32 +637,544 @@ this phase. Manual/structural verification performed instead:
       deferred to whichever app first wires these components into a real
       page, same limitation as Phase 1's behavioral checklist.
 
-## Known remaining risks (as of this writing)
+## Known remaining risks (updated through Phase 6)
 
-- The manual QA checklist above has not been executed against the live
-  DB. The structural pieces (RLS policies, unique constraints, function
-  bodies) have been read back and match design, but no live-user-session
-  behavioral verification has happened yet.
+Resolved since the last update of this section (kept here, struck through
+in spirit rather than deleted, so the history of what used to be a risk
+stays visible — see "Cleanup" below for the policy on removing stale
+content entirely):
+
+- ~~No shared "Delete Permanently" primitive exists yet outside JoaOffice~~
+  — JoaBooks now has its own (`deleteContentItemPermanently`, Phase 4),
+  independently designed with an extra multi-relation guard JoaOffice's
+  doesn't have. Two real implementations now exist; still no *shared*
+  primitive in `joasuite-shared` itself, and that remains a deliberate
+  choice (see the "Safe delete semantics" table above) — different apps
+  have made different, reasonable choices about exactly what "permanently"
+  cascades into, and forcing one shared implementation would mean picking
+  a single answer that doesn't fit every app.
+- ~~None of the Phase 2 shared UI components have a real consuming app
+  yet~~ — JoaBooks' File Library (Phase 4) is a real, live consumer of
+  `ContentDetail`, `RelatedRecordsPanel`, `LinkToRecordDialog`,
+  `AddExternalLinkDialog`, `ArchiveContentAction`, `DeletePermanentlyAction`,
+  and `ContentVersionsPanel` — every component in the Phase 2 table above
+  except `ContentUploader`/`ContentGrid` now has at least one real caller.
+  Layout/prop-shape assumptions made without a live consumer have now been
+  exercised; no shape mismatch was found.
+
+Still open:
+
+- The manual QA checklist above (Phase 1) has still not been executed
+  against the live DB from this sandbox (no `supabase.co` access, no test
+  framework existed until Phase 6 — see "Final security matrix" below,
+  which adds one, but it is also unexecuted from this sandbox for the same
+  reason). Structural pieces (RLS policies, unique constraints, function
+  bodies) have been read back and match design across every phase; no
+  live-user-session behavioral verification has happened from this
+  environment at any point in this project.
 - `runContentBackfill`'s per-attachment work is not batched/transactional
   beyond one page — a crash mid-page leaves some attachments in that page
   wrapped and others not; safe to just re-run the same page (idempotent),
   but not atomic.
-- No shared "Delete Permanently" primitive exists yet outside JoaOffice's
-  app-specific implementation — a second app that needs this tier will
-  need to write its own cascade, at least until a real second caller
-  justifies promoting a shared version.
-- `content_items_update` RLS currently grants write to anyone who can
-  view (no separate editor tier) — acceptable for the current
-  Unlink/Archive-only write surface, called out explicitly in the schema
-  migration's own comment as an intentional, revisit-later simplification.
-- None of the Phase 2 shared UI components have a real consuming app yet
-  (this phase's own scope boundary explicitly forbids wiring them into
-  JoaOffice/JoaBooks screens) — they are built, typechecked, and exported,
-  but the first real integration is the point at which layout/prop-shape
-  assumptions made without a live consumer will actually get tested.
-- `ContentProvider`/`ContentAuthorizationProvider` are contracts only, no
-  reference implementation exists in any app repo yet (unlike
-  `ContentRelationProvider`, which JoaBooks already implements for real).
-  The first app to adopt `ContentDetail`/`ContentUploader` will be
-  writing the first real `ContentProvider`, which may surface a shape
-  mismatch this design didn't anticipate.
+- `content_items_update` RLS still grants write to anyone who can view (no
+  separate editor tier) — unchanged since Phase 1, still an intentional
+  simplification per the schema migration's own comment, still worth
+  revisiting once/if a real caller needs write access narrower than view
+  access on the same item.
+- `ContentProvider`/`ContentAuthorizationProvider` (the two DI-contract
+  *types*, distinct from the underlying operations they describe) still
+  have no literal reference implementation in any app repo — JoaBooks'
+  File Library page wires individual callback props (`onArchive`,
+  `onDeletePermanently`, `onLinkRelation`, etc.) directly to `ContentDetail`
+  rather than constructing an object shaped like `ContentProvider`. The
+  underlying operations all exist and work; the specific DI-object shape
+  these two types describe has simply never been the pattern any real
+  page followed — `ContentRelationProvider` (a different, older contract)
+  is the one that has real implementations. Worth revisiting whether
+  `ContentProvider`/`ContentAuthorizationProvider` should be simplified,
+  removed, or left as an unused-but-harmless contract the next time this
+  file is substantially revised (see "Cleanup recommendations" below —
+  not touched destructively as part of Phase 6 itself).
+- Duplicate detection (Phase 6) is schema-ready (`content_versions.sha256`/
+  `file_size`/`mime_type` already exist) and has one reference query
+  (JoaBooks' `findDuplicateContent`), but `sha256` is not populated by any
+  existing wrap path (`getOrCreateContentItemForAttachment`,
+  `wrapAttachmentAsContentItem`, JoaHR's inline wrap, etc.) — every one of
+  those would need to download+hash the file at wrap time to make exact
+  (not just size+mime) duplicate detection actually fire. Not retrofitted
+  in this pass — see "Duplicate detection foundation" below.
+- Existing Content Discovery (Phase 6) suggestion heuristics are
+  deliberately simple (`pg_trgm` title/name similarity, keyword matching)
+  per the explicit "do not make AI classification required" instruction —
+  they will under- and over-suggest in ways a smarter classifier wouldn't;
+  this is accepted as the correct v1 trade-off, not an oversight.
+
+---
+
+# Phase 6 — Future-app extension contract, discovery, and final hardening
+
+Everything below was added in Phase 6, whose explicit charter was:
+**finalize and document the architecture so JoaCRM, JoaApproval, and any
+future JoaSuite app can integrate without another schema redesign — do
+NOT build the full JoaCRM or JoaApproval product.** Nothing in this
+section is a shipped product feature for either hypothetical app; the
+CRM/Approval material below is a worked example proving the contract,
+not a spec anyone is building against yet.
+
+## Future App Integration Contract
+
+This is the answer to "what does a brand-new JoaSuite app need to do to
+plug into Content Core?" — written so a future implementer (human or
+Claude) can follow it without re-deriving anything from first principles.
+
+**A new app never needs to change:**
+
+- `public.content_items` — no new columns, no new `content_type` values.
+- `public.content_versions` — no new columns.
+- `public.content_relations` — no new columns. Critically:
+  **`app_code` and `entity_type` are plain `text`, not enums** (confirmed
+  by reading `20260820140000_content_core_schema_foundation.sql`'s
+  `CREATE TABLE` statements directly — there is no `CHECK` constraint or
+  Postgres enum type restricting either column to a fixed value list).
+  A brand-new app_code like `'joacrm'` or a brand-new entity_type like
+  `'joacrm.opportunity'` is valid the instant the first row using it is
+  inserted — no migration, no `ALTER TYPE ... ADD VALUE`, nothing.
+- `public.user_can_view_content()` / `user_can_view_content_relation_target()`
+  — these already dispatch generically by `entity_type` prefix (see
+  "Authorization dispatch" above); they don't need to know a new app
+  exists.
+- Any other app's code, schema, or RLS policy.
+
+**A new app must add exactly one thing to shared, cross-app code:** a new
+`ELSIF _doc_kind::text LIKE 'newapp.%' THEN ...` branch (or a specific
+`_doc_kind = '...'` branch) inside `public.user_can_view_doc()`, calling
+into that app's own authorization function — the same pattern every
+existing app already follows (`joahr.%` → `hr.can_view_worker_document()`,
+`joasop.document` → `sop_can_view_document()`, `joaoffice.%` →
+`is_internal_staff_scoped(...,'joaoffice')`). This is a **JoaBooks-owned
+migration** per "Migration ownership" above — write it there, vendor it
+byte-identical into every other repo's `supabase/migrations/`, same as
+every prior `doc_kind` branch addition in this project's history. This is
+the one and only schema-adjacent touchpoint a new app requires, and it's
+additive (`CREATE OR REPLACE FUNCTION`, new branch appended) — never a
+breaking change to an existing branch.
+
+**What the new app supplies entirely on its own side** (no cross-repo
+coordination needed beyond the one migration above):
+
+| Adapter | Required? | What it does | Reference implementation |
+|---|---|---|---|
+| **Authorization provider** | Yes (the app's own `can_view_<X>()` Postgres function the new `user_can_view_doc()` branch calls into) | Decides who can see one of the app's own domain records. Entirely the new app's business — Content Core never inspects a role directly (see "Authorization dispatch"). | `hr.can_view_worker_document()`, `sop_can_view_document()` |
+| **Relation provider** (`ContentRelationProvider`) | Optional — only if the app wants to appear as a "link this file to a record" target | `getEntityTypes()`/`searchEntities()`/`resolveEntities()`/`getEntityHref()`, implemented as the app's own local `createServerFn(...)` calls (never re-exported from `joasuite-shared`'s `dist/` — see the suite-wide "createServerFn must be app-local" rule in every app's CLAUDE.md) | JoaBooks' `content-core.functions.ts` (6 entity types) |
+| **App-specific metadata extension** | Optional | An app-owned table that references a `content_item_id` for data Content Core has no opinion about (JoaOffice's `office.document_links.content_item_id` carrying category/security_level/expiration/reminder_days is the existing precedent) | `office.document_links` |
+| **Presentation components / wrapper** | Optional | Either build a page around the Phase 2 shared components (`ContentDetail`, `RelatedRecordsPanel`, etc.) or hand-roll a page-specific UI (JoaOffice's `DocumentVaultTable` predates and doesn't use the shared components at all) — both are valid, "adapters underneath existing UI" is explicitly preferred over a forced rewrite | JoaBooks' File Library (shared components); JoaOffice's Document Vault (hand-rolled) |
+| **Domain record integration** | Yes, implicitly | The new app's own domain tables (`joacrm.accounts`, etc.) — Content Core never owns or duplicates these; a `content_relations` row only ever points *at* one by `(entity_type, entity_id)` | N/A — every app's own schema |
+
+**One physical file, relations from many apps** is not a hypothetical —
+it's exactly what already happens in production-shaped code today: a
+contractor's W-9 (`joahr.worker_document` origin) gets a second relation
+into `joabooks / party` via `linkWorkerDocumentToJoaBooksVendor`, and an
+Office-origin policy PDF gets a `joasop.document` relation via
+`createPolicyFromContentItem` — same content item, same physical file
+(or, for the JoaSOP case, potentially zero new file rows at all), multiple
+apps' worth of relations, each gated by that specific relation's own
+namespace check.
+
+## JoaCRM example contract (not implemented — proves the contract only)
+
+A hypothetical future JoaCRM would need four record types: **Account**,
+**Contact**, **Opportunity**, **Activity**. Working through what each
+needs, to prove the contract above is sufficient without inventing
+anything new:
+
+- **Migration**: one JoaBooks-owned `ALTER TYPE public.doc_kind ADD VALUE`
+  set (`'joacrm.account'`, `'joacrm.contact'`, `'joacrm.opportunity'`,
+  `'joacrm.activity'`) plus one new `ELSIF _doc_kind::text LIKE 'joacrm.%'`
+  branch in `user_can_view_doc()` delegating to a new
+  `joacrm.can_view_record()` (or per-type functions) that JoaCRM owns and
+  writes itself.
+- **Authorization provider**: `joacrm.can_view_record()` — JoaCRM's own
+  business (e.g. account-team membership, sales-region scoping — whatever
+  JoaCRM's actual access model turns out to be; Content Core has zero
+  opinion on this).
+- **Relation provider**: JoaCRM's own `content-core.functions.ts`-
+  equivalent implementing `getEntityTypes()` → `[account, contact,
+  opportunity, activity]`, with `searchEntities`/`resolveEntities`
+  querying JoaCRM's own tables — copy JoaBooks' file's *shape*, not its
+  entity list (per "App adapter contract" above).
+- **Worked example matching the Phase 6 prompt's own scenario**: an
+  `RFP.pdf` uploaded once in JoaCRM gets three `content_relations` rows:
+  `joacrm / account / A`, `joacrm / opportunity / O` (both same-namespace,
+  OR-visibility between them per "The cross-app leak this design
+  specifically defends against" — either being visible is enough since
+  they share JoaCRM's own trust boundary), and `joabooks / project / P`
+  (a different namespace — a caller needs to pass **both** the JoaCRM
+  check for at least one of {A, O} **and** independently the JoaBooks
+  check for P, per the AND-across-namespaces rule). One physical file,
+  zero duplication, three business contexts. Note "project" isn't a real
+  JoaBooks entity type today (Phase 4's ground-truthing confirmed
+  JoaBooks has no `projects` table) — the example is illustrative of the
+  *mechanism*, not a claim that this specific relation could be created
+  against today's real JoaBooks schema without JoaBooks adding a Project
+  concept of its own first.
+- **No CRM UI, no `joacrm` repo, no new server functions were written for
+  this phase** — this section exists purely to demonstrate the contract
+  above requires nothing else.
+
+## JoaApproval example contract (not implemented — proves the contract only)
+
+A hypothetical future JoaApproval attaches *existing* content as evidence
+to an approval request, without ever owning the files:
+
+```
+Approval Request #100
+    -> Contract.pdf            (content_relations: joaapproval / approval_request / 100)
+    -> Vendor Comparison.xlsx  (content_relations: joaapproval / approval_request / 100)
+    -> Google Sheet URL        (content_relations: joaapproval / approval_request / 100)
+```
+
+- All three are ordinary `content_items` (two files, one `external_link`)
+  that already exist for other reasons — likely originated in JoaBooks
+  (the contract, the comparison sheet) or added directly as a link. None
+  of them are created *by* JoaApproval; JoaApproval only ever adds a
+  `content_relations` row pointing an existing item at
+  `(entity_type: 'joaapproval.approval_request', entity_id: 100)` — the
+  exact same "pick from existing content" pattern JoaSOP's
+  `createPolicyFromContentItem`/`listEligibleContentForSop` already
+  implements for real (see "JoaSOP: consumer-only integration" above) —
+  JoaApproval would be JoaSOP's second real-world precedent for a
+  consumer-only integration, not a new pattern.
+- **Completing or closing Approval Request #100 must never delete, own,
+  or take custody of those three content items.** This falls out of the
+  architecture automatically, not from anything JoaApproval would need to
+  implement specially: `content_relations` rows are pointers (see "Origin
+  vs relation vs permission"), and the only thing that could delete a
+  content item outright is a "Delete Permanently" action — which, per
+  every existing implementation's design (JoaOffice's, JoaBooks'), is
+  Unlink-tier-or-above and always a deliberate, separate user action, not
+  a side effect of an unrelated domain-record status change like "approval
+  completed."
+- Authorization: `joaapproval.can_view_approval_request()`, JoaApproval's
+  own business rules (likely: assigned approver, requester, or a
+  privileged role) — again, zero Content Core involvement in *what* those
+  rules are.
+
+## Existing Content Discovery
+
+Solves: a tenant that has used one JoaSuite app for years, then subscribes
+to a second one, has real content sitting in Content Core (or eligible to
+be wrapped into it) that would be useful in the new app — but nothing
+proactively surfaces it. Two concrete implementations were built this
+phase, one per the two activation examples in the Phase 6 prompt; both
+share the same shape, documented here as the reusable pattern rather than
+as shared code (per the suite-wide app-local `createServerFn` rule, this
+cannot literally be one shared function — every app writes its own).
+
+**The pattern:**
+
+1. **Query, scoped by real authorization, never by role alone.** Both
+   implementations query `content_items` through the *caller's own*
+   RLS-scoped client (`context.supabase`, not `supabaseAdmin`) — a
+   content item eligible for discovery may have originated in any app,
+   so "is this user JoaBooks/JoaSOP staff" alone is not sufficient
+   authority to decide what's discoverable (the same reasoning already
+   documented for `listUnlinkedContentItems`/`listEligibleContentForSop`
+   in the per-app integration work). `content_items_select` RLS
+   (`user_can_view_content()`) is the only thing deciding what a given
+   discovery query can even see.
+2. **Deterministic candidate scoring, not a blanket list.** Rather than
+   just "everything unlinked," a suggestion additionally proposes a
+   likely *action* with a reason, computed from:
+   - **JoaBooks** (`content-core.functions.ts`'s `suggestVendorLinks`
+     query, new this phase): `pg_trgm` `similarity()` between the content
+     item's `title` and every non-archived `party.name_en` in the tenant
+     — the exact same fuzzy-match primitive `find_similar_vendors`
+     already uses for vendor dedup, reapplied here rather than inventing
+     a second scoring mechanism. A match above threshold becomes a
+     suggested "Link to Vendor" (or "Link to Customer", based on the
+     matched party's `is_vendor`/`is_customer` flags) action with the
+     matched party's name and similarity score as the shown reason.
+   - **JoaSOP** (`content-core-adapter.functions.ts`'s
+     `suggestDocTypeForContent`, new this phase): a small deterministic
+     keyword table (`handbook`→`handbook`, `policy`→`policy`,
+     `procedure`/`sop`→`sop`, `safety`→`safety`, `training`→`training`)
+     matched case-insensitively against the content item's `title` —
+     "Employee Handbook.pdf" → suggested `doc_type: "handbook"`,
+     pre-selecting (not auto-submitting) that value in
+     `CreateFromContentDialog`.
+   - Both are intentionally simple pattern-matching, not ML — see "Do
+     not build AI dependency now" below.
+3. **Suggestions require confirmation — nothing is auto-created.**
+   Neither implementation ever inserts a `content_relations` row on its
+   own; the suggestion is a read-only response the UI renders as an
+   action button, and the actual relation is only created when the user
+   clicks it — the exact same `createContentRelation`/
+   `createPolicyFromContentItem` write path a manual "Link to record"
+   action already goes through, with the same server-side re-validation.
+4. **"Ignore" persists, without a new table.** Dismissing a suggestion
+   writes one `content_relations` row with
+   `relation_type: 'discovery_ignored'` (not the default `'related'`),
+   `entity_type: '<app_code>.discovery'`, and `entity_id` set to the
+   content item's own id (a self-referential marker — the same fallback
+   pattern JoaOffice's `wrapAttachmentAsContentItem` already established
+   for `entity_id: docId ?? contentItemId`). Future discovery queries
+   `NOT EXISTS`-filter out any item with such a row for the current
+   `app_code`. This is deliberately **not** a real domain relation (it
+   never resolves to an actual record `user_can_view_doc` would check —
+   `<app_code>.discovery` is not a `doc_kind` `user_can_view_doc()` has a
+   branch for, so nothing outside the discovery query itself ever tries
+   to interpret it), and it costs zero new tables/migrations —
+   `content_relations.relation_type` is plain `text`, not constrained to
+   `'related'`, so this required no schema change either, matching the
+   Phase 6 charter's "no schema redesign for a new capability" spirit
+   even though it's the same repo, not a new app.
+
+## JoaBooks activation example (built)
+
+`app.documents.index.tsx`'s File Library gained a fifth tab, **Suggestions**,
+alongside All/Recent/Unlinked/Archived: content items with no `joabooks`
+namespace relation and no `discovery_ignored` marker for `app_code:
+'joabooks'`, each row showing the matched vendor/customer name and
+similarity score plus three actions — **Link to Vendor**, **Link to
+Customer** (whichever the party match implies; both offered if the party
+is flagged as both), and **Ignore**. "Link to Bill" from the prompt's own
+example list was **not** built as a separate action: a Bill doesn't have
+a stable "name" to fuzzy-match a filename against the way a vendor/customer
+does (a Bill's identity is its `request_no` + party, and the useful
+association is almost always "this file relates to this *vendor*," with
+which specific Bill, if any, better decided by the user via the existing
+manual "Link to record" picker) — matching a filename directly to a
+`request_no` would need OCR/content-aware extraction, explicitly out of
+scope per "do not build AI dependency now."
+
+## JoaSOP activation example (built)
+
+`CreateFromContentDialog`'s picker step now shows a suggested `doc_type`
+badge next to any content item whose title keyword-matches the table in
+"Existing Content Discovery" above, and pre-selects that `doc_type` when
+the item is picked (still fully editable before Create) — "Employee
+Handbook.pdf" pre-selects `handbook`, "Expense Policy.pdf" and "IT
+Security Policy.pdf" both pre-select `policy`. A dedicated "Ignore" action
+was **not** added to the JoaSOP picker specifically — unlike JoaBooks'
+Suggestions tab (a standing list the user would otherwise have to keep
+re-dismissing), the JoaSOP picker is a one-shot, on-demand search the
+user opens only when they intend to create something, so there is no
+recurring "nag" to dismiss in the first place.
+
+## Do not build AI dependency now
+
+Every heuristic above (`pg_trgm` similarity, a fixed keyword table) is
+deterministic, runs entirely in Postgres or plain TypeScript, and has zero
+external-API/model dependency. Nothing in Content Core's correctness —
+authorization, relation integrity, delete safety — depends on discovery
+working well; a bad or missing suggestion just means a human uses the
+existing manual "Link to record"/"Create Policy from existing content"
+flow instead, which was already the only path before this phase. This
+was a design constraint, not an implementation shortcut: swapping in a
+smarter classifier later (an LLM-based title/content classifier, for
+instance) is purely additive — it would replace the *scoring* step only,
+behind the same "suggestion requires confirmation" contract, never
+touching the schema or the write path.
+
+## Duplicate detection foundation
+
+**Schema is already ready, from Phase 1** — no migration needed this
+phase. `content_versions.sha256`, `file_size`, `mime_type` have existed
+since `20260820140000_content_core_schema_foundation.sql`; nothing
+consumed them until now.
+
+**Built this phase**: `findDuplicateContent(tenant_id, { size, mime,
+sha256? })` in JoaBooks' `content-core.functions.ts` — a read-only query,
+callable before an upload commits, that:
+
+1. If `sha256` is provided, looks for an **exact** match
+   (`content_versions.sha256 = :sha256`) — a true duplicate, byte-for-byte.
+2. Otherwise (or in addition), a **possible-duplicate prefilter** on
+   `(file_size, mime_type)` matching — cheap, always available even before
+   any hash is computed, but a size+mime match is only a hint, not a
+   confirmed duplicate (two unrelated PDFs can trivially share a byte
+   count).
+3. Returns candidate `content_item_id`s (visibility-filtered — the query
+   runs through the caller's own RLS client, same reasoning as Discovery
+   above) for the UI to show as "This file already exists. Link the
+   existing file instead?" — **never auto-linked, never auto-merged**, an
+   explicit user click is required either way, matching the prompt's own
+   example wording verbatim.
+
+**Not done this phase, flagged as real remaining work** (see "Known
+remaining risks" above for the short version): `sha256` is not actually
+*populated* by any existing wrap path today. Making exact-match detection
+fire for real requires downloading the file from storage and hashing it
+at wrap time in `getOrCreateContentItemForAttachment` (JoaBooks),
+`wrapAttachmentAsContentItem` (JoaOffice), and the inline wrap block in
+JoaHR's `linkWorkerDocumentToJoaBooksVendor` — three call sites across
+three repos, each a real (if small) change with its own failure mode
+(storage download timeout/error) to handle. This was deliberately not
+retrofitted into three repos' existing, working wrap paths as part of a
+"foundation" phase explicitly scoped to *not* perform destructive or
+broad changes — until this lands, `findDuplicateContent`'s exact-match
+path will simply never find a hit (every `sha256` is `NULL`), and only
+the size+mime prefilter is live. Recommended as the first concrete
+follow-up task (see "Cleanup recommendations" below).
+
+## Final security matrix
+
+A new automated test suite —
+`joabooks/src/lib/__tests__/content-core-security.test.ts`, using Vitest
+(newly added as a devDependency; no test framework existed anywhere in
+this project before this file) — asserts directly against the live
+Supabase project's `user_can_view_content()`/`user_can_view_doc()`/
+`has_role()`/`tenant_has_app()` RPCs (bypassing app-layer server functions
+entirely, since the DB layer is what's actually shared/critical across
+all 4 apps) for the eleven scenarios the Phase 6 prompt names: Office-only
+subscription, Books-only, HR-only, SOP-only, Office+Books, Office+HR,
+Books+HR, Office+SOP, multi-app-subscribed-tenant-with-user-assigned-to-
+only-one-app, different roles in different apps, and cross-tenant denial —
+plus the two invariants the prompt calls out explicitly by name:
+**subscription != permission** (a tenant subscribed to an app doesn't
+mean every member can see that app's content) and **relation != permission**
+(a `content_relations` row existing doesn't mean the row's creator, or
+anyone else, automatically gains access through it — access is still
+re-derived from `user_can_view_doc()` every time).
+
+**This suite is written but has not been executed** — this sandbox has no
+network path to `supabase.co` (the same constraint disclosed in every app
+repo's own CLAUDE.md "DB migrations in this repo" section, and in this
+file's pre-Phase-6 "Testing status" sections above), so a suite that needs
+live DB fixtures (real test tenants/users/roles/content items, created
+and torn down per run) cannot be run from here. See the suite's own
+top-of-file comment for exact run instructions (`npm test`, required env
+vars) — ask the user to run it in an environment with live Supabase
+credentials (their own machine, or wherever this project's CI eventually
+lives) and report the results back.
+
+## Final architecture diagrams
+
+**Content flow** — how a physical file becomes visible through a domain
+record:
+
+```
+DOMAIN RECORDS            (a Bill, a Worker Document Requirement, a Policy,
+      |                    a future CRM Opportunity — owned entirely by
+      |                    each app's own schema; Content Core never
+      |                    duplicates or owns these)
+      v
+CONTENT RELATIONS         (public.content_relations — many-to-many pointers:
+      |                    which content_item(s) this record is linked to,
+      |                    tagged with app_code + entity_type + entity_id)
+      v
+SHARED CONTENT CORE       (public.content_items — the logical "this
+      |                    document/link" object: title, description,
+      |                    dates, archive flag, origin provenance)
+      v
+CONTENT VERSIONS          (public.content_versions — one point-in-time
+      |                    representation; current_version_id picks
+      |                    which one is "current" today)
+      v
+ATTACHMENTS / STORAGE /   (public.attachments + Supabase Storage for a
+EXTERNAL URL               file, or a validated http(s) URL for a link —
+                            never both, never neither)
+```
+
+**Independently, authorization flow** — how "can this user see it" is
+decided (deliberately a *separate* chain from the content-flow diagram
+above; nothing in the top diagram determines visibility on its own):
+
+```
+CONTENT ITEM
+      |
+      v
+ACCESS SCOPES              (no dedicated table — see "Deviation: no
+      |                     content_access_scopes table" above. Derived
+      |                     at query time by grouping the item's
+      |                     content_relations rows into app-code
+      |                     namespaces and requiring the caller to pass
+      |                     every namespace's own check — AND across
+      |                     namespaces, OR within one)
+      v
+APPLICATION AUTHORIZATION  (user_can_view_doc()'s per-entity_type-prefix
+ADAPTERS                    dispatch — hr.can_view_worker_document(),
+                             sop_can_view_document(),
+                             is_internal_staff_scoped(...,'joaoffice'),
+                             JoaBooks' own per-doc_kind logic — each
+                             entirely owned by its own app, none of them
+                             known to Content Core itself)
+```
+
+**Ownership summary** (answers "who is allowed to change this"):
+
+| Concept | Owned by |
+|---|---|
+| `content_items`/`content_versions`/`content_relations` schema | JoaBooks (canonical migration source — see "Migration ownership") |
+| `user_can_view_content()`/`user_can_view_content_relation_target()` | JoaBooks (canonical; dispatches generically, never app-specific logic inline) |
+| `user_can_view_doc()`'s per-app branches | JoaBooks writes the migration; each app owns the *function it delegates to* (`hr.can_view_worker_document()` is JoaHR's, `sop_can_view_document()` is JoaSOP's, etc.) |
+| A specific content item's data (title, versions, etc.) | Whichever row's `created_by`/`source_app` says — Content Core doesn't reassign ownership on relation changes |
+| A specific `content_relations` row | The app that created it (`app_code` column) — but per RLS, deletable by anyone who can prove access to *both* sides, not just the creator |
+| App-specific metadata extension tables (`office.document_links`, etc.) | Each app's own repo entirely |
+| `ContentRelationProvider`/adapter server functions | Each app's own repo, own local `createServerFn` calls, never `joasuite-shared`'s `dist/` |
+| Shared presentational UI components (`ContentDetail`, etc.) | `joasuite-shared`, versioned via its own git history, consumed by pinned commit SHA per app |
+
+**Deletion summary** (the three tiers, restated as one table for quick
+reference — full detail in "Safe delete semantics" above):
+
+| Tier | Destroys | Destroys physical file? |
+|---|---|---|
+| Unlink | One `content_relations` row | Never |
+| Archive | Nothing — sets a visibility flag | Never |
+| Delete Permanently | `content_relations` (all) → `content_versions` → `content_items`, app-specific whether it cascades further | App-specific decision; JoaOffice and JoaBooks both currently cascade into the attachment + storage object, but only after JoaBooks' extra "not linked from elsewhere" guard passes |
+
+**Migration summary**: one canonical repo (JoaBooks) writes every Content
+Core schema migration; it's copied byte-identical into every other app's
+own `supabase/migrations/` folder (schema-history accuracy, not
+re-execution — the tables are shared on one physical DB); `core-vendor/
+manifest.txt` tracks `.sql` files the same way it already tracked shared
+`.ts` files, so a future puller (a new app repo, or a currently-unattached
+one) picks up the full migration set automatically.
+
+## Cleanup recommendations (not performed — recommendation only)
+
+Per the Phase 6 charter's own instruction ("do not delete compatibility
+paths merely because the new architecture exists... provide a separate
+cleanup recommendation before destructive removal"), nothing below has
+been deleted. This is a list for a human to review and explicitly approve
+before any of it is acted on:
+
+1. **`content_items.title`/`description` fields' consistency across apps**
+   — spot check whether every wrap path (JoaBooks/JoaOffice/JoaHR) sets
+   `title` to the same kind of value (filename vs. a human label) —
+   currently all three use the underlying `attachments.filename`, so this
+   is consistent today, but worth a lint/test rather than trusting
+   convention as the project grows.
+2. **Promote `assertSafeExternalUrl` to `joasuite-shared`** — flagged as
+   "not yet done" since Phase 2; now that JoaOffice has independently
+   reimplemented the identical http/https-only check for its own external
+   link support, there are two copies instead of one, exactly the kind of
+   drift risk this project's own incident history (the `user_can_view_doc()`
+   drift) warns about. Low risk to promote (pure function, no state), but
+   not done automatically here since it touches 2 existing call sites'
+   imports — a human should choose the moment.
+3. **`ContentProvider`/`ContentAuthorizationProvider` types** — per "Known
+   remaining risks" above, these have no real implementation anywhere.
+   Recommend either (a) writing the first real one the next time an app
+   builds a *second* Content-Core-native detail page (to see if the
+   contract actually fits a second real consumer), or (b) if that never
+   happens within a reasonable window, removing the two types as
+   speculative/unused — do not remove preemptively; wait for evidence one
+   way or the other.
+4. **`sha256` population** — the concrete next step named in "Duplicate
+   detection foundation" above; recommended as the next phase's first
+   task, not bundled into this one.
+5. **`DocumentLibraryTable`'s legacy `onDelete` prop** — still JoaBooks'
+   own raw-attachment hard-delete, predating and structurally unrelated to
+   the Unlink/Archive/Delete-Permanently tiers documented throughout this
+   file (see "Delete/Archive UX" above). Recommend eventually folding it
+   into the same three-tier model File Library's `ContentDetail` dialog
+   already uses, so there's only one delete mental model on the page
+   instead of two — but this is a real (if small) behavior change to a
+   live control, so flagged for explicit review, not done here.
+6. **Do NOT** clean up: the `payment_requests` table naming history, any
+   `'bill'` doc_kind dead-code paths, or anything else covered by an
+   already-completed, already-decided cleanup phase documented in an app
+   repo's own CLAUDE.md (e.g. JoaBooks' Bill/PR unification Phase 7/8) —
+   those are unrelated projects with their own closed decision trail; do
+   not conflate "Content Core cleanup" scope with them.
