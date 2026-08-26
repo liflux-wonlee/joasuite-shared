@@ -5101,6 +5101,188 @@ function ContentUploader({
     ] })
   ] });
 }
+function ContentMetadataPanel({ item, addedByLabel, formatDate: formatDate3, onSave, renderTagsEditor }) {
+  const { t } = useTranslation();
+  const { ui } = useJoaSuite();
+  const { Button, Input, Label, Textarea, Badge } = ui;
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState({
+    title: item.title,
+    description: item.description,
+    author: item.author,
+    originLabel: item.originLabel,
+    documentDate: item.documentDate,
+    expirationDate: item.expirationDate,
+    keywords: item.keywords ?? []
+  });
+  const [keywordInput, setKeywordInput] = useState("");
+  const fmt2 = formatDate3 ?? ((s) => s ?? "");
+  function startEdit() {
+    setForm({
+      title: item.title,
+      description: item.description,
+      author: item.author,
+      originLabel: item.originLabel,
+      documentDate: item.documentDate,
+      expirationDate: item.expirationDate,
+      keywords: item.keywords ?? []
+    });
+    setKeywordInput("");
+    setEditing(true);
+  }
+  function addKeyword() {
+    const k = keywordInput.trim();
+    if (!k) return;
+    setForm((f) => ({ ...f, keywords: [.../* @__PURE__ */ new Set([...f.keywords ?? [], k])] }));
+    setKeywordInput("");
+  }
+  function removeKeyword(k) {
+    setForm((f) => ({ ...f, keywords: (f.keywords ?? []).filter((x) => x !== k) }));
+  }
+  async function handleSave() {
+    if (!onSave) return;
+    setBusy(true);
+    try {
+      await onSave(form);
+      setEditing(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const row = (label, value) => value ? /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-0.5", children: [
+    /* @__PURE__ */ jsx("span", { className: "text-xs text-muted-foreground", children: label }),
+    /* @__PURE__ */ jsx("span", { className: "text-sm", children: value })
+  ] }) : null;
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-3 rounded-lg border p-3", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between", children: [
+      /* @__PURE__ */ jsx("h4", { className: "text-sm font-medium", children: t("content_core.details", "Details") }),
+      onSave && !editing && /* @__PURE__ */ jsx(Button, { size: "sm", variant: "ghost", onClick: startEdit, children: t("content_core.edit_details", "Edit details") })
+    ] }),
+    !editing && /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-x-4 gap-y-2", children: [
+      row(String(t("content_core.author", "Author")), item.author),
+      row(String(t("content_core.origin_label", "Origin")), item.originLabel),
+      row(String(t("content_core.added_by", "Added by")), addedByLabel),
+      row(String(t("content_core.document_date", "Document date")), item.documentDate ? fmt2(item.documentDate) : null),
+      row(String(t("content_core.expiration_date", "Expires")), item.expirationDate ? fmt2(item.expirationDate) : null),
+      item.keywords?.length ? /* @__PURE__ */ jsxs("div", { className: "col-span-2 flex flex-col gap-1", children: [
+        /* @__PURE__ */ jsx("span", { className: "text-xs text-muted-foreground", children: t("content_core.keywords", "Keywords") }),
+        /* @__PURE__ */ jsx("div", { className: "flex flex-wrap gap-1", children: item.keywords.map((k) => /* @__PURE__ */ jsx(Badge, { variant: "secondary", className: "text-xs", children: k }, k)) })
+      ] }) : null,
+      renderTagsEditor && /* @__PURE__ */ jsxs("div", { className: "col-span-2 flex flex-col gap-1", children: [
+        /* @__PURE__ */ jsx("span", { className: "text-xs text-muted-foreground", children: t("content_core.tags", "Tags") }),
+        renderTagsEditor()
+      ] })
+    ] }),
+    editing && /* @__PURE__ */ jsxs("div", { className: "space-y-3", children: [
+      /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-3", children: [
+        /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+          /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.title", "Title") }),
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              value: form.title ?? "",
+              onChange: (e) => setForm((f) => ({ ...f, title: e.target.value })),
+              maxLength: 300
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+          /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.author", "Author") }),
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              value: form.author ?? "",
+              onChange: (e) => setForm((f) => ({ ...f, author: e.target.value })),
+              placeholder: String(t("content_core.author_placeholder", "Who produced this document?")),
+              maxLength: 300
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+          /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.origin_label", "Origin") }),
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              value: form.originLabel ?? "",
+              onChange: (e) => setForm((f) => ({ ...f, originLabel: e.target.value })),
+              placeholder: String(t("content_core.origin_label_placeholder", "e.g. Emailed by vendor")),
+              maxLength: 300
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+          /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.document_date", "Document date") }),
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              type: "date",
+              value: form.documentDate ?? "",
+              onChange: (e) => setForm((f) => ({ ...f, documentDate: e.target.value || null }))
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+          /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.expiration_date", "Expires") }),
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              type: "date",
+              value: form.expirationDate ?? "",
+              onChange: (e) => setForm((f) => ({ ...f, expirationDate: e.target.value || null }))
+            }
+          )
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+        /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.description", "Description") }),
+        /* @__PURE__ */ jsx(
+          Textarea,
+          {
+            value: form.description ?? "",
+            onChange: (e) => setForm((f) => ({ ...f, description: e.target.value })),
+            maxLength: 2e3,
+            rows: 2
+          }
+        )
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+        /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.keywords", "Keywords") }),
+        /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground", children: t("content_core.keywords_help", "Add any words you may use to find this later.") }),
+        /* @__PURE__ */ jsx("div", { className: "flex flex-wrap gap-1", children: (form.keywords ?? []).map((k) => /* @__PURE__ */ jsxs(Badge, { variant: "secondary", className: "gap-1 text-xs", children: [
+          k,
+          /* @__PURE__ */ jsx("button", { type: "button", "aria-label": `Remove ${k}`, onClick: () => removeKeyword(k), className: "ml-0.5", children: "\xD7" })
+        ] }, k)) }),
+        /* @__PURE__ */ jsxs("div", { className: "flex gap-2", children: [
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              value: keywordInput,
+              onChange: (e) => setKeywordInput(e.target.value),
+              onKeyDown: (e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addKeyword();
+                }
+              },
+              placeholder: String(t("content_core.keywords_add_placeholder", "Type a word, press Enter")),
+              maxLength: 60
+            }
+          ),
+          /* @__PURE__ */ jsx(Button, { type: "button", variant: "outline", size: "sm", onClick: addKeyword, children: t("content_core.add", "Add") })
+        ] })
+      ] }),
+      renderTagsEditor && /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+        /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.tags", "Tags") }),
+        renderTagsEditor()
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex justify-end gap-2", children: [
+        /* @__PURE__ */ jsx(Button, { variant: "outline", size: "sm", disabled: busy, onClick: () => setEditing(false), children: t("content_core.cancel", "Cancel") }),
+        /* @__PURE__ */ jsx(Button, { size: "sm", disabled: busy, onClick: handleSave, children: t("content_core.save", "Save") })
+      ] })
+    ] })
+  ] });
+}
 function ContentDetail({
   item,
   versions,
@@ -5115,7 +5297,10 @@ function ContentDetail({
   onDeletePermanently,
   formatSize,
   formatDate: formatDate3,
-  labels
+  labels,
+  addedByLabel,
+  onSaveMetadata,
+  renderTagsEditor
 }) {
   const { t } = useTranslation();
   const { ui } = useJoaSuite();
@@ -5141,6 +5326,16 @@ function ContentDetail({
       onArchive && /* @__PURE__ */ jsx(ArchiveContentAction, { archived: !!item.archivedAt, onArchive, onUnarchive }),
       onDeletePermanently && /* @__PURE__ */ jsx(DeletePermanentlyAction, { onDelete: onDeletePermanently })
     ] }),
+    /* @__PURE__ */ jsx(
+      ContentMetadataPanel,
+      {
+        item,
+        addedByLabel,
+        formatDate: formatDate3,
+        onSave: onSaveMetadata,
+        renderTagsEditor
+      }
+    ),
     /* @__PURE__ */ jsx(
       ContentVersionsPanel,
       {
@@ -7570,6 +7765,6 @@ function BillingComparePage({ appCode }) {
   ] });
 }
 
-export { APP_CODES, APP_DISPLAY, AddExternalLinkDialog, AppOverviewSection, ArchiveContentAction, AttachmentPreviewDialog, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, ContentDetail, ContentUploader, ContentVersionsPanel, DEFAULT_APP_URLS, DeletePermanentlyAction, DocumentLibraryTable, FieldGroup, FieldRow, InviteAsUserBanner, JoaSuiteProvider, LanguageSwitcher, LinkToRecordDialog, NotificationsBell, OrgChartView, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, RelatedRecordsPanel, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, TeamMemberView, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, guessAttachmentKind, mergeSharedResources, roleLabel, useJoaSuite, useOrgScope };
+export { APP_CODES, APP_DISPLAY, AddExternalLinkDialog, AppOverviewSection, ArchiveContentAction, AttachmentPreviewDialog, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, ContentDetail, ContentMetadataPanel, ContentUploader, ContentVersionsPanel, DEFAULT_APP_URLS, DeletePermanentlyAction, DocumentLibraryTable, FieldGroup, FieldRow, InviteAsUserBanner, JoaSuiteProvider, LanguageSwitcher, LinkToRecordDialog, NotificationsBell, OrgChartView, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, RelatedRecordsPanel, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, TeamMemberView, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, guessAttachmentKind, mergeSharedResources, roleLabel, useJoaSuite, useOrgScope };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

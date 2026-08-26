@@ -77,6 +77,7 @@ export { AddExternalLinkDialog, type AddExternalLinkDialogProps } from "./compon
 export { ContentVersionsPanel, type ContentVersionsPanelProps } from "./components/ContentVersionsPanel";
 export { ContentUploader, type ContentUploaderProps } from "./components/ContentUploader";
 export { ContentDetail, type ContentDetailProps } from "./components/ContentDetail";
+export { ContentMetadataPanel, type ContentMetadataPanelProps, type ContentMetadataPatch } from "./components/ContentMetadataPanel";
 export { OrgStructureSettingsPage } from "./components/org-structure/OrgStructureSettingsPage";
 export { OrgChartView } from "./components/org-structure/OrgChartView";
 export type {

@@ -915,6 +915,12 @@ type ContentItem = {
     sourceApp: string;
     originEntityType: string | null;
     originEntityId: string | null;
+    /** Free-text: who actually authored/produced this document in the real world. Distinct from createdBy (who added it to JoaSuite). */
+    author: string | null;
+    /** Free-text provenance supplement to originEntityType/Id, for content with no specific linkable record (e.g. "Emailed by vendor"). */
+    originLabel: string | null;
+    /** User-entered free-form search terms, distinct from tags (a shared, reusable vocabulary). */
+    keywords: string[];
     currentVersionId: string | null;
     createdBy: string | null;
     createdAt: string;
@@ -1194,6 +1200,36 @@ type ContentUploaderProps = {
  */
 declare function ContentUploader({ onUploadFile, onAddExternalLink, accept, uploadLabel, linkLabel, linkDialogTitle, disabled, }: ContentUploaderProps): react.JSX.Element;
 
+type ContentMetadataPatch = {
+    title?: string | null;
+    description?: string | null;
+    author?: string | null;
+    originLabel?: string | null;
+    documentDate?: string | null;
+    expirationDate?: string | null;
+    keywords?: string[];
+};
+type ContentMetadataPanelProps = {
+    item: ContentItem;
+    /** Resolved "who actually added this" -- prefer this over item.createdBy; see content-core.functions.ts's resolveAddedBy for why they can differ. */
+    addedByLabel?: string | null;
+    formatDate?: (s: string | null | undefined) => string;
+    /** Omit to render read-only (no Edit button). */
+    onSave?: (patch: ContentMetadataPatch) => Promise<void>;
+    /** Host-rendered tag editor (e.g. joabooks' TagPicker) -- kept as an injected slot since tag vocabulary/creation is app-specific, not something shared-ui owns. */
+    renderTagsEditor?: () => React.ReactNode;
+};
+/**
+ * File Library redesign, Phase A/D: the "organizational memory" metadata a
+ * content item carries beyond its raw file -- Author, Origin, Added By,
+ * Document/Expiration dates, free-form Keywords, and (via the injected
+ * slot) Tags. Read-only by default; pass onSave to enable a lightweight
+ * "Edit details" form (Section 10 of the File Library spec: do not force
+ * the user to fill everything before saving -- every field here stays
+ * optional).
+ */
+declare function ContentMetadataPanel({ item, addedByLabel, formatDate, onSave, renderTagsEditor }: ContentMetadataPanelProps): react.JSX.Element;
+
 type ContentDetailProps = {
     item: ContentItem;
     versions: ContentVersion[];
@@ -1222,6 +1258,16 @@ type ContentDetailProps = {
         createdLabel?: string;
         archivedBadge?: string;
     };
+    /**
+     * File Library redesign (Phase A/B/D) -- all optional and additive, so
+     * existing consumers are unaffected until they opt in.
+     */
+    /** Resolved "who actually added this" -- prefer over item.createdBy; see content-core.functions.ts's resolveAddedBy for why they can differ (a lazily-wrapped legacy attachment's created_by is whoever clicked "link", not the original uploader). */
+    addedByLabel?: string | null;
+    /** Enables the "Edit details" form (author/origin/dates/keywords/title/description) inside ContentMetadataPanel. Omit to keep the detail view read-only. */
+    onSaveMetadata?: (patch: ContentMetadataPatch) => Promise<void>;
+    /** Host-rendered tag editor (e.g. joabooks' TagPicker) -- kept as an injected slot since tag vocabulary/creation is app-specific. */
+    renderTagsEditor?: () => React.ReactNode;
 };
 /**
  * Composed detail view for one content item: header metadata, versions,
@@ -1233,7 +1279,7 @@ type ContentDetailProps = {
  * an app is free to use those smaller pieces directly instead of this
  * composition if its own detail page layout differs.
  */
-declare function ContentDetail({ item, versions, relations, relationProvider, onLinkRelation, onUnlinkRelation, onNavigateRelation, onOpenVersion, onArchive, onUnarchive, onDeletePermanently, formatSize, formatDate, labels, }: ContentDetailProps): react.JSX.Element;
+declare function ContentDetail({ item, versions, relations, relationProvider, onLinkRelation, onUnlinkRelation, onNavigateRelation, onOpenVersion, onArchive, onUnarchive, onDeletePermanently, formatSize, formatDate, labels, addedByLabel, onSaveMetadata, renderTagsEditor, }: ContentDetailProps): react.JSX.Element;
 
 declare function OrgStructureSettingsPage({ tenantId }: {
     tenantId: string;
@@ -1313,4 +1359,4 @@ declare function BillingComparePage({ appCode }: {
  */
 declare function useOrgScope(): [string[], (tenantIds: string[]) => void];
 
-export { AddExternalLinkDialog, type AddExternalLinkDialogProps, type AppCatalogEntry, AppCode, AppOverviewSection, type AppSummaryTile, type ApprovalSummary, ArchiveContentAction, type ArchiveContentActionProps, AttachmentPreviewDialog, type AttachmentPreviewDialogProps, type AttachmentPreviewKind, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type ContentAuthorizationProvider, ContentDetail, type ContentDetailProps, type ContentItem, type ContentItemDetail, type ContentOrigin, type ContentProvider, type ContentRelationProvider, type ContentRelationRow, type ContentSearchFilters, type ContentType, ContentUploader, type ContentUploaderProps, type ContentVersion, ContentVersionsPanel, type ContentVersionsPanelProps, DeletePermanentlyAction, type DeletePermanentlyActionProps, type Department, type DocumentLibraryRow, DocumentLibraryTable, type DocumentLibraryTableProps, FieldGroup, FieldRow, InviteAsUserBanner, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, LinkToRecordDialog, type LinkToRecordDialogProps, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, type OrgChartDepartmentT, type OrgChartPersonT, type OrgChartPositionT, OrgChartView, type OrgChartViewProps, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, RelatedRecordsPanel, type RelatedRecordsPanelProps, type RelationEntityTypeOption, type RelationSearchResult, type RouterAdapter, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, type TeamMemberInput, type TeamMemberRow, TeamMemberView, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, guessAttachmentKind, mergeSharedResources, useJoaSuite, useOrgScope };
+export { AddExternalLinkDialog, type AddExternalLinkDialogProps, type AppCatalogEntry, AppCode, AppOverviewSection, type AppSummaryTile, type ApprovalSummary, ArchiveContentAction, type ArchiveContentActionProps, AttachmentPreviewDialog, type AttachmentPreviewDialogProps, type AttachmentPreviewKind, type AuthState, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, type BoundServerFns, type ContentAuthorizationProvider, ContentDetail, type ContentDetailProps, type ContentItem, type ContentItemDetail, ContentMetadataPanel, type ContentMetadataPanelProps, type ContentMetadataPatch, type ContentOrigin, type ContentProvider, type ContentRelationProvider, type ContentRelationRow, type ContentSearchFilters, type ContentType, ContentUploader, type ContentUploaderProps, type ContentVersion, ContentVersionsPanel, type ContentVersionsPanelProps, DeletePermanentlyAction, type DeletePermanentlyActionProps, type Department, type DocumentLibraryRow, DocumentLibraryTable, type DocumentLibraryTableProps, FieldGroup, FieldRow, InviteAsUserBanner, type InvitePresetKey, type JoaSuiteContextValue, JoaSuiteProvider, LanguageSwitcher, LinkToRecordDialog, type LinkToRecordDialogProps, type ManageableTenant, type ManageableUserRow, type Membership, type NotificationRow, NotificationsBell, type OrgChartDepartmentT, type OrgChartPersonT, type OrgChartPositionT, OrgChartView, type OrgChartViewProps, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, type Position, PostLoginGate, RelatedRecordsPanel, type RelatedRecordsPanelProps, type RelationEntityTypeOption, type RelationSearchResult, type RouterAdapter, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, type SuiteHomeData, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, type TeamMemberInput, type TeamMemberRow, TeamMemberView, type TenantAppRow, ThemeToggle, type UiAdapter, type UserAppAssignment, UserBadge, UserDetailPage, UserInvitePage, UserListPage, guessAttachmentKind, mergeSharedResources, useJoaSuite, useOrgScope };
