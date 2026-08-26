@@ -4645,9 +4645,9 @@ function AttachmentPreviewDialog({
       /* @__PURE__ */ jsx(DialogTitle, { className: "truncate text-sm font-medium", children: filename }),
       downloadUrl && /* @__PURE__ */ jsx("a", { href: downloadUrl, download: filename, children: /* @__PURE__ */ jsx(Button, { size: "sm", variant: "outline", type: "button", children: downloadLabel }) })
     ] }),
-    /* @__PURE__ */ jsxs("div", { className: "flex-1 min-h-0 bg-muted/30 rounded overflow-hidden flex items-center justify-center", children: [
-      kind === "image" && previewUrl && /* @__PURE__ */ jsx("img", { src: previewUrl, alt: filename, className: "max-h-full max-w-full object-contain" }),
-      kind === "pdf" && previewUrl && (renderPdf ? renderPdf(previewUrl) : /* @__PURE__ */ jsx("iframe", { src: previewUrl, title: filename, className: "w-full h-full border-0" }))
+    /* @__PURE__ */ jsxs("div", { className: "flex-1 min-h-0 bg-muted/30 rounded overflow-hidden relative", children: [
+      kind === "image" && previewUrl && /* @__PURE__ */ jsx("div", { className: "absolute inset-0 flex items-center justify-center", children: /* @__PURE__ */ jsx("img", { src: previewUrl, alt: filename, className: "max-h-full max-w-full object-contain" }) }),
+      kind === "pdf" && previewUrl && /* @__PURE__ */ jsx("div", { className: "absolute inset-0 overflow-auto", children: renderPdf ? renderPdf(previewUrl) : /* @__PURE__ */ jsx("iframe", { src: previewUrl, title: filename, className: "w-full h-full border-0" }) })
     ] })
   ] }) });
 }
