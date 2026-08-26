@@ -6,6 +6,7 @@ import { ContentVersionsPanel } from "./ContentVersionsPanel";
 import { RelatedRecordsPanel } from "./RelatedRecordsPanel";
 import { ArchiveContentAction } from "./ArchiveContentAction";
 import { DeletePermanentlyAction } from "./DeletePermanentlyAction";
+import { ContentMetadataPanel, type ContentMetadataPatch } from "./ContentMetadataPanel";
 
 export type ContentDetailProps = {
   item: ContentItem;
@@ -35,6 +36,16 @@ export type ContentDetailProps = {
     createdLabel?: string;
     archivedBadge?: string;
   };
+  /**
+   * File Library redesign (Phase A/B/D) -- all optional and additive, so
+   * existing consumers are unaffected until they opt in.
+   */
+  /** Resolved "who actually added this" -- prefer over item.createdBy; see content-core.functions.ts's resolveAddedBy for why they can differ (a lazily-wrapped legacy attachment's created_by is whoever clicked "link", not the original uploader). */
+  addedByLabel?: string | null;
+  /** Enables the "Edit details" form (author/origin/dates/keywords/title/description) inside ContentMetadataPanel. Omit to keep the detail view read-only. */
+  onSaveMetadata?: (patch: ContentMetadataPatch) => Promise<void>;
+  /** Host-rendered tag editor (e.g. joabooks' TagPicker) -- kept as an injected slot since tag vocabulary/creation is app-specific. */
+  renderTagsEditor?: () => React.ReactNode;
 };
 
 /**
@@ -62,6 +73,9 @@ export function ContentDetail({
   formatSize,
   formatDate,
   labels,
+  addedByLabel,
+  onSaveMetadata,
+  renderTagsEditor,
 }: ContentDetailProps) {
   const { t } = useTranslation();
   const { ui } = useJoaSuite();
@@ -90,6 +104,14 @@ export function ContentDetail({
           {onDeletePermanently && <DeletePermanentlyAction onDelete={onDeletePermanently} />}
         </div>
       )}
+
+      <ContentMetadataPanel
+        item={item}
+        addedByLabel={addedByLabel}
+        formatDate={formatDate}
+        onSave={onSaveMetadata}
+        renderTagsEditor={renderTagsEditor}
+      />
 
       <ContentVersionsPanel
         versions={versions}

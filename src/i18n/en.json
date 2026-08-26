@@ -400,6 +400,21 @@
     "invalid_url": "Enter a valid http(s) URL.",
     "add": "Add",
     "source_app_label": "Source",
-    "created_label": "Created"
+    "created_label": "Created",
+    "details": "Details",
+    "edit_details": "Edit details",
+    "author": "Author",
+    "author_placeholder": "Who produced this document?",
+    "origin_label": "Origin",
+    "origin_label_placeholder": "e.g. Emailed by vendor",
+    "added_by": "Added by",
+    "document_date": "Document date",
+    "expiration_date": "Expires",
+    "keywords": "Keywords",
+    "keywords_help": "Add any words you may use to find this later.",
+    "keywords_add_placeholder": "Type a word, press Enter",
+    "tags": "Tags",
+    "save": "Save",
+    "saved": "Saved"
   }
 }

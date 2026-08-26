@@ -464,7 +464,22 @@ var en_default = {
     invalid_url: "Enter a valid http(s) URL.",
     add: "Add",
     source_app_label: "Source",
-    created_label: "Created"
+    created_label: "Created",
+    details: "Details",
+    edit_details: "Edit details",
+    author: "Author",
+    author_placeholder: "Who produced this document?",
+    origin_label: "Origin",
+    origin_label_placeholder: "e.g. Emailed by vendor",
+    added_by: "Added by",
+    document_date: "Document date",
+    expiration_date: "Expires",
+    keywords: "Keywords",
+    keywords_help: "Add any words you may use to find this later.",
+    keywords_add_placeholder: "Type a word, press Enter",
+    tags: "Tags",
+    save: "Save",
+    saved: "Saved"
   }
 };
 
@@ -868,7 +883,22 @@ var ko_default = {
     invalid_url: "\uC720\uD6A8\uD55C http(s) URL\uC744 \uC785\uB825\uD558\uC138\uC694.",
     add: "\uCD94\uAC00",
     source_app_label: "\uCD9C\uCC98",
-    created_label: "\uC0DD\uC131\uC77C"
+    created_label: "\uC0DD\uC131\uC77C",
+    details: "\uC0C1\uC138 \uC815\uBCF4",
+    edit_details: "\uC0C1\uC138 \uC815\uBCF4 \uC218\uC815",
+    author: "\uC791\uC131\uC790",
+    author_placeholder: "\uC774 \uBB38\uC11C\uB97C \uC791\uC131\uD55C \uC0AC\uB78C\uC740 \uB204\uAD6C\uC778\uAC00\uC694?",
+    origin_label: "\uCD9C\uCC98",
+    origin_label_placeholder: "\uC608: \uACF5\uAE09\uC5C5\uCCB4\uAC00 \uC774\uBA54\uC77C\uB85C \uBCF4\uB0C4",
+    added_by: "\uCD94\uAC00\uD55C \uC0AC\uB78C",
+    document_date: "\uBB38\uC11C \uB0A0\uC9DC",
+    expiration_date: "\uB9CC\uB8CC\uC77C",
+    keywords: "\uD0A4\uC6CC\uB4DC",
+    keywords_help: "\uB098\uC911\uC5D0 \uC774 \uD30C\uC77C\uC744 \uCC3E\uC744 \uB54C \uC0AC\uC6A9\uD560 \uB9CC\uD55C \uB2E8\uC5B4\uB97C \uCD94\uAC00\uD558\uC138\uC694.",
+    keywords_add_placeholder: "\uB2E8\uC5B4 \uC785\uB825 \uD6C4 Enter",
+    tags: "\uD0DC\uADF8",
+    save: "\uC800\uC7A5",
+    saved: "\uC800\uC7A5\uB428"
   }
 };
 
@@ -1257,7 +1287,22 @@ var zh_default = {
     invalid_url: "\u8BF7\u8F93\u5165\u6709\u6548\u7684 http(s) URL\u3002",
     add: "\u6DFB\u52A0",
     source_app_label: "\u6765\u6E90",
-    created_label: "\u521B\u5EFA\u65F6\u95F4"
+    created_label: "\u521B\u5EFA\u65F6\u95F4",
+    details: "\u8BE6\u60C5",
+    edit_details: "\u7F16\u8F91\u8BE6\u60C5",
+    author: "\u4F5C\u8005",
+    author_placeholder: "\u6B64\u6587\u4EF6\u7684\u5B9E\u9645\u4F5C\u8005\u662F\u8C01?",
+    origin_label: "\u6765\u6E90",
+    origin_label_placeholder: "\u4F8B\u5982:\u4F9B\u5E94\u5546\u901A\u8FC7\u90AE\u4EF6\u53D1\u9001",
+    added_by: "\u6DFB\u52A0\u8005",
+    document_date: "\u6587\u4EF6\u65E5\u671F",
+    expiration_date: "\u5230\u671F\u65E5",
+    keywords: "\u5173\u952E\u8BCD",
+    keywords_help: "\u6DFB\u52A0\u4EE5\u540E\u53EF\u80FD\u7528\u6765\u67E5\u627E\u6B64\u5185\u5BB9\u7684\u4EFB\u4F55\u8BCD\u8BED\u3002",
+    keywords_add_placeholder: "\u8F93\u5165\u8BCD\u8BED\u540E\u6309 Enter",
+    tags: "\u6807\u7B7E",
+    save: "\u4FDD\u5B58",
+    saved: "\u5DF2\u4FDD\u5B58"
   }
 };
 
@@ -1649,7 +1694,22 @@ var es_default = {
     invalid_url: "Ingrese una URL http(s) v\xE1lida.",
     add: "Agregar",
     source_app_label: "Origen",
-    created_label: "Creado"
+    created_label: "Creado",
+    details: "Detalles",
+    edit_details: "Editar detalles",
+    author: "Autor",
+    author_placeholder: "\xBFQui\xE9n produjo este documento?",
+    origin_label: "Origen",
+    origin_label_placeholder: "p. ej. Enviado por correo por el proveedor",
+    added_by: "Agregado por",
+    document_date: "Fecha del documento",
+    expiration_date: "Vence",
+    keywords: "Palabras clave",
+    keywords_help: "Agregue palabras que pueda usar para encontrar esto m\xE1s tarde.",
+    keywords_add_placeholder: "Escriba una palabra y presione Enter",
+    tags: "Etiquetas",
+    save: "Guardar",
+    saved: "Guardado"
   }
 };
 
@@ -2041,7 +2101,22 @@ var vi_default = {
     invalid_url: "Nh\u1EADp URL http(s) h\u1EE3p l\u1EC7.",
     add: "Th\xEAm",
     source_app_label: "Ngu\u1ED3n",
-    created_label: "Ng\xE0y t\u1EA1o"
+    created_label: "Ng\xE0y t\u1EA1o",
+    details: "Chi ti\u1EBFt",
+    edit_details: "Ch\u1EC9nh s\u1EEDa chi ti\u1EBFt",
+    author: "T\xE1c gi\u1EA3",
+    author_placeholder: "Ai \u0111\xE3 t\u1EA1o ra t\xE0i li\u1EC7u n\xE0y?",
+    origin_label: "Ngu\u1ED3n g\u1ED1c",
+    origin_label_placeholder: "vd: Nh\xE0 cung c\u1EA5p g\u1EEDi qua email",
+    added_by: "Th\xEAm b\u1EDFi",
+    document_date: "Ng\xE0y t\xE0i li\u1EC7u",
+    expiration_date: "H\u1EBFt h\u1EA1n",
+    keywords: "T\u1EEB kh\xF3a",
+    keywords_help: "Th\xEAm b\u1EA5t k\u1EF3 t\u1EEB n\xE0o b\u1EA1n c\xF3 th\u1EC3 d\xF9ng \u0111\u1EC3 t\xECm l\u1EA1i m\u1EE5c n\xE0y sau.",
+    keywords_add_placeholder: "Nh\u1EADp m\u1ED9t t\u1EEB, nh\u1EA5n Enter",
+    tags: "Th\u1EBB",
+    save: "L\u01B0u",
+    saved: "\u0110\xE3 l\u01B0u"
   }
 };
 
@@ -5101,6 +5176,188 @@ function ContentUploader({
     ] })
   ] });
 }
+function ContentMetadataPanel({ item, addedByLabel, formatDate: formatDate3, onSave, renderTagsEditor }) {
+  const { t } = useTranslation();
+  const { ui } = useJoaSuite();
+  const { Button, Input, Label, Textarea, Badge } = ui;
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState({
+    title: item.title,
+    description: item.description,
+    author: item.author,
+    originLabel: item.originLabel,
+    documentDate: item.documentDate,
+    expirationDate: item.expirationDate,
+    keywords: item.keywords ?? []
+  });
+  const [keywordInput, setKeywordInput] = useState("");
+  const fmt2 = formatDate3 ?? ((s) => s ?? "");
+  function startEdit() {
+    setForm({
+      title: item.title,
+      description: item.description,
+      author: item.author,
+      originLabel: item.originLabel,
+      documentDate: item.documentDate,
+      expirationDate: item.expirationDate,
+      keywords: item.keywords ?? []
+    });
+    setKeywordInput("");
+    setEditing(true);
+  }
+  function addKeyword() {
+    const k = keywordInput.trim();
+    if (!k) return;
+    setForm((f) => ({ ...f, keywords: [.../* @__PURE__ */ new Set([...f.keywords ?? [], k])] }));
+    setKeywordInput("");
+  }
+  function removeKeyword(k) {
+    setForm((f) => ({ ...f, keywords: (f.keywords ?? []).filter((x) => x !== k) }));
+  }
+  async function handleSave() {
+    if (!onSave) return;
+    setBusy(true);
+    try {
+      await onSave(form);
+      setEditing(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const row = (label, value) => value ? /* @__PURE__ */ jsxs("div", { className: "flex flex-col gap-0.5", children: [
+    /* @__PURE__ */ jsx("span", { className: "text-xs text-muted-foreground", children: label }),
+    /* @__PURE__ */ jsx("span", { className: "text-sm", children: value })
+  ] }) : null;
+  return /* @__PURE__ */ jsxs("div", { className: "space-y-3 rounded-lg border p-3", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between", children: [
+      /* @__PURE__ */ jsx("h4", { className: "text-sm font-medium", children: t("content_core.details", "Details") }),
+      onSave && !editing && /* @__PURE__ */ jsx(Button, { size: "sm", variant: "ghost", onClick: startEdit, children: t("content_core.edit_details", "Edit details") })
+    ] }),
+    !editing && /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-x-4 gap-y-2", children: [
+      row(String(t("content_core.author", "Author")), item.author),
+      row(String(t("content_core.origin_label", "Origin")), item.originLabel),
+      row(String(t("content_core.added_by", "Added by")), addedByLabel),
+      row(String(t("content_core.document_date", "Document date")), item.documentDate ? fmt2(item.documentDate) : null),
+      row(String(t("content_core.expiration_date", "Expires")), item.expirationDate ? fmt2(item.expirationDate) : null),
+      item.keywords?.length ? /* @__PURE__ */ jsxs("div", { className: "col-span-2 flex flex-col gap-1", children: [
+        /* @__PURE__ */ jsx("span", { className: "text-xs text-muted-foreground", children: t("content_core.keywords", "Keywords") }),
+        /* @__PURE__ */ jsx("div", { className: "flex flex-wrap gap-1", children: item.keywords.map((k) => /* @__PURE__ */ jsx(Badge, { variant: "secondary", className: "text-xs", children: k }, k)) })
+      ] }) : null,
+      renderTagsEditor && /* @__PURE__ */ jsxs("div", { className: "col-span-2 flex flex-col gap-1", children: [
+        /* @__PURE__ */ jsx("span", { className: "text-xs text-muted-foreground", children: t("content_core.tags", "Tags") }),
+        renderTagsEditor()
+      ] })
+    ] }),
+    editing && /* @__PURE__ */ jsxs("div", { className: "space-y-3", children: [
+      /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-3", children: [
+        /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+          /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.title_label", "Title") }),
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              value: form.title ?? "",
+              onChange: (e) => setForm((f) => ({ ...f, title: e.target.value })),
+              maxLength: 300
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+          /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.author", "Author") }),
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              value: form.author ?? "",
+              onChange: (e) => setForm((f) => ({ ...f, author: e.target.value })),
+              placeholder: String(t("content_core.author_placeholder", "Who produced this document?")),
+              maxLength: 300
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+          /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.origin_label", "Origin") }),
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              value: form.originLabel ?? "",
+              onChange: (e) => setForm((f) => ({ ...f, originLabel: e.target.value })),
+              placeholder: String(t("content_core.origin_label_placeholder", "e.g. Emailed by vendor")),
+              maxLength: 300
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+          /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.document_date", "Document date") }),
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              type: "date",
+              value: form.documentDate ?? "",
+              onChange: (e) => setForm((f) => ({ ...f, documentDate: e.target.value || null }))
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+          /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.expiration_date", "Expires") }),
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              type: "date",
+              value: form.expirationDate ?? "",
+              onChange: (e) => setForm((f) => ({ ...f, expirationDate: e.target.value || null }))
+            }
+          )
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+        /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.description_label", "Description") }),
+        /* @__PURE__ */ jsx(
+          Textarea,
+          {
+            value: form.description ?? "",
+            onChange: (e) => setForm((f) => ({ ...f, description: e.target.value })),
+            maxLength: 2e3,
+            rows: 2
+          }
+        )
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+        /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.keywords", "Keywords") }),
+        /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground", children: t("content_core.keywords_help", "Add any words you may use to find this later.") }),
+        /* @__PURE__ */ jsx("div", { className: "flex flex-wrap gap-1", children: (form.keywords ?? []).map((k) => /* @__PURE__ */ jsxs(Badge, { variant: "secondary", className: "gap-1 text-xs", children: [
+          k,
+          /* @__PURE__ */ jsx("button", { type: "button", "aria-label": `Remove ${k}`, onClick: () => removeKeyword(k), className: "ml-0.5", children: "\xD7" })
+        ] }, k)) }),
+        /* @__PURE__ */ jsxs("div", { className: "flex gap-2", children: [
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              value: keywordInput,
+              onChange: (e) => setKeywordInput(e.target.value),
+              onKeyDown: (e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addKeyword();
+                }
+              },
+              placeholder: String(t("content_core.keywords_add_placeholder", "Type a word, press Enter")),
+              maxLength: 60
+            }
+          ),
+          /* @__PURE__ */ jsx(Button, { type: "button", variant: "outline", size: "sm", onClick: addKeyword, children: t("content_core.add", "Add") })
+        ] })
+      ] }),
+      renderTagsEditor && /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+        /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.tags", "Tags") }),
+        renderTagsEditor()
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex justify-end gap-2", children: [
+        /* @__PURE__ */ jsx(Button, { variant: "outline", size: "sm", disabled: busy, onClick: () => setEditing(false), children: t("content_core.cancel", "Cancel") }),
+        /* @__PURE__ */ jsx(Button, { size: "sm", disabled: busy, onClick: handleSave, children: t("content_core.save", "Save") })
+      ] })
+    ] })
+  ] });
+}
 function ContentDetail({
   item,
   versions,
@@ -5115,7 +5372,10 @@ function ContentDetail({
   onDeletePermanently,
   formatSize,
   formatDate: formatDate3,
-  labels
+  labels,
+  addedByLabel,
+  onSaveMetadata,
+  renderTagsEditor
 }) {
   const { t } = useTranslation();
   const { ui } = useJoaSuite();
@@ -5141,6 +5401,16 @@ function ContentDetail({
       onArchive && /* @__PURE__ */ jsx(ArchiveContentAction, { archived: !!item.archivedAt, onArchive, onUnarchive }),
       onDeletePermanently && /* @__PURE__ */ jsx(DeletePermanentlyAction, { onDelete: onDeletePermanently })
     ] }),
+    /* @__PURE__ */ jsx(
+      ContentMetadataPanel,
+      {
+        item,
+        addedByLabel,
+        formatDate: formatDate3,
+        onSave: onSaveMetadata,
+        renderTagsEditor
+      }
+    ),
     /* @__PURE__ */ jsx(
       ContentVersionsPanel,
       {
@@ -7570,6 +7840,6 @@ function BillingComparePage({ appCode }) {
   ] });
 }
 
-export { APP_CODES, APP_DISPLAY, AddExternalLinkDialog, AppOverviewSection, ArchiveContentAction, AttachmentPreviewDialog, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, ContentDetail, ContentUploader, ContentVersionsPanel, DEFAULT_APP_URLS, DeletePermanentlyAction, DocumentLibraryTable, FieldGroup, FieldRow, InviteAsUserBanner, JoaSuiteProvider, LanguageSwitcher, LinkToRecordDialog, NotificationsBell, OrgChartView, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, RelatedRecordsPanel, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, TeamMemberView, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, guessAttachmentKind, mergeSharedResources, roleLabel, useJoaSuite, useOrgScope };
+export { APP_CODES, APP_DISPLAY, AddExternalLinkDialog, AppOverviewSection, ArchiveContentAction, AttachmentPreviewDialog, BillingComparePage, BillingDetailsPage, BillingDiscountsPage, BillingInvoicesPage, BillingLayout, BillingOverviewPage, BillingPaymentMethodsPage, BillingReferralsPage, BillingUsagePage, ContentDetail, ContentMetadataPanel, ContentUploader, ContentVersionsPanel, DEFAULT_APP_URLS, DeletePermanentlyAction, DocumentLibraryTable, FieldGroup, FieldRow, InviteAsUserBanner, JoaSuiteProvider, LanguageSwitcher, LinkToRecordDialog, NotificationsBell, OrgChartView, OrgScopeToggle, OrgStructureSettingsPage, PlansSection, PostLoginGate, ROLES_BY_APP, RelatedRecordsPanel, SETTINGS_KV_APP_URL_KEYS, SUPPORTED_LANGUAGES, SetPasswordForm, SignUpForm, SuiteHomePage, SuiteSettingsHub, SuiteSwitcher, TeamListPage, TeamMemberForm, TeamMemberView, ThemeToggle, UserBadge, UserDetailPage, UserInvitePage, UserListPage, guessAttachmentKind, mergeSharedResources, roleLabel, useJoaSuite, useOrgScope };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map

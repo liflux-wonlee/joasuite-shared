@@ -25,6 +25,12 @@ export type ContentItem = {
   sourceApp: string;
   originEntityType: string | null;
   originEntityId: string | null;
+  /** Free-text: who actually authored/produced this document in the real world. Distinct from createdBy (who added it to JoaSuite). */
+  author: string | null;
+  /** Free-text provenance supplement to originEntityType/Id, for content with no specific linkable record (e.g. "Emailed by vendor"). */
+  originLabel: string | null;
+  /** User-entered free-form search terms, distinct from tags (a shared, reusable vocabulary). */
+  keywords: string[];
   currentVersionId: string | null;
   createdBy: string | null;
   createdAt: string;

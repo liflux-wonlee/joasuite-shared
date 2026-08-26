@@ -382,6 +382,21 @@
     "invalid_url": "请输入有效的 http(s) URL。",
     "add": "添加",
     "source_app_label": "来源",
-    "created_label": "创建时间"
+    "created_label": "创建时间",
+    "details": "详情",
+    "edit_details": "编辑详情",
+    "author": "作者",
+    "author_placeholder": "此文件的实际作者是谁?",
+    "origin_label": "来源",
+    "origin_label_placeholder": "例如:供应商通过邮件发送",
+    "added_by": "添加者",
+    "document_date": "文件日期",
+    "expiration_date": "到期日",
+    "keywords": "关键词",
+    "keywords_help": "添加以后可能用来查找此内容的任何词语。",
+    "keywords_add_placeholder": "输入词语后按 Enter",
+    "tags": "标签",
+    "save": "保存",
+    "saved": "已保存"
   }
 }

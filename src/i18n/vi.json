@@ -385,6 +385,21 @@
     "invalid_url": "Nhập URL http(s) hợp lệ.",
     "add": "Thêm",
     "source_app_label": "Nguồn",
-    "created_label": "Ngày tạo"
+    "created_label": "Ngày tạo",
+    "details": "Chi tiết",
+    "edit_details": "Chỉnh sửa chi tiết",
+    "author": "Tác giả",
+    "author_placeholder": "Ai đã tạo ra tài liệu này?",
+    "origin_label": "Nguồn gốc",
+    "origin_label_placeholder": "vd: Nhà cung cấp gửi qua email",
+    "added_by": "Thêm bởi",
+    "document_date": "Ngày tài liệu",
+    "expiration_date": "Hết hạn",
+    "keywords": "Từ khóa",
+    "keywords_help": "Thêm bất kỳ từ nào bạn có thể dùng để tìm lại mục này sau.",
+    "keywords_add_placeholder": "Nhập một từ, nhấn Enter",
+    "tags": "Thẻ",
+    "save": "Lưu",
+    "saved": "Đã lưu"
   }
 }
