@@ -11,6 +11,7 @@ export type ContentMetadataPatch = {
   documentDate?: string | null;
   expirationDate?: string | null;
   keywords?: string[];
+  documentType?: string | null;
 };
 
 export type ContentMetadataPanelProps = {
@@ -48,6 +49,7 @@ export function ContentMetadataPanel({ item, addedByLabel, formatDate, onSave, r
     documentDate: item.documentDate,
     expirationDate: item.expirationDate,
     keywords: item.keywords ?? [],
+    documentType: item.documentType,
   });
   const [keywordInput, setKeywordInput] = useState("");
 
@@ -62,6 +64,7 @@ export function ContentMetadataPanel({ item, addedByLabel, formatDate, onSave, r
       documentDate: item.documentDate,
       expirationDate: item.expirationDate,
       keywords: item.keywords ?? [],
+      documentType: item.documentType,
     });
     setKeywordInput("");
     setEditing(true);
@@ -97,6 +100,12 @@ export function ContentMetadataPanel({ item, addedByLabel, formatDate, onSave, r
       </div>
     ) : null;
 
+  const visibilityLabel = {
+    inbox: t("content_core.visibility_inbox", "Inbox"),
+    normal: t("content_core.visibility_normal", "Library"),
+    background: t("content_core.visibility_background", "Background (not shown in default browsing)"),
+  }[item.libraryVisibility];
+
   return (
     <div className="space-y-3 rounded-lg border p-3">
       <div className="flex items-center justify-between">
@@ -110,6 +119,8 @@ export function ContentMetadataPanel({ item, addedByLabel, formatDate, onSave, r
 
       {!editing && (
         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+          {row(String(t("content_core.status", "Status")), visibilityLabel)}
+          {row(String(t("content_core.document_type", "Document type")), item.documentType)}
           {row(String(t("content_core.author", "Author")), item.author)}
           {row(String(t("content_core.origin_label", "Origin")), item.originLabel)}
           {row(String(t("content_core.added_by", "Added by")), addedByLabel)}
@@ -145,6 +156,15 @@ export function ContentMetadataPanel({ item, addedByLabel, formatDate, onSave, r
                 value={form.title ?? ""}
                 onChange={(e: any) => setForm((f) => ({ ...f, title: e.target.value }))}
                 maxLength={300}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t("content_core.document_type", "Document type")}</Label>
+              <Input
+                value={form.documentType ?? ""}
+                onChange={(e: any) => setForm((f) => ({ ...f, documentType: e.target.value }))}
+                placeholder={String(t("content_core.document_type_placeholder", "e.g. Invoice, Contract, Insurance Certificate"))}
+                maxLength={120}
               />
             </div>
             <div className="space-y-1">

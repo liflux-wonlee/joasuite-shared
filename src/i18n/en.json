@@ -415,6 +415,13 @@
     "keywords_add_placeholder": "Type a word, press Enter",
     "tags": "Tags",
     "save": "Save",
-    "saved": "Saved"
+    "saved": "Saved",
+    "status": "Status",
+    "document_type": "Document type",
+    "document_type_placeholder": "e.g. Invoice, Contract, Insurance Certificate",
+    "visibility_inbox": "Inbox",
+    "visibility_normal": "Library",
+    "visibility_background": "Background (not shown in default browsing)",
+    "keep_in_library": "Keep in Library"
   }
 }

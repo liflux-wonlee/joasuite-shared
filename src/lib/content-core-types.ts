@@ -31,6 +31,10 @@ export type ContentItem = {
   originLabel: string | null;
   /** User-entered free-form search terms, distinct from tags (a shared, reusable vocabulary). */
   keywords: string[];
+  /** Optional business/document classification (Invoice, Contract, Insurance Certificate, ...), distinct from contentType (file vs external_link -- what KIND of container this is). */
+  documentType: string | null;
+  /** Default-browsing tier -- see content_items.library_visibility's own migration comment. Orthogonal to archivedAt and to relations. */
+  libraryVisibility: "inbox" | "normal" | "background";
   currentVersionId: string | null;
   createdBy: string | null;
   createdAt: string;

@@ -46,6 +46,15 @@ export type ContentDetailProps = {
   onSaveMetadata?: (patch: ContentMetadataPatch) => Promise<void>;
   /** Host-rendered tag editor (e.g. joabooks' TagPicker) -- kept as an injected slot since tag vocabulary/creation is app-specific. */
   renderTagsEditor?: () => React.ReactNode;
+  /**
+   * File Library redesign, Library Visibility model -- pass this when
+   * item.libraryVisibility === "background" to show a "Keep in Library"
+   * action that promotes it to "normal" (first-class Library content).
+   * Omit (or the item isn't background) to hide the button entirely --
+   * matches onDeletePermanently's "only show when it's actually legal"
+   * convention.
+   */
+  onPromoteToLibrary?: () => Promise<void>;
 };
 
 /**
@@ -76,10 +85,11 @@ export function ContentDetail({
   addedByLabel,
   onSaveMetadata,
   renderTagsEditor,
+  onPromoteToLibrary,
 }: ContentDetailProps) {
   const { t } = useTranslation();
   const { ui } = useJoaSuite();
-  const { Badge } = ui;
+  const { Badge, Button } = ui;
 
   return (
     <div className="space-y-6">
@@ -96,8 +106,13 @@ export function ContentDetail({
         </p>
       </div>
 
-      {(onArchive || onDeletePermanently) && (
+      {(onArchive || onDeletePermanently || (onPromoteToLibrary && item.libraryVisibility === "background")) && (
         <div className="flex items-center gap-2">
+          {onPromoteToLibrary && item.libraryVisibility === "background" && (
+            <Button size="sm" variant="outline" onClick={onPromoteToLibrary}>
+              {t("content_core.keep_in_library", "Keep in Library")}
+            </Button>
+          )}
           {onArchive && (
             <ArchiveContentAction archived={!!item.archivedAt} onArchive={onArchive} onUnarchive={onUnarchive} />
           )}
