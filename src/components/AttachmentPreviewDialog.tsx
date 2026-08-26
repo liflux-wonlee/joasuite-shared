@@ -70,16 +70,34 @@ export function AttachmentPreviewDialog({
             </a>
           )}
         </DialogHeader>
-        <div className="flex-1 min-h-0 bg-muted/30 rounded overflow-hidden flex items-center justify-center">
+        {/*
+          `relative` + `absolute inset-0` on each content wrapper (instead of
+          `flex items-center justify-center` directly on this container) so
+          the PDF branch gets a genuinely bounded box to scroll within.
+          `align-items: center` on a flex container lets its child size to
+          its own content instead of stretching to fill -- a multi-page PDF
+          then grows past the visible area with no scrollbar (the *content*
+          overflows, but the overflow-auto div wrapping it never becomes
+          shorter than that content, so there's nothing to scroll *within*),
+          and the top/bottom got clipped by this div's own `overflow-hidden`
+          instead. `absolute inset-0` always resolves to a definite size
+          from the `relative` ancestor regardless of flex alignment, so
+          `overflow-auto` on the PDF wrapper has something real to scroll.
+        */}
+        <div className="flex-1 min-h-0 bg-muted/30 rounded overflow-hidden relative">
           {kind === "image" && previewUrl && (
-            <img src={previewUrl} alt={filename} className="max-h-full max-w-full object-contain" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <img src={previewUrl} alt={filename} className="max-h-full max-w-full object-contain" />
+            </div>
           )}
           {kind === "pdf" && previewUrl && (
-            renderPdf ? (
-              renderPdf(previewUrl)
-            ) : (
-              <iframe src={previewUrl} title={filename} className="w-full h-full border-0" />
-            )
+            <div className="absolute inset-0 overflow-auto">
+              {renderPdf ? (
+                renderPdf(previewUrl)
+              ) : (
+                <iframe src={previewUrl} title={filename} className="w-full h-full border-0" />
+              )}
+            </div>
           )}
         </div>
       </DialogContent>
