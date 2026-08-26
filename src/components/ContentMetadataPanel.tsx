@@ -140,7 +140,7 @@ export function ContentMetadataPanel({ item, addedByLabel, formatDate, onSave, r
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label className="text-xs">{t("content_core.title", "Title")}</Label>
+              <Label className="text-xs">{t("content_core.title_label", "Title")}</Label>
               <Input
                 value={form.title ?? ""}
                 onChange={(e: any) => setForm((f) => ({ ...f, title: e.target.value }))}
@@ -183,7 +183,7 @@ export function ContentMetadataPanel({ item, addedByLabel, formatDate, onSave, r
             </div>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">{t("content_core.description", "Description")}</Label>
+            <Label className="text-xs">{t("content_core.description_label", "Description")}</Label>
             <Textarea
               value={form.description ?? ""}
               onChange={(e: any) => setForm((f) => ({ ...f, description: e.target.value }))}

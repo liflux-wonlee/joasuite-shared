@@ -397,6 +397,21 @@
     "invalid_url": "유효한 http(s) URL을 입력하세요.",
     "add": "추가",
     "source_app_label": "출처",
-    "created_label": "생성일"
+    "created_label": "생성일",
+    "details": "상세 정보",
+    "edit_details": "상세 정보 수정",
+    "author": "작성자",
+    "author_placeholder": "이 문서를 작성한 사람은 누구인가요?",
+    "origin_label": "출처",
+    "origin_label_placeholder": "예: 공급업체가 이메일로 보냄",
+    "added_by": "추가한 사람",
+    "document_date": "문서 날짜",
+    "expiration_date": "만료일",
+    "keywords": "키워드",
+    "keywords_help": "나중에 이 파일을 찾을 때 사용할 만한 단어를 추가하세요.",
+    "keywords_add_placeholder": "단어 입력 후 Enter",
+    "tags": "태그",
+    "save": "저장",
+    "saved": "저장됨"
   }
 }
