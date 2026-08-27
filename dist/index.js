@@ -38,7 +38,19 @@ var ROLES_BY_APP = {
   joaoffice: ["owner", "super_admin", "admin", "hr_manager", "manager", "employee"],
   joaapproval: ["owner", "super_admin", "approver"],
   joacrm: ["owner", "super_admin", "approver"],
-  joahr: ["owner", "super_admin", "approver", "hr_manager", "manager", "employee", "billing_admin"]
+  joahr: [
+    "owner",
+    "super_admin",
+    "approver",
+    "hr_manager",
+    "manager",
+    "payroll_manager",
+    "scheduler",
+    "time_approver",
+    "read_only",
+    "employee",
+    "billing_admin"
+  ]
 };
 var SETTINGS_KV_APP_URL_KEYS = APP_CODES.map((c) => `app_url.${c}`);
 function roleLabel(role) {
@@ -3592,22 +3604,22 @@ function UserListPage() {
   ] });
 }
 function rolesForApp(code) {
-  return ROLES_BY_APP[code] ?? ["owner", "super_admin", "approver"];
+  return ROLES_BY_APP[code] ?? [];
 }
 function applyPreset(preset, appCode) {
   switch (preset) {
     case "owner_admin":
       if (rolesForApp(appCode).includes("owner")) return "owner";
-      return rolesForApp(appCode)[0] ?? null;
+      return null;
     case "manager":
       if (appCode === "joabooks") return "finance_manager";
       if (appCode === "joasop") return "sop_admin";
-      return "super_admin";
+      if (rolesForApp(appCode).includes("manager")) return "manager";
+      return null;
     case "finance_staff":
       if (appCode === "joabooks") return "finance_ap";
       return null;
     case "field_tech":
-      if (appCode === "joabooks") return "approver";
       return null;
     case "approver":
       if (appCode === "joasop") return "sop_reviewer";

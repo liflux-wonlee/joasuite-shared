@@ -56,7 +56,19 @@ export const ROLES_BY_APP: Record<AppCode, string[]> = {
   joaoffice: ["owner", "super_admin", "admin", "hr_manager", "manager", "employee"],
   joaapproval: ["owner", "super_admin", "approver"],
   joacrm: ["owner", "super_admin", "approver"],
-  joahr: ["owner", "super_admin", "approver", "hr_manager", "manager", "employee", "billing_admin"],
+  joahr: [
+    "owner",
+    "super_admin",
+    "approver",
+    "hr_manager",
+    "manager",
+    "payroll_manager",
+    "scheduler",
+    "time_approver",
+    "read_only",
+    "employee",
+    "billing_admin",
+  ],
 };
 
 export const SETTINGS_KV_APP_URL_KEYS = APP_CODES.map((c) => `app_url.${c}` as const);
