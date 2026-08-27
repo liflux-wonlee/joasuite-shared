@@ -400,6 +400,17 @@
     "keywords_add_placeholder": "Nhập một từ, nhấn Enter",
     "tags": "Thẻ",
     "save": "Lưu",
-    "saved": "Đã lưu"
+    "saved": "Đã lưu",
+    "status": "Trạng thái",
+    "document_type": "Loại tài liệu",
+    "document_type_placeholder": "vd: Hóa đơn, Hợp đồng, Giấy chứng nhận bảo hiểm",
+    "visibility_inbox": "Hộp thư đến",
+    "visibility_normal": "Thư viện",
+    "visibility_background": "Nền (không hiển thị trong duyệt mặc định)",
+    "keep_in_library": "Giữ trong Thư viện",
+    "visible_to": "Hiển thị cho",
+    "visible_to_everyone": "Mọi người",
+    "visible_to_help_everyone": "Mọi người trong workspace đều có thể xem mục này. Chọn vai trò bên dưới để giới hạn.",
+    "visible_to_help_restricted": "Chỉ giới hạn cho các vai trò đã chọn bên dưới (Owner/Super Admin luôn có thể xem mọi thứ)."
   }
 }

@@ -99,3 +99,83 @@ user other than the caller:
 - If that check is missing, it's the same bug class as the
   `accountUpdateUserProfile` incident above — copy the
   `assertCallerCanChangeUserEmail` pattern rather than inventing a new one.
+
+# Role/permission audit 2026-08-27: UserInvitePage.tsx is dead code — the real bugs live in each app's own local invite page
+
+User pasted an external ("GPT") role/permission hardening plan and asked
+for a code-grounded review before implementation. Investigating GPT's
+"Invite preset privilege-escalation" claims led to discovering
+`src/components/users/UserInvitePage.tsx` — the shared Invite UI
+component with its own `applyPreset`/`rolesForApp` logic — is **not
+imported by any of the 4 app repos** (joabooks/joaoffice/joasop/joahr each
+hand-roll their own local `src/routes/app.people.invite.tsx` instead, with
+`joabooks`/`joasop`/`joahr`'s copies byte-identical to what this component
+had, and joaoffice's structurally different). Fixed the bugs here anyway
+(for correctness / in case this component is ever wired up), but the
+*actually live* fixes are in each app's own local file — see joabooks'
+CLAUDE.md for the full audit writeup.
+
+Fixed:
+- `applyPreset`'s `"manager"` case fell back to `"super_admin"` for any
+  app with no explicit mapping (joaoffice/joahr) instead of their real,
+  lower-privilege `"manager"` role.
+- `"field_tech"` granted joabooks `"approver"` (financial approval) by
+  default — now `null`.
+- `rolesForApp`'s unknown-app-code fallback
+  (`?? ["owner","super_admin","approver"]`) now fails closed (`?? []`).
+- `"owner_admin"`'s `rolesForApp(appCode)[0] ?? null` fallback (GPT's
+  claimed "first role in array" escalation) removed — was unreachable
+  dead code today (every real app's role array starts with `"owner"`),
+  but removed as defense-in-depth for any future app added to
+  `ROLES_BY_APP` without `"owner"` listed first.
+
+`ROLES_BY_APP.joahr` was also found missing `payroll_manager`/
+`scheduler`/`time_approver`/`read_only` — 4 real, `app_role`-enum-backed
+roles JoaHR's own `joahr-access.ts` actively uses that were never exposed
+in this shared catalog. Added.
+
+# Library access control: allowed-roles allow-list, not a hierarchy — 2026-08-27
+
+User asked for a per-Library-item access restriction ("visible to
+everyone by default, but if you pick a role, only that role or above can
+see it"). Before implementing, confirmed via `AskUserQuestion` that "role
+or above" can't be built literally: this codebase has **no role hierarchy
+anywhere** — every permission check (`has_role`/`has_any_role`/
+`is_internal_staff`/etc.) is set-membership against a hardcoded role
+list, never an ordered/ranked comparison (re-confirmed during the same
+day's role/permission audit, see the entry above). The user chose an
+explicit multi-select role allow-list over introducing a brand-new,
+Library-only tier hierarchy that would exist nowhere else in the
+codebase.
+
+Also resolved without needing to ask: "visible to everyone" only ever
+means internal tenant members. JoaBooks' `/app/documents` (Library) is
+already unreachable by vendor/approver/customer portal users —
+`app.tsx`'s route guard redirects `isVendor` away from any `/app/*` path
+outside a small allow-list (`/app/payment-requests/*`, account pages),
+and Library isn't in it; same shape for `isApprover`. So this feature
+only ever needs to reason about internal-staff role rows, never
+portal-flavored ones.
+
+**Shipped**: `ContentItem.allowedRoles: string[]` (empty = unrestricted,
+the default). `ContentMetadataPanel` gained a "Visible to" row (read-only:
+"Everyone" or a badge list of role labels) and, in edit mode, a checkbox
+grid of `ROLES_BY_APP[item.sourceApp]` — **owner/super_admin are
+deliberately excluded from the checkbox list itself**, not because
+they're denied, but because they always bypass this check regardless
+(same convention as every other role gate in this schema), so listing
+them as selectable would be misleading. `ContentMetadataPatch` gained
+`allowedRoles?: string[]`, flowing through the existing generic
+`onSaveMetadata` plumbing — no `ContentDetail`/`ContentMetadataPanel`
+prop-surface change needed beyond the new field itself.
+
+**Enforcement is in the DB, not just the UI** — see joabooks' CLAUDE.md
+for the `user_can_view_content()` migration this depends on
+(`content_items.allowed_roles`, checked before the existing
+content_relations-based visibility logic, scoped to the item's own
+`source_app` so a role granted in an unrelated app can't satisfy it).
+That same migration also fixes a bug this feature's "visible to everyone
+by default" premise depended on: a content_item with zero
+`content_relations` (e.g. a freshly-uploaded Inbox item) previously
+returned `false` for anyone but its creator — the opposite of "everyone
+can see it by default." Fixed to return `is_tenant_member()` instead.

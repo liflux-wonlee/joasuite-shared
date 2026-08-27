@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useJoaSuite } from "../context";
 import type { ContentItem } from "../lib/content-core-types";
+import { ROLES_BY_APP, roleLabel } from "../constants";
 
 export type ContentMetadataPatch = {
   title?: string | null;
@@ -11,6 +12,9 @@ export type ContentMetadataPatch = {
   documentDate?: string | null;
   expirationDate?: string | null;
   keywords?: string[];
+  documentType?: string | null;
+  /** Empty = visible to everyone (default). Non-empty = restricted to holders of at least one listed role. */
+  allowedRoles?: string[];
 };
 
 export type ContentMetadataPanelProps = {
@@ -36,7 +40,7 @@ export type ContentMetadataPanelProps = {
 export function ContentMetadataPanel({ item, addedByLabel, formatDate, onSave, renderTagsEditor }: ContentMetadataPanelProps) {
   const { t } = useTranslation();
   const { ui } = useJoaSuite();
-  const { Button, Input, Label, Textarea, Badge } = ui;
+  const { Button, Input, Label, Textarea, Badge, Checkbox } = ui;
 
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -48,10 +52,20 @@ export function ContentMetadataPanel({ item, addedByLabel, formatDate, onSave, r
     documentDate: item.documentDate,
     expirationDate: item.expirationDate,
     keywords: item.keywords ?? [],
+    documentType: item.documentType,
+    allowedRoles: item.allowedRoles ?? [],
   });
   const [keywordInput, setKeywordInput] = useState("");
 
   const fmt = formatDate ?? ((s: string | null | undefined) => s ?? "");
+
+  // Roles selectable for restricting this item, scoped to its own
+  // sourceApp -- owner/super_admin are deliberately excluded from the list
+  // itself since they always bypass this check regardless (see
+  // user_can_view_content()'s own comment), not because they're denied.
+  const selectableRoles = (
+    (ROLES_BY_APP as Record<string, string[]>)[item.sourceApp] ?? []
+  ).filter((r) => r !== "owner" && r !== "super_admin");
 
   function startEdit() {
     setForm({
@@ -62,9 +76,18 @@ export function ContentMetadataPanel({ item, addedByLabel, formatDate, onSave, r
       documentDate: item.documentDate,
       expirationDate: item.expirationDate,
       keywords: item.keywords ?? [],
+      documentType: item.documentType,
+      allowedRoles: item.allowedRoles ?? [],
     });
     setKeywordInput("");
     setEditing(true);
+  }
+
+  function toggleAllowedRole(role: string) {
+    setForm((f) => {
+      const cur = f.allowedRoles ?? [];
+      return { ...f, allowedRoles: cur.includes(role) ? cur.filter((r) => r !== role) : [...cur, role] };
+    });
   }
 
   function addKeyword() {
@@ -97,6 +120,12 @@ export function ContentMetadataPanel({ item, addedByLabel, formatDate, onSave, r
       </div>
     ) : null;
 
+  const visibilityLabel = {
+    inbox: t("content_core.visibility_inbox", "Inbox"),
+    normal: t("content_core.visibility_normal", "Library"),
+    background: t("content_core.visibility_background", "Background (not shown in default browsing)"),
+  }[item.libraryVisibility];
+
   return (
     <div className="space-y-3 rounded-lg border p-3">
       <div className="flex items-center justify-between">
@@ -110,6 +139,22 @@ export function ContentMetadataPanel({ item, addedByLabel, formatDate, onSave, r
 
       {!editing && (
         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+          {row(String(t("content_core.status", "Status")), visibilityLabel)}
+          {row(
+            String(t("content_core.visible_to", "Visible to")),
+            item.allowedRoles?.length ? (
+              <div className="flex flex-wrap gap-1">
+                {item.allowedRoles.map((r) => (
+                  <Badge key={r} variant="secondary" className="text-xs">
+                    {roleLabel(r)}
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              String(t("content_core.visible_to_everyone", "Everyone"))
+            ),
+          )}
+          {row(String(t("content_core.document_type", "Document type")), item.documentType)}
           {row(String(t("content_core.author", "Author")), item.author)}
           {row(String(t("content_core.origin_label", "Origin")), item.originLabel)}
           {row(String(t("content_core.added_by", "Added by")), addedByLabel)}
@@ -148,6 +193,15 @@ export function ContentMetadataPanel({ item, addedByLabel, formatDate, onSave, r
               />
             </div>
             <div className="space-y-1">
+              <Label className="text-xs">{t("content_core.document_type", "Document type")}</Label>
+              <Input
+                value={form.documentType ?? ""}
+                onChange={(e: any) => setForm((f) => ({ ...f, documentType: e.target.value }))}
+                placeholder={String(t("content_core.document_type_placeholder", "e.g. Invoice, Contract, Insurance Certificate"))}
+                maxLength={120}
+              />
+            </div>
+            <div className="space-y-1">
               <Label className="text-xs">{t("content_core.author", "Author")}</Label>
               <Input
                 value={form.author ?? ""}
@@ -182,6 +236,27 @@ export function ContentMetadataPanel({ item, addedByLabel, formatDate, onSave, r
               />
             </div>
           </div>
+          {selectableRoles.length > 0 && (
+            <div className="space-y-1">
+              <Label className="text-xs">{t("content_core.visible_to", "Visible to")}</Label>
+              <p className="text-xs text-muted-foreground">
+                {(form.allowedRoles ?? []).length === 0
+                  ? t("content_core.visible_to_help_everyone", "Everyone in the workspace can see this item. Check roles below to restrict it.")
+                  : t("content_core.visible_to_help_restricted", "Restricted to the checked roles below (Owner/Super Admin can always see everything).")}
+              </p>
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                {selectableRoles.map((r) => (
+                  <label key={r} className="flex items-center gap-1.5 text-sm">
+                    <Checkbox
+                      checked={(form.allowedRoles ?? []).includes(r)}
+                      onCheckedChange={() => toggleAllowedRole(r)}
+                    />
+                    {roleLabel(r)}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="space-y-1">
             <Label className="text-xs">{t("content_core.description_label", "Description")}</Label>
             <Textarea

@@ -921,6 +921,12 @@ type ContentItem = {
     originLabel: string | null;
     /** User-entered free-form search terms, distinct from tags (a shared, reusable vocabulary). */
     keywords: string[];
+    /** Optional business/document classification (Invoice, Contract, Insurance Certificate, ...), distinct from contentType (file vs external_link -- what KIND of container this is). */
+    documentType: string | null;
+    /** Default-browsing tier -- see content_items.library_visibility's own migration comment. Orthogonal to archivedAt and to relations. */
+    libraryVisibility: "inbox" | "normal" | "background";
+    /** Empty = visible to every tenant member (default). Non-empty = restricted to members holding at least one of these roles (owner/super_admin always bypass). No hierarchy -- this codebase has none; see content_items.allowed_roles's own migration comment. */
+    allowedRoles: string[];
     currentVersionId: string | null;
     createdBy: string | null;
     createdAt: string;
@@ -1208,6 +1214,9 @@ type ContentMetadataPatch = {
     documentDate?: string | null;
     expirationDate?: string | null;
     keywords?: string[];
+    documentType?: string | null;
+    /** Empty = visible to everyone (default). Non-empty = restricted to holders of at least one listed role. */
+    allowedRoles?: string[];
 };
 type ContentMetadataPanelProps = {
     item: ContentItem;
@@ -1268,6 +1277,15 @@ type ContentDetailProps = {
     onSaveMetadata?: (patch: ContentMetadataPatch) => Promise<void>;
     /** Host-rendered tag editor (e.g. joabooks' TagPicker) -- kept as an injected slot since tag vocabulary/creation is app-specific. */
     renderTagsEditor?: () => React.ReactNode;
+    /**
+     * File Library redesign, Library Visibility model -- pass this when
+     * item.libraryVisibility === "background" to show a "Keep in Library"
+     * action that promotes it to "normal" (first-class Library content).
+     * Omit (or the item isn't background) to hide the button entirely --
+     * matches onDeletePermanently's "only show when it's actually legal"
+     * convention.
+     */
+    onPromoteToLibrary?: () => Promise<void>;
 };
 /**
  * Composed detail view for one content item: header metadata, versions,
@@ -1279,7 +1297,7 @@ type ContentDetailProps = {
  * an app is free to use those smaller pieces directly instead of this
  * composition if its own detail page layout differs.
  */
-declare function ContentDetail({ item, versions, relations, relationProvider, onLinkRelation, onUnlinkRelation, onNavigateRelation, onOpenVersion, onArchive, onUnarchive, onDeletePermanently, formatSize, formatDate, labels, addedByLabel, onSaveMetadata, renderTagsEditor, }: ContentDetailProps): react.JSX.Element;
+declare function ContentDetail({ item, versions, relations, relationProvider, onLinkRelation, onUnlinkRelation, onNavigateRelation, onOpenVersion, onArchive, onUnarchive, onDeletePermanently, formatSize, formatDate, labels, addedByLabel, onSaveMetadata, renderTagsEditor, onPromoteToLibrary, }: ContentDetailProps): react.JSX.Element;
 
 declare function OrgStructureSettingsPage({ tenantId }: {
     tenantId: string;

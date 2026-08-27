@@ -412,6 +412,17 @@
     "keywords_add_placeholder": "단어 입력 후 Enter",
     "tags": "태그",
     "save": "저장",
-    "saved": "저장됨"
+    "saved": "저장됨",
+    "status": "상태",
+    "document_type": "문서 유형",
+    "document_type_placeholder": "예: 청구서, 계약서, 보험 증서",
+    "visibility_inbox": "받은함",
+    "visibility_normal": "라이브러리",
+    "visibility_background": "백그라운드 (기본 목록에 표시 안 됨)",
+    "keep_in_library": "라이브러리에 유지",
+    "visible_to": "열람 가능",
+    "visible_to_everyone": "전체 공개",
+    "visible_to_help_everyone": "워크스페이스의 모든 사용자가 이 항목을 볼 수 있습니다. 제한하려면 아래에서 역할을 선택하세요.",
+    "visible_to_help_restricted": "아래에서 선택한 역할로 제한됩니다 (Owner/Super Admin은 항상 모든 항목을 볼 수 있습니다)."
   }
 }

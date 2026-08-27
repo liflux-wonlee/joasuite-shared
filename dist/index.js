@@ -38,7 +38,19 @@ var ROLES_BY_APP = {
   joaoffice: ["owner", "super_admin", "admin", "hr_manager", "manager", "employee"],
   joaapproval: ["owner", "super_admin", "approver"],
   joacrm: ["owner", "super_admin", "approver"],
-  joahr: ["owner", "super_admin", "approver", "hr_manager", "manager", "employee", "billing_admin"]
+  joahr: [
+    "owner",
+    "super_admin",
+    "approver",
+    "hr_manager",
+    "manager",
+    "payroll_manager",
+    "scheduler",
+    "time_approver",
+    "read_only",
+    "employee",
+    "billing_admin"
+  ]
 };
 var SETTINGS_KV_APP_URL_KEYS = APP_CODES.map((c) => `app_url.${c}`);
 function roleLabel(role) {
@@ -479,7 +491,18 @@ var en_default = {
     keywords_add_placeholder: "Type a word, press Enter",
     tags: "Tags",
     save: "Save",
-    saved: "Saved"
+    saved: "Saved",
+    status: "Status",
+    document_type: "Document type",
+    document_type_placeholder: "e.g. Invoice, Contract, Insurance Certificate",
+    visibility_inbox: "Inbox",
+    visibility_normal: "Library",
+    visibility_background: "Background (not shown in default browsing)",
+    keep_in_library: "Keep in Library",
+    visible_to: "Visible to",
+    visible_to_everyone: "Everyone",
+    visible_to_help_everyone: "Everyone in the workspace can see this item. Check roles below to restrict it.",
+    visible_to_help_restricted: "Restricted to the checked roles below (Owner/Super Admin can always see everything)."
   }
 };
 
@@ -898,7 +921,18 @@ var ko_default = {
     keywords_add_placeholder: "\uB2E8\uC5B4 \uC785\uB825 \uD6C4 Enter",
     tags: "\uD0DC\uADF8",
     save: "\uC800\uC7A5",
-    saved: "\uC800\uC7A5\uB428"
+    saved: "\uC800\uC7A5\uB428",
+    status: "\uC0C1\uD0DC",
+    document_type: "\uBB38\uC11C \uC720\uD615",
+    document_type_placeholder: "\uC608: \uCCAD\uAD6C\uC11C, \uACC4\uC57D\uC11C, \uBCF4\uD5D8 \uC99D\uC11C",
+    visibility_inbox: "\uBC1B\uC740\uD568",
+    visibility_normal: "\uB77C\uC774\uBE0C\uB7EC\uB9AC",
+    visibility_background: "\uBC31\uADF8\uB77C\uC6B4\uB4DC (\uAE30\uBCF8 \uBAA9\uB85D\uC5D0 \uD45C\uC2DC \uC548 \uB428)",
+    keep_in_library: "\uB77C\uC774\uBE0C\uB7EC\uB9AC\uC5D0 \uC720\uC9C0",
+    visible_to: "\uC5F4\uB78C \uAC00\uB2A5",
+    visible_to_everyone: "\uC804\uCCB4 \uACF5\uAC1C",
+    visible_to_help_everyone: "\uC6CC\uD06C\uC2A4\uD398\uC774\uC2A4\uC758 \uBAA8\uB4E0 \uC0AC\uC6A9\uC790\uAC00 \uC774 \uD56D\uBAA9\uC744 \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uC81C\uD55C\uD558\uB824\uBA74 \uC544\uB798\uC5D0\uC11C \uC5ED\uD560\uC744 \uC120\uD0DD\uD558\uC138\uC694.",
+    visible_to_help_restricted: "\uC544\uB798\uC5D0\uC11C \uC120\uD0DD\uD55C \uC5ED\uD560\uB85C \uC81C\uD55C\uB429\uB2C8\uB2E4 (Owner/Super Admin\uC740 \uD56D\uC0C1 \uBAA8\uB4E0 \uD56D\uBAA9\uC744 \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4)."
   }
 };
 
@@ -1302,7 +1336,18 @@ var zh_default = {
     keywords_add_placeholder: "\u8F93\u5165\u8BCD\u8BED\u540E\u6309 Enter",
     tags: "\u6807\u7B7E",
     save: "\u4FDD\u5B58",
-    saved: "\u5DF2\u4FDD\u5B58"
+    saved: "\u5DF2\u4FDD\u5B58",
+    status: "\u72B6\u6001",
+    document_type: "\u6587\u6863\u7C7B\u578B",
+    document_type_placeholder: "\u4F8B\u5982:\u53D1\u7968\u3001\u5408\u540C\u3001\u4FDD\u9669\u8BC1\u4E66",
+    visibility_inbox: "\u6536\u4EF6\u7BB1",
+    visibility_normal: "\u6587\u4EF6\u5E93",
+    visibility_background: "\u540E\u53F0(\u9ED8\u8BA4\u6D4F\u89C8\u4E2D\u4E0D\u663E\u793A)",
+    keep_in_library: "\u4FDD\u7559\u5728\u6587\u4EF6\u5E93\u4E2D",
+    visible_to: "\u53EF\u89C1\u8303\u56F4",
+    visible_to_everyone: "\u6240\u6709\u4EBA",
+    visible_to_help_everyone: "\u5DE5\u4F5C\u533A\u5185\u6240\u6709\u4EBA\u90FD\u53EF\u4EE5\u770B\u5230\u6B64\u9879\u76EE\u3002\u52FE\u9009\u4E0B\u9762\u7684\u89D2\u8272\u4EE5\u9650\u5236\u8BBF\u95EE\u3002",
+    visible_to_help_restricted: "\u4EC5\u9650\u52FE\u9009\u7684\u89D2\u8272\u67E5\u770B(Owner/Super Admin \u59CB\u7EC8\u53EF\u4EE5\u67E5\u770B\u6240\u6709\u5185\u5BB9)\u3002"
   }
 };
 
@@ -1709,7 +1754,18 @@ var es_default = {
     keywords_add_placeholder: "Escriba una palabra y presione Enter",
     tags: "Etiquetas",
     save: "Guardar",
-    saved: "Guardado"
+    saved: "Guardado",
+    status: "Estado",
+    document_type: "Tipo de documento",
+    document_type_placeholder: "p. ej. Factura, Contrato, Certificado de seguro",
+    visibility_inbox: "Bandeja de entrada",
+    visibility_normal: "Biblioteca",
+    visibility_background: "Segundo plano (no se muestra en la navegaci\xF3n predeterminada)",
+    keep_in_library: "Mantener en la biblioteca",
+    visible_to: "Visible para",
+    visible_to_everyone: "Todos",
+    visible_to_help_everyone: "Todos en el espacio de trabajo pueden ver este elemento. Marca roles abajo para restringirlo.",
+    visible_to_help_restricted: "Restringido a los roles marcados abajo (Owner/Super Admin siempre pueden ver todo)."
   }
 };
 
@@ -2116,7 +2172,18 @@ var vi_default = {
     keywords_add_placeholder: "Nh\u1EADp m\u1ED9t t\u1EEB, nh\u1EA5n Enter",
     tags: "Th\u1EBB",
     save: "L\u01B0u",
-    saved: "\u0110\xE3 l\u01B0u"
+    saved: "\u0110\xE3 l\u01B0u",
+    status: "Tr\u1EA1ng th\xE1i",
+    document_type: "Lo\u1EA1i t\xE0i li\u1EC7u",
+    document_type_placeholder: "vd: H\xF3a \u0111\u01A1n, H\u1EE3p \u0111\u1ED3ng, Gi\u1EA5y ch\u1EE9ng nh\u1EADn b\u1EA3o hi\u1EC3m",
+    visibility_inbox: "H\u1ED9p th\u01B0 \u0111\u1EBFn",
+    visibility_normal: "Th\u01B0 vi\u1EC7n",
+    visibility_background: "N\u1EC1n (kh\xF4ng hi\u1EC3n th\u1ECB trong duy\u1EC7t m\u1EB7c \u0111\u1ECBnh)",
+    keep_in_library: "Gi\u1EEF trong Th\u01B0 vi\u1EC7n",
+    visible_to: "Hi\u1EC3n th\u1ECB cho",
+    visible_to_everyone: "M\u1ECDi ng\u01B0\u1EDDi",
+    visible_to_help_everyone: "M\u1ECDi ng\u01B0\u1EDDi trong workspace \u0111\u1EC1u c\xF3 th\u1EC3 xem m\u1EE5c n\xE0y. Ch\u1ECDn vai tr\xF2 b\xEAn d\u01B0\u1EDBi \u0111\u1EC3 gi\u1EDBi h\u1EA1n.",
+    visible_to_help_restricted: "Ch\u1EC9 gi\u1EDBi h\u1EA1n cho c\xE1c vai tr\xF2 \u0111\xE3 ch\u1ECDn b\xEAn d\u01B0\u1EDBi (Owner/Super Admin lu\xF4n c\xF3 th\u1EC3 xem m\u1ECDi th\u1EE9)."
   }
 };
 
@@ -3557,22 +3624,22 @@ function UserListPage() {
   ] });
 }
 function rolesForApp(code) {
-  return ROLES_BY_APP[code] ?? ["owner", "super_admin", "approver"];
+  return ROLES_BY_APP[code] ?? [];
 }
 function applyPreset(preset, appCode) {
   switch (preset) {
     case "owner_admin":
       if (rolesForApp(appCode).includes("owner")) return "owner";
-      return rolesForApp(appCode)[0] ?? null;
+      return null;
     case "manager":
       if (appCode === "joabooks") return "finance_manager";
       if (appCode === "joasop") return "sop_admin";
-      return "super_admin";
+      if (rolesForApp(appCode).includes("manager")) return "manager";
+      return null;
     case "finance_staff":
       if (appCode === "joabooks") return "finance_ap";
       return null;
     case "field_tech":
-      if (appCode === "joabooks") return "approver";
       return null;
     case "approver":
       if (appCode === "joasop") return "sop_reviewer";
@@ -5179,7 +5246,7 @@ function ContentUploader({
 function ContentMetadataPanel({ item, addedByLabel, formatDate: formatDate3, onSave, renderTagsEditor }) {
   const { t } = useTranslation();
   const { ui } = useJoaSuite();
-  const { Button, Input, Label, Textarea, Badge } = ui;
+  const { Button, Input, Label, Textarea, Badge, Checkbox } = ui;
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
@@ -5189,10 +5256,13 @@ function ContentMetadataPanel({ item, addedByLabel, formatDate: formatDate3, onS
     originLabel: item.originLabel,
     documentDate: item.documentDate,
     expirationDate: item.expirationDate,
-    keywords: item.keywords ?? []
+    keywords: item.keywords ?? [],
+    documentType: item.documentType,
+    allowedRoles: item.allowedRoles ?? []
   });
   const [keywordInput, setKeywordInput] = useState("");
   const fmt2 = formatDate3 ?? ((s) => s ?? "");
+  const selectableRoles = (ROLES_BY_APP[item.sourceApp] ?? []).filter((r) => r !== "owner" && r !== "super_admin");
   function startEdit() {
     setForm({
       title: item.title,
@@ -5201,10 +5271,18 @@ function ContentMetadataPanel({ item, addedByLabel, formatDate: formatDate3, onS
       originLabel: item.originLabel,
       documentDate: item.documentDate,
       expirationDate: item.expirationDate,
-      keywords: item.keywords ?? []
+      keywords: item.keywords ?? [],
+      documentType: item.documentType,
+      allowedRoles: item.allowedRoles ?? []
     });
     setKeywordInput("");
     setEditing(true);
+  }
+  function toggleAllowedRole(role) {
+    setForm((f) => {
+      const cur = f.allowedRoles ?? [];
+      return { ...f, allowedRoles: cur.includes(role) ? cur.filter((r) => r !== role) : [...cur, role] };
+    });
   }
   function addKeyword() {
     const k = keywordInput.trim();
@@ -5229,12 +5307,23 @@ function ContentMetadataPanel({ item, addedByLabel, formatDate: formatDate3, onS
     /* @__PURE__ */ jsx("span", { className: "text-xs text-muted-foreground", children: label }),
     /* @__PURE__ */ jsx("span", { className: "text-sm", children: value })
   ] }) : null;
+  const visibilityLabel = {
+    inbox: t("content_core.visibility_inbox", "Inbox"),
+    normal: t("content_core.visibility_normal", "Library"),
+    background: t("content_core.visibility_background", "Background (not shown in default browsing)")
+  }[item.libraryVisibility];
   return /* @__PURE__ */ jsxs("div", { className: "space-y-3 rounded-lg border p-3", children: [
     /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between", children: [
       /* @__PURE__ */ jsx("h4", { className: "text-sm font-medium", children: t("content_core.details", "Details") }),
       onSave && !editing && /* @__PURE__ */ jsx(Button, { size: "sm", variant: "ghost", onClick: startEdit, children: t("content_core.edit_details", "Edit details") })
     ] }),
     !editing && /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-x-4 gap-y-2", children: [
+      row(String(t("content_core.status", "Status")), visibilityLabel),
+      row(
+        String(t("content_core.visible_to", "Visible to")),
+        item.allowedRoles?.length ? /* @__PURE__ */ jsx("div", { className: "flex flex-wrap gap-1", children: item.allowedRoles.map((r) => /* @__PURE__ */ jsx(Badge, { variant: "secondary", className: "text-xs", children: roleLabel(r) }, r)) }) : String(t("content_core.visible_to_everyone", "Everyone"))
+      ),
+      row(String(t("content_core.document_type", "Document type")), item.documentType),
       row(String(t("content_core.author", "Author")), item.author),
       row(String(t("content_core.origin_label", "Origin")), item.originLabel),
       row(String(t("content_core.added_by", "Added by")), addedByLabel),
@@ -5259,6 +5348,18 @@ function ContentMetadataPanel({ item, addedByLabel, formatDate: formatDate3, onS
               value: form.title ?? "",
               onChange: (e) => setForm((f) => ({ ...f, title: e.target.value })),
               maxLength: 300
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+          /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.document_type", "Document type") }),
+          /* @__PURE__ */ jsx(
+            Input,
+            {
+              value: form.documentType ?? "",
+              onChange: (e) => setForm((f) => ({ ...f, documentType: e.target.value })),
+              placeholder: String(t("content_core.document_type_placeholder", "e.g. Invoice, Contract, Insurance Certificate")),
+              maxLength: 120
             }
           )
         ] }),
@@ -5308,6 +5409,20 @@ function ContentMetadataPanel({ item, addedByLabel, formatDate: formatDate3, onS
             }
           )
         ] })
+      ] }),
+      selectableRoles.length > 0 && /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+        /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.visible_to", "Visible to") }),
+        /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground", children: (form.allowedRoles ?? []).length === 0 ? t("content_core.visible_to_help_everyone", "Everyone in the workspace can see this item. Check roles below to restrict it.") : t("content_core.visible_to_help_restricted", "Restricted to the checked roles below (Owner/Super Admin can always see everything).") }),
+        /* @__PURE__ */ jsx("div", { className: "grid grid-cols-2 gap-1.5 sm:grid-cols-3", children: selectableRoles.map((r) => /* @__PURE__ */ jsxs("label", { className: "flex items-center gap-1.5 text-sm", children: [
+          /* @__PURE__ */ jsx(
+            Checkbox,
+            {
+              checked: (form.allowedRoles ?? []).includes(r),
+              onCheckedChange: () => toggleAllowedRole(r)
+            }
+          ),
+          roleLabel(r)
+        ] }, r)) })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
         /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.description_label", "Description") }),
@@ -5375,11 +5490,12 @@ function ContentDetail({
   labels,
   addedByLabel,
   onSaveMetadata,
-  renderTagsEditor
+  renderTagsEditor,
+  onPromoteToLibrary
 }) {
   const { t } = useTranslation();
   const { ui } = useJoaSuite();
-  const { Badge } = ui;
+  const { Badge, Button } = ui;
   return /* @__PURE__ */ jsxs("div", { className: "space-y-6", children: [
     /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
       /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
@@ -5397,7 +5513,8 @@ function ContentDetail({
         formatDate3 ? formatDate3(item.createdAt) : item.createdAt
       ] })
     ] }),
-    (onArchive || onDeletePermanently) && /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+    (onArchive || onDeletePermanently || onPromoteToLibrary && item.libraryVisibility === "background") && /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+      onPromoteToLibrary && item.libraryVisibility === "background" && /* @__PURE__ */ jsx(Button, { size: "sm", variant: "outline", onClick: onPromoteToLibrary, children: t("content_core.keep_in_library", "Keep in Library") }),
       onArchive && /* @__PURE__ */ jsx(ArchiveContentAction, { archived: !!item.archivedAt, onArchive, onUnarchive }),
       onDeletePermanently && /* @__PURE__ */ jsx(DeletePermanentlyAction, { onDelete: onDeletePermanently })
     ] }),

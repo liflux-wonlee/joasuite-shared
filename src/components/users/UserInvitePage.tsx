@@ -8,24 +8,36 @@ import { ROLES_BY_APP, roleLabel } from "../../constants";
 import type { InvitePresetKey, ManageableTenant } from "../../types";
 
 function rolesForApp(code: string): string[] {
-  return (ROLES_BY_APP as Record<string, string[]>)[code] ?? ["owner", "super_admin", "approver"];
+  // Deny-by-default: an app code with no entry in ROLES_BY_APP gets no
+  // roles offered at all, never a privileged guess.
+  return (ROLES_BY_APP as Record<string, string[]>)[code] ?? [];
 }
 
 function applyPreset(preset: InvitePresetKey, appCode: string): string | null {
-  // returns role for this app, or null = no access
+  // returns role for this app, or null = no access. Every branch here must
+  // fail closed: an app with no explicit mapping for a preset gets NO role,
+  // never a fallback to a more-privileged one (owner/super_admin/etc).
   switch (preset) {
     case "owner_admin":
       if (rolesForApp(appCode).includes("owner")) return "owner";
-      return rolesForApp(appCode)[0] ?? null;
+      return null;
     case "manager":
       if (appCode === "joabooks") return "finance_manager";
       if (appCode === "joasop") return "sop_admin";
-      return "super_admin";
+      // "manager" is a real, lower-privilege role for joaoffice/joahr,
+      // distinct from hr_manager (which has broader HR-data access) --
+      // the Manager preset should land on "manager", never escalate to
+      // super_admin just because there's no bespoke mapping here.
+      if (rolesForApp(appCode).includes("manager")) return "manager";
+      return null;
     case "finance_staff":
       if (appCode === "joabooks") return "finance_ap";
       return null;
     case "field_tech":
-      if (appCode === "joabooks") return "approver";
+      // No app currently has a low-privilege "field" role to map to --
+      // joabooks' "approver" (financial approval authority) was wrong
+      // here, so this preset intentionally grants nothing until a real
+      // low-privilege role exists to point it at.
       return null;
     case "approver":
       if (appCode === "joasop") return "sop_reviewer";

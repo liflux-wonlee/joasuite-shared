@@ -400,6 +400,17 @@
     "keywords_add_placeholder": "Escriba una palabra y presione Enter",
     "tags": "Etiquetas",
     "save": "Guardar",
-    "saved": "Guardado"
+    "saved": "Guardado",
+    "status": "Estado",
+    "document_type": "Tipo de documento",
+    "document_type_placeholder": "p. ej. Factura, Contrato, Certificado de seguro",
+    "visibility_inbox": "Bandeja de entrada",
+    "visibility_normal": "Biblioteca",
+    "visibility_background": "Segundo plano (no se muestra en la navegación predeterminada)",
+    "keep_in_library": "Mantener en la biblioteca",
+    "visible_to": "Visible para",
+    "visible_to_everyone": "Todos",
+    "visible_to_help_everyone": "Todos en el espacio de trabajo pueden ver este elemento. Marca roles abajo para restringirlo.",
+    "visible_to_help_restricted": "Restringido a los roles marcados abajo (Owner/Super Admin siempre pueden ver todo)."
   }
 }
