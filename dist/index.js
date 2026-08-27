@@ -4812,10 +4812,9 @@ function DocumentLibraryTable({
   loading,
   formatSize = defaultFormatSize,
   formatDate: formatDate3 = defaultFormatDate,
-  onOpen,
+  onOpenDetail,
   onNavigate,
-  onDelete,
-  onLink
+  onDelete
 }) {
   const { t } = useTranslation();
   const { ui } = useJoaSuite();
@@ -4832,39 +4831,48 @@ function DocumentLibraryTable({
     /* @__PURE__ */ jsxs("tbody", { children: [
       loading && /* @__PURE__ */ jsx("tr", { children: /* @__PURE__ */ jsx("td", { colSpan: 6, className: "px-4 py-8 text-center text-muted-foreground", children: t("doc_library.loading", "Loading\u2026") }) }),
       !loading && rows.length === 0 && /* @__PURE__ */ jsx("tr", { children: /* @__PURE__ */ jsx("td", { colSpan: 6, className: "px-4 py-10 text-center text-muted-foreground", children: t("doc_library.empty", "No documents yet.") }) }),
-      !loading && rows.map((r) => /* @__PURE__ */ jsxs("tr", { className: "border-b last:border-0 hover:bg-muted/40", children: [
-        /* @__PURE__ */ jsx("td", { className: "px-4 py-2.5 whitespace-nowrap text-muted-foreground", children: r.docKindLabel }),
-        /* @__PURE__ */ jsx("td", { className: "px-4 py-2.5 max-w-[240px]", children: /* @__PURE__ */ jsx(
-          "button",
-          {
-            type: "button",
-            onClick: () => onOpen?.(r),
-            className: "truncate block text-left hover:text-primary hover:underline",
-            title: r.filename,
-            children: r.filename
-          }
-        ) }),
-        /* @__PURE__ */ jsx("td", { className: "px-4 py-2.5 max-w-[220px]", children: r.linkedHref ? /* @__PURE__ */ jsx(
-          "button",
-          {
-            type: "button",
-            onClick: () => onNavigate?.(r),
-            className: "truncate block text-left text-primary hover:underline",
-            title: r.linkedLabel ?? void 0,
-            children: r.linkedLabel ?? "\u2014"
-          }
-        ) : /* @__PURE__ */ jsx("span", { className: "truncate block text-muted-foreground", title: r.linkedLabel ?? void 0, children: r.linkedLabel ?? "\u2014" }) }),
-        /* @__PURE__ */ jsxs("td", { className: "px-4 py-2.5 whitespace-nowrap text-muted-foreground", children: [
-          formatDate3(r.createdAt),
-          r.uploadedByLabel ? ` \xB7 ${r.uploadedByLabel}` : ""
-        ] }),
-        /* @__PURE__ */ jsx("td", { className: "px-4 py-2.5 whitespace-nowrap text-muted-foreground", children: formatSize(r.size) }),
-        /* @__PURE__ */ jsx("td", { className: "px-4 py-2.5", children: /* @__PURE__ */ jsxs("div", { className: "flex justify-end gap-1", children: [
-          onOpen && /* @__PURE__ */ jsx(Button, { variant: "ghost", size: "sm", onClick: () => onOpen(r), children: t("doc_library.open", "Open") }),
-          onLink && /* @__PURE__ */ jsx(Button, { variant: "ghost", size: "sm", onClick: () => onLink(r), children: t("content_core.link_to_record", "Link to record") }),
-          onDelete && /* @__PURE__ */ jsx(Button, { variant: "ghost", size: "sm", onClick: () => onDelete(r), children: t("doc_library.delete", "Delete") })
-        ] }) })
-      ] }, r.id))
+      !loading && rows.map((r) => /* @__PURE__ */ jsxs(
+        "tr",
+        {
+          onClick: () => onOpenDetail?.(r),
+          className: `border-b last:border-0 hover:bg-muted/40 ${onOpenDetail ? "cursor-pointer" : ""}`,
+          children: [
+            /* @__PURE__ */ jsx("td", { className: "px-4 py-2.5 whitespace-nowrap text-muted-foreground", children: r.docKindLabel }),
+            /* @__PURE__ */ jsx("td", { className: "px-4 py-2.5 max-w-[240px]", children: /* @__PURE__ */ jsx("span", { className: "truncate block text-left", title: r.filename, children: r.filename }) }),
+            /* @__PURE__ */ jsx("td", { className: "px-4 py-2.5 max-w-[220px]", children: r.linkedHref ? /* @__PURE__ */ jsx(
+              "button",
+              {
+                type: "button",
+                onClick: (e) => {
+                  e.stopPropagation();
+                  onNavigate?.(r);
+                },
+                className: "truncate block text-left text-primary hover:underline",
+                title: r.linkedLabel ?? void 0,
+                children: r.linkedLabel ?? "\u2014"
+              }
+            ) : /* @__PURE__ */ jsx("span", { className: "truncate block text-muted-foreground", title: r.linkedLabel ?? void 0, children: r.linkedLabel ?? "\u2014" }) }),
+            /* @__PURE__ */ jsxs("td", { className: "px-4 py-2.5 whitespace-nowrap text-muted-foreground", children: [
+              formatDate3(r.createdAt),
+              r.uploadedByLabel ? ` \xB7 ${r.uploadedByLabel}` : ""
+            ] }),
+            /* @__PURE__ */ jsx("td", { className: "px-4 py-2.5 whitespace-nowrap text-muted-foreground", children: formatSize(r.size) }),
+            /* @__PURE__ */ jsx("td", { className: "px-4 py-2.5", children: onDelete && /* @__PURE__ */ jsx("div", { className: "flex justify-end gap-1", children: /* @__PURE__ */ jsx(
+              Button,
+              {
+                variant: "ghost",
+                size: "sm",
+                onClick: (e) => {
+                  e.stopPropagation();
+                  onDelete(r);
+                },
+                children: t("doc_library.delete", "Delete")
+              }
+            ) }) })
+          ]
+        },
+        r.id
+      ))
     ] })
   ] }) });
 }
