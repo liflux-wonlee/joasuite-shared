@@ -99,3 +99,37 @@ user other than the caller:
 - If that check is missing, it's the same bug class as the
   `accountUpdateUserProfile` incident above — copy the
   `assertCallerCanChangeUserEmail` pattern rather than inventing a new one.
+
+# Role/permission audit 2026-08-27: UserInvitePage.tsx is dead code — the real bugs live in each app's own local invite page
+
+User pasted an external ("GPT") role/permission hardening plan and asked
+for a code-grounded review before implementation. Investigating GPT's
+"Invite preset privilege-escalation" claims led to discovering
+`src/components/users/UserInvitePage.tsx` — the shared Invite UI
+component with its own `applyPreset`/`rolesForApp` logic — is **not
+imported by any of the 4 app repos** (joabooks/joaoffice/joasop/joahr each
+hand-roll their own local `src/routes/app.people.invite.tsx` instead, with
+`joabooks`/`joasop`/`joahr`'s copies byte-identical to what this component
+had, and joaoffice's structurally different). Fixed the bugs here anyway
+(for correctness / in case this component is ever wired up), but the
+*actually live* fixes are in each app's own local file — see joabooks'
+CLAUDE.md for the full audit writeup.
+
+Fixed:
+- `applyPreset`'s `"manager"` case fell back to `"super_admin"` for any
+  app with no explicit mapping (joaoffice/joahr) instead of their real,
+  lower-privilege `"manager"` role.
+- `"field_tech"` granted joabooks `"approver"` (financial approval) by
+  default — now `null`.
+- `rolesForApp`'s unknown-app-code fallback
+  (`?? ["owner","super_admin","approver"]`) now fails closed (`?? []`).
+- `"owner_admin"`'s `rolesForApp(appCode)[0] ?? null` fallback (GPT's
+  claimed "first role in array" escalation) removed — was unreachable
+  dead code today (every real app's role array starts with `"owner"`),
+  but removed as defense-in-depth for any future app added to
+  `ROLES_BY_APP` without `"owner"` listed first.
+
+`ROLES_BY_APP.joahr` was also found missing `payroll_manager`/
+`scheduler`/`time_approver`/`read_only` — 4 real, `app_role`-enum-backed
+roles JoaHR's own `joahr-access.ts` actively uses that were never exposed
+in this shared catalog. Added.
