@@ -422,6 +422,10 @@
     "visibility_inbox": "Inbox",
     "visibility_normal": "Library",
     "visibility_background": "Background (not shown in default browsing)",
-    "keep_in_library": "Keep in Library"
+    "keep_in_library": "Keep in Library",
+    "visible_to": "Visible to",
+    "visible_to_everyone": "Everyone",
+    "visible_to_help_everyone": "Everyone in the workspace can see this item. Check roles below to restrict it.",
+    "visible_to_help_restricted": "Restricted to the checked roles below (Owner/Super Admin can always see everything)."
   }
 }

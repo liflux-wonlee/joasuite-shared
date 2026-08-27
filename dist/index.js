@@ -498,7 +498,11 @@ var en_default = {
     visibility_inbox: "Inbox",
     visibility_normal: "Library",
     visibility_background: "Background (not shown in default browsing)",
-    keep_in_library: "Keep in Library"
+    keep_in_library: "Keep in Library",
+    visible_to: "Visible to",
+    visible_to_everyone: "Everyone",
+    visible_to_help_everyone: "Everyone in the workspace can see this item. Check roles below to restrict it.",
+    visible_to_help_restricted: "Restricted to the checked roles below (Owner/Super Admin can always see everything)."
   }
 };
 
@@ -924,7 +928,11 @@ var ko_default = {
     visibility_inbox: "\uBC1B\uC740\uD568",
     visibility_normal: "\uB77C\uC774\uBE0C\uB7EC\uB9AC",
     visibility_background: "\uBC31\uADF8\uB77C\uC6B4\uB4DC (\uAE30\uBCF8 \uBAA9\uB85D\uC5D0 \uD45C\uC2DC \uC548 \uB428)",
-    keep_in_library: "\uB77C\uC774\uBE0C\uB7EC\uB9AC\uC5D0 \uC720\uC9C0"
+    keep_in_library: "\uB77C\uC774\uBE0C\uB7EC\uB9AC\uC5D0 \uC720\uC9C0",
+    visible_to: "\uC5F4\uB78C \uAC00\uB2A5",
+    visible_to_everyone: "\uC804\uCCB4 \uACF5\uAC1C",
+    visible_to_help_everyone: "\uC6CC\uD06C\uC2A4\uD398\uC774\uC2A4\uC758 \uBAA8\uB4E0 \uC0AC\uC6A9\uC790\uAC00 \uC774 \uD56D\uBAA9\uC744 \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4. \uC81C\uD55C\uD558\uB824\uBA74 \uC544\uB798\uC5D0\uC11C \uC5ED\uD560\uC744 \uC120\uD0DD\uD558\uC138\uC694.",
+    visible_to_help_restricted: "\uC544\uB798\uC5D0\uC11C \uC120\uD0DD\uD55C \uC5ED\uD560\uB85C \uC81C\uD55C\uB429\uB2C8\uB2E4 (Owner/Super Admin\uC740 \uD56D\uC0C1 \uBAA8\uB4E0 \uD56D\uBAA9\uC744 \uBCFC \uC218 \uC788\uC2B5\uB2C8\uB2E4)."
   }
 };
 
@@ -1335,7 +1343,11 @@ var zh_default = {
     visibility_inbox: "\u6536\u4EF6\u7BB1",
     visibility_normal: "\u6587\u4EF6\u5E93",
     visibility_background: "\u540E\u53F0(\u9ED8\u8BA4\u6D4F\u89C8\u4E2D\u4E0D\u663E\u793A)",
-    keep_in_library: "\u4FDD\u7559\u5728\u6587\u4EF6\u5E93\u4E2D"
+    keep_in_library: "\u4FDD\u7559\u5728\u6587\u4EF6\u5E93\u4E2D",
+    visible_to: "\u53EF\u89C1\u8303\u56F4",
+    visible_to_everyone: "\u6240\u6709\u4EBA",
+    visible_to_help_everyone: "\u5DE5\u4F5C\u533A\u5185\u6240\u6709\u4EBA\u90FD\u53EF\u4EE5\u770B\u5230\u6B64\u9879\u76EE\u3002\u52FE\u9009\u4E0B\u9762\u7684\u89D2\u8272\u4EE5\u9650\u5236\u8BBF\u95EE\u3002",
+    visible_to_help_restricted: "\u4EC5\u9650\u52FE\u9009\u7684\u89D2\u8272\u67E5\u770B(Owner/Super Admin \u59CB\u7EC8\u53EF\u4EE5\u67E5\u770B\u6240\u6709\u5185\u5BB9)\u3002"
   }
 };
 
@@ -1749,7 +1761,11 @@ var es_default = {
     visibility_inbox: "Bandeja de entrada",
     visibility_normal: "Biblioteca",
     visibility_background: "Segundo plano (no se muestra en la navegaci\xF3n predeterminada)",
-    keep_in_library: "Mantener en la biblioteca"
+    keep_in_library: "Mantener en la biblioteca",
+    visible_to: "Visible para",
+    visible_to_everyone: "Todos",
+    visible_to_help_everyone: "Todos en el espacio de trabajo pueden ver este elemento. Marca roles abajo para restringirlo.",
+    visible_to_help_restricted: "Restringido a los roles marcados abajo (Owner/Super Admin siempre pueden ver todo)."
   }
 };
 
@@ -2163,7 +2179,11 @@ var vi_default = {
     visibility_inbox: "H\u1ED9p th\u01B0 \u0111\u1EBFn",
     visibility_normal: "Th\u01B0 vi\u1EC7n",
     visibility_background: "N\u1EC1n (kh\xF4ng hi\u1EC3n th\u1ECB trong duy\u1EC7t m\u1EB7c \u0111\u1ECBnh)",
-    keep_in_library: "Gi\u1EEF trong Th\u01B0 vi\u1EC7n"
+    keep_in_library: "Gi\u1EEF trong Th\u01B0 vi\u1EC7n",
+    visible_to: "Hi\u1EC3n th\u1ECB cho",
+    visible_to_everyone: "M\u1ECDi ng\u01B0\u1EDDi",
+    visible_to_help_everyone: "M\u1ECDi ng\u01B0\u1EDDi trong workspace \u0111\u1EC1u c\xF3 th\u1EC3 xem m\u1EE5c n\xE0y. Ch\u1ECDn vai tr\xF2 b\xEAn d\u01B0\u1EDBi \u0111\u1EC3 gi\u1EDBi h\u1EA1n.",
+    visible_to_help_restricted: "Ch\u1EC9 gi\u1EDBi h\u1EA1n cho c\xE1c vai tr\xF2 \u0111\xE3 ch\u1ECDn b\xEAn d\u01B0\u1EDBi (Owner/Super Admin lu\xF4n c\xF3 th\u1EC3 xem m\u1ECDi th\u1EE9)."
   }
 };
 
@@ -5226,7 +5246,7 @@ function ContentUploader({
 function ContentMetadataPanel({ item, addedByLabel, formatDate: formatDate3, onSave, renderTagsEditor }) {
   const { t } = useTranslation();
   const { ui } = useJoaSuite();
-  const { Button, Input, Label, Textarea, Badge } = ui;
+  const { Button, Input, Label, Textarea, Badge, Checkbox } = ui;
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
@@ -5237,10 +5257,12 @@ function ContentMetadataPanel({ item, addedByLabel, formatDate: formatDate3, onS
     documentDate: item.documentDate,
     expirationDate: item.expirationDate,
     keywords: item.keywords ?? [],
-    documentType: item.documentType
+    documentType: item.documentType,
+    allowedRoles: item.allowedRoles ?? []
   });
   const [keywordInput, setKeywordInput] = useState("");
   const fmt2 = formatDate3 ?? ((s) => s ?? "");
+  const selectableRoles = (ROLES_BY_APP[item.sourceApp] ?? []).filter((r) => r !== "owner" && r !== "super_admin");
   function startEdit() {
     setForm({
       title: item.title,
@@ -5250,10 +5272,17 @@ function ContentMetadataPanel({ item, addedByLabel, formatDate: formatDate3, onS
       documentDate: item.documentDate,
       expirationDate: item.expirationDate,
       keywords: item.keywords ?? [],
-      documentType: item.documentType
+      documentType: item.documentType,
+      allowedRoles: item.allowedRoles ?? []
     });
     setKeywordInput("");
     setEditing(true);
+  }
+  function toggleAllowedRole(role) {
+    setForm((f) => {
+      const cur = f.allowedRoles ?? [];
+      return { ...f, allowedRoles: cur.includes(role) ? cur.filter((r) => r !== role) : [...cur, role] };
+    });
   }
   function addKeyword() {
     const k = keywordInput.trim();
@@ -5290,6 +5319,10 @@ function ContentMetadataPanel({ item, addedByLabel, formatDate: formatDate3, onS
     ] }),
     !editing && /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 gap-x-4 gap-y-2", children: [
       row(String(t("content_core.status", "Status")), visibilityLabel),
+      row(
+        String(t("content_core.visible_to", "Visible to")),
+        item.allowedRoles?.length ? /* @__PURE__ */ jsx("div", { className: "flex flex-wrap gap-1", children: item.allowedRoles.map((r) => /* @__PURE__ */ jsx(Badge, { variant: "secondary", className: "text-xs", children: roleLabel(r) }, r)) }) : String(t("content_core.visible_to_everyone", "Everyone"))
+      ),
       row(String(t("content_core.document_type", "Document type")), item.documentType),
       row(String(t("content_core.author", "Author")), item.author),
       row(String(t("content_core.origin_label", "Origin")), item.originLabel),
@@ -5376,6 +5409,20 @@ function ContentMetadataPanel({ item, addedByLabel, formatDate: formatDate3, onS
             }
           )
         ] })
+      ] }),
+      selectableRoles.length > 0 && /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+        /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.visible_to", "Visible to") }),
+        /* @__PURE__ */ jsx("p", { className: "text-xs text-muted-foreground", children: (form.allowedRoles ?? []).length === 0 ? t("content_core.visible_to_help_everyone", "Everyone in the workspace can see this item. Check roles below to restrict it.") : t("content_core.visible_to_help_restricted", "Restricted to the checked roles below (Owner/Super Admin can always see everything).") }),
+        /* @__PURE__ */ jsx("div", { className: "grid grid-cols-2 gap-1.5 sm:grid-cols-3", children: selectableRoles.map((r) => /* @__PURE__ */ jsxs("label", { className: "flex items-center gap-1.5 text-sm", children: [
+          /* @__PURE__ */ jsx(
+            Checkbox,
+            {
+              checked: (form.allowedRoles ?? []).includes(r),
+              onCheckedChange: () => toggleAllowedRole(r)
+            }
+          ),
+          roleLabel(r)
+        ] }, r)) })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
         /* @__PURE__ */ jsx(Label, { className: "text-xs", children: t("content_core.description_label", "Description") }),

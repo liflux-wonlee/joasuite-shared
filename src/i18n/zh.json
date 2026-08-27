@@ -404,6 +404,10 @@
     "visibility_inbox": "收件箱",
     "visibility_normal": "文件库",
     "visibility_background": "后台(默认浏览中不显示)",
-    "keep_in_library": "保留在文件库中"
+    "keep_in_library": "保留在文件库中",
+    "visible_to": "可见范围",
+    "visible_to_everyone": "所有人",
+    "visible_to_help_everyone": "工作区内所有人都可以看到此项目。勾选下面的角色以限制访问。",
+    "visible_to_help_restricted": "仅限勾选的角色查看(Owner/Super Admin 始终可以查看所有内容)。"
   }
 }
