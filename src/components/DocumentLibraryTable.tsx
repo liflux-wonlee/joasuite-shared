@@ -22,13 +22,11 @@ export type DocumentLibraryTableProps = {
   loading?: boolean;
   formatSize?: (n: number | null | undefined) => string;
   formatDate?: (s: string | null | undefined) => string;
-  /** Open the file for preview/download. */
-  onOpen?: (row: DocumentLibraryRow) => void;
+  /** Open this row's detail view (metadata, versions, related records). Clicking anywhere on the row (except the linked-record cell, which navigates instead) triggers this. */
+  onOpenDetail?: (row: DocumentLibraryRow) => void;
   /** Navigate to the row's linked record (linkedHref). */
   onNavigate?: (row: DocumentLibraryRow) => void;
   onDelete?: (row: DocumentLibraryRow) => void;
-  /** Open the Related Records / Link-to-record flow for this row. */
-  onLink?: (row: DocumentLibraryRow) => void;
 };
 
 function defaultFormatSize(n: number | null | undefined): string {
@@ -64,10 +62,9 @@ export function DocumentLibraryTable({
   loading,
   formatSize = defaultFormatSize,
   formatDate = defaultFormatDate,
-  onOpen,
+  onOpenDetail,
   onNavigate,
   onDelete,
-  onLink,
 }: DocumentLibraryTableProps) {
   const { t } = useTranslation();
   const { ui } = useJoaSuite();
@@ -103,23 +100,25 @@ export function DocumentLibraryTable({
           )}
           {!loading &&
             rows.map((r) => (
-              <tr key={r.id} className="border-b last:border-0 hover:bg-muted/40">
+              <tr
+                key={r.id}
+                onClick={() => onOpenDetail?.(r)}
+                className={`border-b last:border-0 hover:bg-muted/40 ${onOpenDetail ? "cursor-pointer" : ""}`}
+              >
                 <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{r.docKindLabel}</td>
                 <td className="px-4 py-2.5 max-w-[240px]">
-                  <button
-                    type="button"
-                    onClick={() => onOpen?.(r)}
-                    className="truncate block text-left hover:text-primary hover:underline"
-                    title={r.filename}
-                  >
+                  <span className="truncate block text-left" title={r.filename}>
                     {r.filename}
-                  </button>
+                  </span>
                 </td>
                 <td className="px-4 py-2.5 max-w-[220px]">
                   {r.linkedHref ? (
                     <button
                       type="button"
-                      onClick={() => onNavigate?.(r)}
+                      onClick={(e: any) => {
+                        e.stopPropagation();
+                        onNavigate?.(r);
+                      }}
                       className="truncate block text-left text-primary hover:underline"
                       title={r.linkedLabel ?? undefined}
                     >
@@ -137,23 +136,20 @@ export function DocumentLibraryTable({
                 </td>
                 <td className="px-4 py-2.5 whitespace-nowrap text-muted-foreground">{formatSize(r.size)}</td>
                 <td className="px-4 py-2.5">
-                  <div className="flex justify-end gap-1">
-                    {onOpen && (
-                      <Button variant="ghost" size="sm" onClick={() => onOpen(r)}>
-                        {t("doc_library.open", "Open")}
-                      </Button>
-                    )}
-                    {onLink && (
-                      <Button variant="ghost" size="sm" onClick={() => onLink(r)}>
-                        {t("content_core.link_to_record", "Link to record")}
-                      </Button>
-                    )}
-                    {onDelete && (
-                      <Button variant="ghost" size="sm" onClick={() => onDelete(r)}>
+                  {onDelete && (
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e: any) => {
+                          e.stopPropagation();
+                          onDelete(r);
+                        }}
+                      >
                         {t("doc_library.delete", "Delete")}
                       </Button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}

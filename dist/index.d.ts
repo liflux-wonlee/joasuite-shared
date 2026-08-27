@@ -803,13 +803,11 @@ type DocumentLibraryTableProps = {
     loading?: boolean;
     formatSize?: (n: number | null | undefined) => string;
     formatDate?: (s: string | null | undefined) => string;
-    /** Open the file for preview/download. */
-    onOpen?: (row: DocumentLibraryRow) => void;
+    /** Open this row's detail view (metadata, versions, related records). Clicking anywhere on the row (except the linked-record cell, which navigates instead) triggers this. */
+    onOpenDetail?: (row: DocumentLibraryRow) => void;
     /** Navigate to the row's linked record (linkedHref). */
     onNavigate?: (row: DocumentLibraryRow) => void;
     onDelete?: (row: DocumentLibraryRow) => void;
-    /** Open the Related Records / Link-to-record flow for this row. */
-    onLink?: (row: DocumentLibraryRow) => void;
 };
 /**
  * Presentational cross-record file table -- the browse/search surface for
@@ -823,7 +821,7 @@ type DocumentLibraryTableProps = {
  * that already calls JoaSuiteProvider, since it only touches the
  * ui.Button primitive every app already supplies.
  */
-declare function DocumentLibraryTable({ rows, loading, formatSize, formatDate, onOpen, onNavigate, onDelete, onLink, }: DocumentLibraryTableProps): react.JSX.Element;
+declare function DocumentLibraryTable({ rows, loading, formatSize, formatDate, onOpenDetail, onNavigate, onDelete, }: DocumentLibraryTableProps): react.JSX.Element;
 
 /**
  * Shared Content Core — relation-provider contract.
