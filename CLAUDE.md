@@ -179,3 +179,59 @@ by default" premise depended on: a content_item with zero
 `content_relations` (e.g. a freshly-uploaded Inbox item) previously
 returned `false` for anyone but its creator — the opposite of "everyone
 can see it by default." Fixed to return `is_tenant_member()` instead.
+
+# Admission policy for this package — tightened 2026-08-27
+
+This session produced two concrete, costly failures of "put it in
+joasuite-shared so N apps share it," on top of the pre-existing
+`createServerFn()`-in-shared-package bug class (see the security-pattern
+entries above, and every app repo's own "`createServerFn()` must be
+called app-local" entry):
+
+1. `src/components/users/UserInvitePage.tsx` was built as a shared Invite
+   UI component but **zero app repos ever imported it** — joabooks/
+   joaoffice/joasop/joahr each independently hand-rolled their own local
+   `app.people.invite.tsx` instead (three of them near-byte-identical
+   copy-pastes of what this component had, one structurally different).
+   The component's own preset-fallback bug (see the 2026-08-27 role/
+   permission audit entry above) shipped live in every one of those local
+   copies — the shared version being "correct" never helped, because
+   nothing consumed it. Pure dead weight, discovered only during an
+   unrelated audit, not before.
+2. `ContentDetail` (removed 2026-08-27 — see joabooks' CLAUDE.md "Library
+   detail: full page instead of a Dialog") had exactly one real consumer
+   (joabooks) for its entire lifetime. Every other app's "will pick this
+   up for free via the next pin bump" language in earlier CLAUDE.md
+   entries was aspirational, not actual.
+
+Going forward, before adding anything new to this package, it must pass
+**both**:
+- **Already has ≥2 real, currently-live consumers** (not "planned to have"
+  or "any app *could* use this") — grep for actual imports across all 4
+  app repos before assuming something is shared just because it sounds
+  general-purpose. A single-consumer component/hook belongs in that app's
+  own `src/`, not here, even if it seems reusable in principle — extract
+  it into this package later, once a second real consumer actually needs
+  it (the "rule of three" applies doubly here, since a wrong guess isn't
+  just wasted code, it's wasted *sync* effort forever after: every future
+  change to it has to be rebuilt, pinned, and reinstalled across every
+  app, whether or not they use it).
+- **Is not, and does not wrap, a `createServerFn()` call** — this is a
+  hard architectural constraint, not a style preference: TanStack Start's
+  production server-function splitting only transforms call sites in the
+  *consuming app's own source tree*, so any `createServerFn()` living
+  inside this package's compiled `dist/` silently loses its closure over
+  injected deps in production. This has already broken real, deployed
+  features in joabooks/joaoffice/joasop/joahr — see any of their
+  CLAUDE.md's own "`createServerFn()` must be called app-local" entry.
+  Plain constants/types/helper functions with no `createServerFn()`
+  involved (e.g. `ROLES_BY_APP`, `ACCOUNT_APP_ROLES`) are unaffected by
+  this and remain fine to share.
+
+What still clearly belongs here, unaffected by this tightening: things
+already proven across multiple real, live consumers today — the
+`JoaSuiteProvider`/auth-tenant context, `NotificationsBell`/
+`SuiteSwitcher`/`PostLoginGate`, and the Content Core primitives
+(`ContentMetadataPanel`/`ContentVersionsPanel`/`RelatedRecordsPanel`/
+`ArchiveContentAction`/`DeletePermanentlyAction`) once a second app
+actually renders them, not just imports the types.
