@@ -6,6 +6,8 @@ export type ContentVersionsPanelProps = {
   versions: ContentVersion[];
   currentVersionId?: string | null;
   onOpen?: (version: ContentVersion) => void;
+  /** Omit to hide the delete control entirely (e.g. a read-only view). */
+  onDelete?: (version: ContentVersion) => void;
   formatSize?: (n: number | null | undefined) => string;
   formatDate?: (s: string | null | undefined) => string;
   /** Injectable section title (Section 7). */
@@ -39,6 +41,7 @@ export function ContentVersionsPanel({
   versions,
   currentVersionId,
   onOpen,
+  onDelete,
   formatSize = defaultFormatSize,
   formatDate = defaultFormatDate,
   title,
@@ -64,11 +67,18 @@ export function ContentVersionsPanel({
                 {v.fileSize != null && <span className="text-muted-foreground shrink-0">{formatSize(v.fileSize)}</span>}
                 <span className="text-muted-foreground shrink-0">{formatDate(v.createdAt)}</span>
               </div>
-              {onOpen && (
-                <Button size="sm" variant="ghost" onClick={() => onOpen(v)}>
-                  {t("content_core.version_open", "Open")}
-                </Button>
-              )}
+              <div className="flex items-center gap-1 shrink-0">
+                {onOpen && (
+                  <Button size="sm" variant="ghost" onClick={() => onOpen(v)}>
+                    {t("content_core.version_open", "Open")}
+                  </Button>
+                )}
+                {onDelete && (
+                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => onDelete(v)}>
+                    {t("content_core.version_delete", "Delete")}
+                  </Button>
+                )}
+              </div>
             </li>
           ))}
         </ul>

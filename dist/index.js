@@ -5180,6 +5180,7 @@ function ContentVersionsPanel({
   versions,
   currentVersionId,
   onOpen,
+  onDelete,
   formatSize = defaultFormatSize2,
   formatDate: formatDate3 = defaultFormatDate2,
   title
@@ -5196,7 +5197,10 @@ function ContentVersionsPanel({
         v.fileSize != null && /* @__PURE__ */ jsx("span", { className: "text-muted-foreground shrink-0", children: formatSize(v.fileSize) }),
         /* @__PURE__ */ jsx("span", { className: "text-muted-foreground shrink-0", children: formatDate3(v.createdAt) })
       ] }),
-      onOpen && /* @__PURE__ */ jsx(Button, { size: "sm", variant: "ghost", onClick: () => onOpen(v), children: t("content_core.version_open", "Open") })
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1 shrink-0", children: [
+        onOpen && /* @__PURE__ */ jsx(Button, { size: "sm", variant: "ghost", onClick: () => onOpen(v), children: t("content_core.version_open", "Open") }),
+        onDelete && /* @__PURE__ */ jsx(Button, { size: "sm", variant: "ghost", className: "text-destructive hover:text-destructive", onClick: () => onDelete(v), children: t("content_core.version_delete", "Delete") })
+      ] })
     ] }, v.id)) })
   ] });
 }
