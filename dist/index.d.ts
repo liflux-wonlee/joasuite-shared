@@ -1159,6 +1159,8 @@ type ContentVersionsPanelProps = {
     versions: ContentVersion[];
     currentVersionId?: string | null;
     onOpen?: (version: ContentVersion) => void;
+    /** Omit to hide the delete control entirely (e.g. a read-only view). */
+    onDelete?: (version: ContentVersion) => void;
     formatSize?: (n: number | null | undefined) => string;
     formatDate?: (s: string | null | undefined) => string;
     /** Injectable section title (Section 7). */
@@ -1171,7 +1173,7 @@ type ContentVersionsPanelProps = {
  * single-row list; nothing here assumes more than one version exists (see
  * docs/shared-content-core.md's "Version-ready design").
  */
-declare function ContentVersionsPanel({ versions, currentVersionId, onOpen, formatSize, formatDate, title, }: ContentVersionsPanelProps): react.JSX.Element;
+declare function ContentVersionsPanel({ versions, currentVersionId, onOpen, onDelete, formatSize, formatDate, title, }: ContentVersionsPanelProps): react.JSX.Element;
 
 type ContentUploaderProps = {
     /**

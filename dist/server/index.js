@@ -2750,6 +2750,107 @@ async function listActiveBundleRulesServer(context) {
   );
 }
 
-export { ACCOUNT_APP_ROLES, APP_CODES as BILLING_APP_CODES, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, MAX_DEPARTMENT_DEPTH, accountResendInvitationServer, accountSendPasswordResetServer, accountUpdateUserProfileServer, addAppSubscriptionServer, addMockPaymentMethodServer, addMockReferralServer, assertSafeExternalUrl, canManageBillingFnServer, cancelSubscriptionServer, changeSubscriptionPlanServer, createArchiveParty, createCancelApp, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDepartmentServer, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createHasEverHadMembership, createInvitePartyContact, createInviteTenantUser, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createPositionServer, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSubscribeApp, createUnarchiveParty, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, deleteDepartmentServer, deletePositionServer, getBillingInvoiceServer, getBillingOverviewServer, getMyProfileServer, getOrgChartTreeServer, getReferralProgramServer, getTeamMemberServer, getTenantUsageServer, inviteUserToWorkspacesServer, listActiveBundleRulesServer, listAvailablePromotionsServer, listBillingInvoicesServer, listBillingPaymentMethodsServer, listBillingPlansServer, listDepartmentsAndPositionsServer, listManageableTenantsServer, listManageableUsersServer, listTeamMembersServer, listTenantDiscountsServer, reactivateSubscriptionServer, redeemPromoCodeServer, removeAppSubscriptionServer, removePaymentMethodServer, removeTenantDiscountServer, resolveScopedTenantIds, retryInvoicePaymentServer, seedSampleBillingInvoicesServer, setDefaultPaymentMethodServer, setUserAppRolesServer, startTrialServer, updateBillingCustomerServer, updateDepartmentServer, updateMyDefaultTenantServer, updateMyTimezoneServer, updatePositionServer, updateReferralStatusServer, upsertTeamMemberServer };
+// src/server/subscription-account.server.ts
+function toCapacity(row) {
+  return {
+    planCode: row.plan_code,
+    baseLimit: Number(row.base_limit),
+    extraSlots: Number(row.extra_slots),
+    effectiveLimit: Number(row.effective_limit),
+    used: Number(row.used),
+    remaining: Number(row.remaining),
+    overLimit: !!row.over_limit,
+    canCreate: !!row.can_create
+  };
+}
+var ACCOUNT_ERROR_CODES = [
+  "ACCOUNT_NOT_FOUND",
+  "ACCOUNT_PERMISSION_DENIED",
+  "ORGANIZATION_LIMIT_REACHED"
+];
+function parseAccountErrorCode(message) {
+  const found = ACCOUNT_ERROR_CODES.find((c) => message.startsWith(c));
+  return found ?? null;
+}
+async function listMySubscriptionAccountsServer(_input, context) {
+  const { data: accounts, error } = await context.supabase.from("subscription_accounts").select("id, name, status, created_at");
+  if (error) throw new Error(error.message);
+  const ids = (accounts ?? []).map((a) => a.id);
+  if (ids.length === 0) return [];
+  const { data: myMemberships, error: mErr } = await context.supabase.from("subscription_account_members").select("account_id, role").in("account_id", ids).eq("user_id", context.userId).eq("status", "active");
+  if (mErr) throw new Error(mErr.message);
+  const roleByAccount = new Map((myMemberships ?? []).map((m) => [m.account_id, m.role]));
+  return (accounts ?? []).map((a) => ({ ...a, my_role: roleByAccount.get(a.id) ?? null }));
+}
+async function getCurrentSubscriptionAccountServer(input, context) {
+  const { data: link, error } = await context.supabase.from("subscription_account_organizations").select("account_id, subscription_accounts(id, name, status)").eq("tenant_id", input.tenant_id).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!link) return null;
+  const { data: membership } = await context.supabase.from("subscription_account_members").select("role").eq("account_id", link.account_id).eq("user_id", context.userId).eq("status", "active").maybeSingle();
+  return { account: link.subscription_accounts, my_role: membership?.role ?? null };
+}
+async function getAccountOrganizationsServer(input, context, deps) {
+  const { data: links, error } = await context.supabase.from("subscription_account_organizations").select("id, tenant_id, status, created_at, archived_at").eq("account_id", input.account_id).order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  if (!links?.length) return [];
+  const tenantIds = links.map((l) => l.tenant_id);
+  const { data: tenants, error: tErr } = await deps.supabaseAdmin.from("tenants").select("id, name, slug").in("id", tenantIds);
+  if (tErr) throw new Error(tErr.message);
+  const tenantById = new Map(
+    (tenants ?? []).map((t) => [t.id, t])
+  );
+  const { data: myTenantRoles } = await deps.supabaseAdmin.from("user_roles").select("tenant_id, role").eq("user_id", context.userId).in("tenant_id", tenantIds);
+  const rolesByTenant = /* @__PURE__ */ new Map();
+  for (const r of myTenantRoles ?? []) {
+    const arr = rolesByTenant.get(r.tenant_id) ?? [];
+    arr.push(r.role);
+    rolesByTenant.set(r.tenant_id, arr);
+  }
+  return links.map((l) => ({
+    link_id: l.id,
+    tenant_id: l.tenant_id,
+    tenant_name: tenantById.get(l.tenant_id)?.name ?? null,
+    tenant_slug: tenantById.get(l.tenant_id)?.slug ?? null,
+    status: l.status,
+    created_at: l.created_at,
+    archived_at: l.archived_at,
+    my_roles: rolesByTenant.get(l.tenant_id) ?? [],
+    is_member: (rolesByTenant.get(l.tenant_id) ?? []).length > 0
+  }));
+}
+async function getOrganizationCapacityServer(input, context) {
+  const { data, error } = await context.supabase.rpc("resolve_organization_capacity", {
+    _account_id: input.account_id,
+    _app_code: input.app_code
+  });
+  if (error) throw new Error(error.message);
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) throw new Error("ACCOUNT_NOT_FOUND: capacity could not be resolved");
+  return toCapacity(row);
+}
+async function getAccountMembersServer(input, context) {
+  const { data: rows, error } = await context.supabase.from("subscription_account_members").select("id, user_id, role, status, created_at").eq("account_id", input.account_id).eq("status", "active").order("created_at", { ascending: true });
+  if (error) throw new Error(error.message);
+  return rows ?? [];
+}
+async function createOrganizationForAccountServer(input, context) {
+  const { data, error } = await context.supabase.rpc("create_organization_for_account", {
+    _account_id: input.account_id,
+    _name: input.name,
+    _slug: input.slug,
+    _display_name: input.display_name ?? null,
+    _email: input.email ?? null,
+    _app_code: input.app_code,
+    _account_name: input.account_name ?? null
+  });
+  if (error) throw new Error(error.message);
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    tenant: { id: row.tenant_id, name: row.tenant_name, slug: row.tenant_slug },
+    account_id: row.account_id
+  };
+}
+
+export { ACCOUNT_APP_ROLES, ACCOUNT_ERROR_CODES, APP_CODES as BILLING_APP_CODES, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, MAX_DEPARTMENT_DEPTH, accountResendInvitationServer, accountSendPasswordResetServer, accountUpdateUserProfileServer, addAppSubscriptionServer, addMockPaymentMethodServer, addMockReferralServer, assertSafeExternalUrl, canManageBillingFnServer, cancelSubscriptionServer, changeSubscriptionPlanServer, createArchiveParty, createCancelApp, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDepartmentServer, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createHasEverHadMembership, createInvitePartyContact, createInviteTenantUser, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createOrganizationForAccountServer, createPositionServer, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSubscribeApp, createUnarchiveParty, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, deleteDepartmentServer, deletePositionServer, getAccountMembersServer, getAccountOrganizationsServer, getBillingInvoiceServer, getBillingOverviewServer, getCurrentSubscriptionAccountServer, getMyProfileServer, getOrgChartTreeServer, getOrganizationCapacityServer, getReferralProgramServer, getTeamMemberServer, getTenantUsageServer, inviteUserToWorkspacesServer, listActiveBundleRulesServer, listAvailablePromotionsServer, listBillingInvoicesServer, listBillingPaymentMethodsServer, listBillingPlansServer, listDepartmentsAndPositionsServer, listManageableTenantsServer, listManageableUsersServer, listMySubscriptionAccountsServer, listTeamMembersServer, listTenantDiscountsServer, parseAccountErrorCode, reactivateSubscriptionServer, redeemPromoCodeServer, removeAppSubscriptionServer, removePaymentMethodServer, removeTenantDiscountServer, resolveScopedTenantIds, retryInvoicePaymentServer, seedSampleBillingInvoicesServer, setDefaultPaymentMethodServer, setUserAppRolesServer, startTrialServer, updateBillingCustomerServer, updateDepartmentServer, updateMyDefaultTenantServer, updateMyTimezoneServer, updatePositionServer, updateReferralStatusServer, upsertTeamMemberServer };
 //# sourceMappingURL=index.js.map
 //# sourceMappingURL=index.js.map
