@@ -1095,4 +1095,94 @@ declare function getTenantUsageServer(input: GetTenantUsageInput, context: Billi
 }>;
 declare function listActiveBundleRulesServer(context: BillingContext): Promise<any>;
 
-export { ACCOUNT_APP_ROLES, type AccountAppRole, type AccountContext, type AccountDeps, type AccountPortal, type AccountUpdateUserProfileInput, type AccountUserIdInput, type AddAppSubscriptionInput, type AddMockPaymentMethodInput, type AddMockReferralInput, type AdminDeps, type AppAssignmentInput, type AppCatalogEntry, AppCode, type AppSubscriptionInput, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, AppCode as BillingAppCode, type BillingContext, type BillingDeps, type BillingInterval, type PlanCode as BillingPlanCode, type TenantInput as BillingTenantInput, type CancelSubscriptionInput, type ChangeSubscriptionPlanInput, type CreateDepartmentInput, type CreatePositionInput, type DeleteDepartmentInput, type DeletePositionInput, type GetBillingInvoiceInput, type GetTenantUsageInput, type InviteUserToWorkspacesInput, type ListBillingInvoicesInput, type ListBillingPlansInput, type ListTeamMembersInput, MAX_DEPARTMENT_DEPTH, type MergePartiesDeps, type OrgChartDepartment, type OrgChartPerson, type OrgChartPosition, type OrgStructureDeps, type PartyRefTable, type PaymentMethodIdInput, type RedeemPromoCodeInput, type RemoveTenantDiscountInput, type SendEmailFn, type SetUserAppRolesInput, type StartTrialInput, type SuiteHomeData, type TeamContext, type TeamDeps, type TeamMemberInput, type TenantAppRow, type TenantInput$1 as TenantInput, type UpdateBillingCustomerInput, type UpdateDepartmentInput, type UpdateMyDefaultTenantInput, type UpdateMyTimezoneInput, type UpdatePositionInput, type UpdateReferralStatusInput, type UpsertTeamMemberInput, accountResendInvitationServer, accountSendPasswordResetServer, accountUpdateUserProfileServer, addAppSubscriptionServer, addMockPaymentMethodServer, addMockReferralServer, assertSafeExternalUrl, canManageBillingFnServer, cancelSubscriptionServer, changeSubscriptionPlanServer, createArchiveParty, createCancelApp, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDepartmentServer, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createHasEverHadMembership, createInvitePartyContact, createInviteTenantUser, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createPositionServer, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSubscribeApp, createUnarchiveParty, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, deleteDepartmentServer, deletePositionServer, getBillingInvoiceServer, getBillingOverviewServer, getMyProfileServer, getOrgChartTreeServer, getReferralProgramServer, getTeamMemberServer, getTenantUsageServer, inviteUserToWorkspacesServer, listActiveBundleRulesServer, listAvailablePromotionsServer, listBillingInvoicesServer, listBillingPaymentMethodsServer, listBillingPlansServer, listDepartmentsAndPositionsServer, listManageableTenantsServer, listManageableUsersServer, listTeamMembersServer, listTenantDiscountsServer, reactivateSubscriptionServer, redeemPromoCodeServer, removeAppSubscriptionServer, removePaymentMethodServer, removeTenantDiscountServer, resolveScopedTenantIds, retryInvoicePaymentServer, seedSampleBillingInvoicesServer, setDefaultPaymentMethodServer, setUserAppRolesServer, startTrialServer, updateBillingCustomerServer, updateDepartmentServer, updateMyDefaultTenantServer, updateMyTimezoneServer, updatePositionServer, updateReferralStatusServer, upsertTeamMemberServer };
+/**
+ * JoaSuite Subscription Account + Multi-Organization module — plain
+ * business-logic functions, deliberately NOT wrapped in `createServerFn()`
+ * here.
+ *
+ * Same root cause and fix as team.server.ts/account.server.ts/
+ * billing.server.ts (see those files' doc comments for the full history):
+ * a `createServerFn()` call living inside this package's pre-compiled dist
+ * can lose context.supabase/context.userId at the handler, because it's
+ * this package's own build step processing the call rather than each
+ * consuming app's TanStack Start/router-plugin Vite build. So the split is
+ * the same as those files: this file owns the actual Supabase queries and
+ * authorization logic; each consuming app's own
+ * `subscription-account.functions.ts` supplies a thin
+ * `createServerFn({method:"POST"}).middleware([requireSupabaseAuth])
+ * .inputValidator(...).handler(({data, context}) => xServer(data, context
+ * as never, deps))` wrapper living in its own source, so the
+ * createServerFn() boundary is always app-local.
+ *
+ * Architecture reminder (see the reviewed plan in joabooks/CLAUDE.md's
+ * "JoaSuite Subscription Account + Multi-Organization Architecture" entry
+ * for the full writeup): `tenant` stays = Organization everywhere else in
+ * the schema. A Subscription Account is a NEW parent commercial entity
+ * that owns 1..N Organizations. Account ownership (subscription_account_
+ * members) and Organization ownership (tenant_users/user_roles) are
+ * DELIBERATELY SEPARATE authorization domains — never conflate them.
+ * Tenant-level RLS is completely untouched by any of this; Account
+ * membership authorizes Account-level operations only, never a bypass of
+ * an Organization's own tenant_users-gated business data.
+ */
+type AccountAuthContext = {
+    supabase: any;
+    userId: string;
+};
+type SubscriptionAccountDeps = {
+    supabaseAdmin: any;
+};
+type OrganizationCapacity = {
+    planCode: string;
+    baseLimit: number;
+    extraSlots: number;
+    effectiveLimit: number;
+    used: number;
+    remaining: number;
+    overLimit: boolean;
+    canCreate: boolean;
+};
+declare const ACCOUNT_ERROR_CODES: readonly ["ACCOUNT_NOT_FOUND", "ACCOUNT_PERMISSION_DENIED", "ORGANIZATION_LIMIT_REACHED"];
+type AccountErrorCode = (typeof ACCOUNT_ERROR_CODES)[number];
+declare function parseAccountErrorCode(message: string): AccountErrorCode | null;
+type ListMySubscriptionAccountsInput = Record<string, never>;
+declare function listMySubscriptionAccountsServer(_input: ListMySubscriptionAccountsInput, context: AccountAuthContext): Promise<any>;
+type GetCurrentSubscriptionAccountInput = {
+    tenant_id: string;
+};
+declare function getCurrentSubscriptionAccountServer(input: GetCurrentSubscriptionAccountInput, context: AccountAuthContext): Promise<{
+    account: any;
+    my_role: any;
+} | null>;
+type GetAccountOrganizationsInput = {
+    account_id: string;
+};
+declare function getAccountOrganizationsServer(input: GetAccountOrganizationsInput, context: AccountAuthContext, deps: SubscriptionAccountDeps): Promise<any>;
+type GetOrganizationCapacityInput = {
+    account_id: string;
+    app_code: string;
+};
+declare function getOrganizationCapacityServer(input: GetOrganizationCapacityInput, context: AccountAuthContext): Promise<OrganizationCapacity>;
+type GetAccountMembersInput = {
+    account_id: string;
+};
+declare function getAccountMembersServer(input: GetAccountMembersInput, context: AccountAuthContext): Promise<any>;
+type CreateOrganizationForAccountInput = {
+    account_id: string | null;
+    name: string;
+    slug: string;
+    display_name?: string | null;
+    email?: string | null;
+    app_code: string;
+    account_name?: string | null;
+};
+declare function createOrganizationForAccountServer(input: CreateOrganizationForAccountInput, context: AccountAuthContext): Promise<{
+    tenant: {
+        id: any;
+        name: any;
+        slug: any;
+    };
+    account_id: any;
+}>;
+
+export { ACCOUNT_APP_ROLES, ACCOUNT_ERROR_CODES, type AccountAppRole, type AccountAuthContext, type AccountContext, type AccountDeps, type AccountErrorCode, type AccountPortal, type AccountUpdateUserProfileInput, type AccountUserIdInput, type AddAppSubscriptionInput, type AddMockPaymentMethodInput, type AddMockReferralInput, type AdminDeps, type AppAssignmentInput, type AppCatalogEntry, AppCode, type AppSubscriptionInput, INTERVALS as BILLING_INTERVALS, PLAN_CODES as BILLING_PLAN_CODES, AppCode as BillingAppCode, type BillingContext, type BillingDeps, type BillingInterval, type PlanCode as BillingPlanCode, type TenantInput as BillingTenantInput, type CancelSubscriptionInput, type ChangeSubscriptionPlanInput, type CreateDepartmentInput, type CreateOrganizationForAccountInput, type CreatePositionInput, type DeleteDepartmentInput, type DeletePositionInput, type GetAccountMembersInput, type GetAccountOrganizationsInput, type GetBillingInvoiceInput, type GetCurrentSubscriptionAccountInput, type GetOrganizationCapacityInput, type GetTenantUsageInput, type InviteUserToWorkspacesInput, type ListBillingInvoicesInput, type ListBillingPlansInput, type ListMySubscriptionAccountsInput, type ListTeamMembersInput, MAX_DEPARTMENT_DEPTH, type MergePartiesDeps, type OrgChartDepartment, type OrgChartPerson, type OrgChartPosition, type OrgStructureDeps, type OrganizationCapacity, type PartyRefTable, type PaymentMethodIdInput, type RedeemPromoCodeInput, type RemoveTenantDiscountInput, type SendEmailFn, type SetUserAppRolesInput, type StartTrialInput, type SubscriptionAccountDeps, type SuiteHomeData, type TeamContext, type TeamDeps, type TeamMemberInput, type TenantAppRow, type TenantInput$1 as TenantInput, type UpdateBillingCustomerInput, type UpdateDepartmentInput, type UpdateMyDefaultTenantInput, type UpdateMyTimezoneInput, type UpdatePositionInput, type UpdateReferralStatusInput, type UpsertTeamMemberInput, accountResendInvitationServer, accountSendPasswordResetServer, accountUpdateUserProfileServer, addAppSubscriptionServer, addMockPaymentMethodServer, addMockReferralServer, assertSafeExternalUrl, canManageBillingFnServer, cancelSubscriptionServer, changeSubscriptionPlanServer, createArchiveParty, createCancelApp, createCleanupPartyContacts, createDeleteParty, createDeletePartyBankAccount, createDeletePartyContact, createDepartmentServer, createGetParty, createGetSuiteHome, createGetTenantSettings, createGetTenantUser, createHasEverHadMembership, createInvitePartyContact, createInviteTenantUser, createListMyAccessibleVendors, createListMyVendorTenants, createListNotifications, createListParties, createListPartyContacts, createListSuiteApps, createListTenantUsers, createMarkAllNotificationsRead, createMarkNotificationRead, createMergeParties, createOrganizationForAccountServer, createPositionServer, createRemoveTenantUser, createResendInvitation, createRevokePartyContact, createSendPasswordResetLink, createSetAppUrl, createSetTenantUserStatus, createSubscribeApp, createUnarchiveParty, createUpdateTenantSettings, createUpdateTenantUserProfile, createUpdateTenantUserRoles, createUpsertParty, createUpsertPartyBankAccount, createUpsertPartyContact, deleteDepartmentServer, deletePositionServer, getAccountMembersServer, getAccountOrganizationsServer, getBillingInvoiceServer, getBillingOverviewServer, getCurrentSubscriptionAccountServer, getMyProfileServer, getOrgChartTreeServer, getOrganizationCapacityServer, getReferralProgramServer, getTeamMemberServer, getTenantUsageServer, inviteUserToWorkspacesServer, listActiveBundleRulesServer, listAvailablePromotionsServer, listBillingInvoicesServer, listBillingPaymentMethodsServer, listBillingPlansServer, listDepartmentsAndPositionsServer, listManageableTenantsServer, listManageableUsersServer, listMySubscriptionAccountsServer, listTeamMembersServer, listTenantDiscountsServer, parseAccountErrorCode, reactivateSubscriptionServer, redeemPromoCodeServer, removeAppSubscriptionServer, removePaymentMethodServer, removeTenantDiscountServer, resolveScopedTenantIds, retryInvoicePaymentServer, seedSampleBillingInvoicesServer, setDefaultPaymentMethodServer, setUserAppRolesServer, startTrialServer, updateBillingCustomerServer, updateDepartmentServer, updateMyDefaultTenantServer, updateMyTimezoneServer, updatePositionServer, updateReferralStatusServer, upsertTeamMemberServer };
